@@ -1789,13 +1789,24 @@ function getTypeBadge(alt) {
 }
 
 // === Tab renderers ===
+function quantitySourceBadge(src) {
+  if (src === 'user_specified') return '<span class="source-badge source-verified" title="Antalet kommer fr\u00e5n din projektbeskrivning">Du angav</span>';
+  return '<span class="source-badge source-estimate" title="AIda uppskattade antalet utifr\u00e5n area och byggnadstyp \u2014 granska om n\u00e5got verkar fel">AIda uppskattat</span>';
+}
+
 function renderProjektContent() {
   const d = state.project;
   let html = '<div class="section-title">Projektinformation</div>';
   html += '<div class="comp-card"><div class="comp-card-header"><h3>' + esc(d.building_type) + ', ' + esc(d.area_bta) + ' m\u00b2 BTA' + (d.name ? ' (' + esc(d.name) + ')' : '') + '</h3></div>';
-  html += '<table class="comp-table"><thead><tr><th>Komponent</th><th>Antal</th><th>Enhet</th><th>Kategori</th></tr></thead><tbody>';
+  html += '<table class="comp-table"><thead><tr><th>Komponent</th><th>Antal</th><th>Enhet</th><th>Kategori</th><th>K\u00e4lla</th></tr></thead><tbody>';
   d.components.forEach(c => {
-    html += '<tr><td style="font-weight:500">' + esc(c.name) + '</td><td>' + esc(c.quantity) + '</td><td>' + esc(c.unit) + '</td><td>' + esc(c.category || '\u2013') + '</td></tr>';
+    html += '<tr>' +
+      '<td style="font-weight:500">' + esc(c.name) + '</td>' +
+      '<td>' + esc(c.quantity) + '</td>' +
+      '<td>' + esc(c.unit) + '</td>' +
+      '<td>' + esc(c.category || '\u2013') + '</td>' +
+      '<td>' + quantitySourceBadge(c.quantity_source) + '</td>' +
+      '</tr>';
   });
   html += '</tbody></table></div>';
   if (d.description) {
@@ -1830,8 +1841,12 @@ function renderAlternativContent() {
   let html = '<div class="section-title">J\u00e4mf\u00f6relse per komponent</div>';
   html += '<div class="method-label">Klimatmetod: GWP-fossil, livscykelskedena A1-A3 (Boverkets klimatdatabas)</div>';
   html += '<div class="source-legend"><span><span class="source-badge source-verified">EPD</span> Verifierad k\u00e4lla</span><span><span class="source-badge source-estimate">Est.</span> Uppskattning</span></div>';
+  const projComps = (state.project && state.project.components) || [];
   data.components.forEach(comp => {
-    html += '<div class="comp-card"><div class="comp-card-header"><h3>' + esc(comp.component_name) + '</h3></div>';
+    const pc = projComps.find(p => p.id === comp.component_id);
+    const qtyLabel = pc ? esc(pc.quantity) + ' ' + esc(pc.unit) + ' ' + quantitySourceBadge(pc.quantity_source) : '';
+    const header = '<h3>' + esc(comp.component_name) + '</h3>' + (qtyLabel ? '<div style="font-size:12px;color:var(--kk-gray-500);margin-top:2px">Antal: ' + qtyLabel + '</div>' : '');
+    html += '<div class="comp-card"><div class="comp-card-header">' + header + '</div>';
     html += '<table class="comp-table"><thead><tr><th style="width:32px"></th><th>Typ</th><th>Material</th><th>K\u00e4lla</th><th style="text-align:right">CO\u2082e (kg)</th><th style="text-align:right">Kostnad</th><th></th></tr></thead><tbody>';
     const blSel = state.selections[comp.component_id] && state.selections[comp.component_id].selected_alternative.name === 'Baslinje';
     html += '<tr class="alt-row' + (blSel ? ' selected' : '') + '" data-comp="' + comp.component_id + '" data-alt="baseline">' +
@@ -1855,13 +1870,24 @@ function renderAlternativContent() {
       }
       const saving = comp.baseline_co2e_kg > 0 ? Math.round((1 - alt.co2e_kg / comp.baseline_co2e_kg) * 100) : 0;
       const isSel = state.selections[comp.component_id] && state.selections[comp.component_id].selected_alternative.name === alt.name;
+      // Decompose total for reuse alternatives where units match (no trailing *).
+      // Lets the user see e.g. "45 st \u00d7 320 kr = 14 400 kr" inline rather than
+      // hidden in Visa mer \u2014 answers Johanna's "varf\u00f6r 45 lampor" without exposing
+      // adjustability yet.
+      const showBreakdown = alt.alternative_type === 'reuse' && !alt.name.endsWith('*') && pc && pc.quantity > 0 && alt.cost_sek > 0;
+      const perUnit = showBreakdown ? Math.round(alt.cost_sek / pc.quantity) : 0;
+      const costCell = alt.name.endsWith('*')
+        ? Math.round(alt.cost_sek).toLocaleString('sv') + ' kr/st *'
+        : (showBreakdown
+          ? '<div style="line-height:1.3">' + Math.round(alt.cost_sek).toLocaleString('sv') + ' kr<div style="font-size:10px;color:var(--kk-gray-500)">' + esc(String(pc.quantity)) + ' \u00d7 ' + perUnit.toLocaleString('sv') + ' kr</div></div>'
+          : Math.round(alt.cost_sek).toLocaleString('sv') + ' kr');
       html += '<tr class="alt-row' + (isSel ? ' selected' : '') + '" data-comp="' + comp.component_id + '" data-alt="' + i + '">' +
         '<td><input type="radio" name="' + comp.component_id + '"' + (isSel ? ' checked' : '') + '></td>' +
         '<td>' + getTypeBadge(alt) + '</td>' +
         '<td style="font-weight:500">' + esc(alt.name) + '</td>' +
         '<td style="font-size:11px">' + formatSource(alt.source) + '</td>' +
         '<td style="text-align:right">' + Math.round(alt.co2e_kg) + ' <span style="color:var(--green-saving);font-size:11px">\u2193' + saving + '%</span></td>' +
-        '<td style="text-align:right">' + (alt.name.endsWith('*') ? Math.round(alt.cost_sek).toLocaleString('sv') + ' kr/st *' : Math.round(alt.cost_sek).toLocaleString('sv') + ' kr') + '</td>' +
+        '<td style="text-align:right">' + costCell + '</td>' +
         '<td>' + (alt.reasoning ? '<button class="reasoning-toggle" onclick="toggleReasoning(\'' + rowId + '\',event)">Visa mer</button>' : '') + '</td></tr>';
       if (alt.reasoning) {
         html += '<tr class="reasoning-row" id="reasoning-' + rowId + '" style="display:none"><td colspan="7">' + esc(alt.reasoning) + '</td></tr>';

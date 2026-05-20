@@ -62,6 +62,7 @@ class PalatsListing:
     quantity: int
     unit: str
     category: str  # AIda category key (golv, fönster, etc.) or ""
+    subcategory: str  # Finer-grained key within category (e.g. "toalett" within "sanitet")
     image_url: str
     url: str  # Direct link to listing on palats.app
     location: str  # Human-readable location name
@@ -162,6 +163,73 @@ def _get_cookies() -> dict[str, str] | None:
     last_fetch_status = "auth_failed"
     logger.warning("No Palats credentials available — reuse search disabled")
     return None
+
+
+# Subcategory keywords within categories that bucket many distinct item types.
+# Used to differentiate e.g. toalettstol vs handfat inside the sanitet category,
+# so a search for "Toalettstol" doesn't drown in unrelated sanitet listings.
+# Order matters per subcategory list (most specific first).
+# Order within a category matters because matching is substring-based:
+# subcategories with compound keywords (e.g. "duschblandare") must be
+# checked before subcategories whose keywords would partially match those
+# compounds (e.g. "dusch"). Rule of thumb — put modifiers/instruments
+# before the surfaces they attach to.
+SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
+    "sanitet": [
+        # Compound blandare-words come first so "tvättställsblandare" doesn't
+        # get caught by the "tvättställ" keyword in handfat.
+        ("blandare", ["duschblandare", "tvättställsblandare", "badkarsblandare",
+                      "köksblandare", "tvättställsarmatur"]),
+        ("toalett", ["toalettstol", "toalett", "wc-stol", "wc stol"]),
+        ("handfat", ["handfat", "tvättställ", "washbasin"]),
+        ("dusch", ["duschvägg", "duschdörr", "duschkabin", "dusch"]),
+        ("badkar", ["badkar", "bathtub"]),
+        # Generic blandare-words last so they only catch plain "Blandare Mora"
+        # listings without surface context.
+        ("blandare", ["blandare", "kran"]),
+        ("urinal", ["urinal"]),
+        ("spegel", ["spegel"]),
+    ],
+    "belysning": [
+        ("skrivbordsbelysning", ["skrivbordslampa", "skrivbordsbelysning", "bordslampa"]),
+        ("taklampa", ["taklampa", "takbelysning", "takarmatur", "spotlight"]),
+        ("vägglampa", ["vägglampa", "vägglykta"]),
+        ("armatur", ["armatur", "belysning", "lampa", "led-"]),
+    ],
+    "dörr": [
+        ("innerdörr", ["innerdörr"]),
+        ("ytterdörr", ["ytterdörr", "entrédörr"]),
+        ("branddörr", ["branddörr"]),
+        ("skjutdörr", ["skjutdörr"]),
+    ],
+    "fönster": [
+        ("energiglas", ["energiglas", "treglas", "isolerglas"]),
+        ("fönsterbänk", ["fönsterbänk"]),
+    ],
+    "vitvaror": [
+        ("tvättmaskin", ["tvättmaskin"]),
+        ("torktumlare", ["torktumlare", "torkskåp"]),
+        ("spis", ["spis", "häll", "ugn"]),
+        ("köksfläkt", ["köksfläkt", "fläktkåpa"]),
+        ("mikro", ["mikrovåg", "mikro"]),
+    ],
+}
+
+
+def _normalize_to_aida_subcategory(category: str, text: str) -> str:
+    """Map listing text to a finer subcategory within its AIda category.
+
+    Returns '' if the category has no subcategories defined or no keyword matched.
+    """
+    subcats = SUBCATEGORY_KEYWORDS.get(category)
+    if not subcats:
+        return ""
+    text_lower = text.lower()
+    for subcat, keywords in subcats:
+        for kw in keywords:
+            if kw in text_lower:
+                return subcat
+    return ""
 
 
 def _normalize_to_aida_category(title: str, description: str = "") -> str:
@@ -307,6 +375,7 @@ def _extract_listing(raw: dict) -> PalatsListing:
     owner_name = owner.get("name", "") if isinstance(owner, dict) else ""
 
     category = _normalize_to_aida_category(title, description)
+    subcategory = _normalize_to_aida_subcategory(category, f"{title} {description}")
 
     # Resolve location
     location_id = raw.get("locationId")
@@ -321,10 +390,20 @@ def _extract_listing(raw: dict) -> PalatsListing:
         quantity=quantity,
         unit=unit,
         category=category,
+        subcategory=subcategory,
         image_url=image_url,
         url=f"https://palats.app/web/listing/{listing_id}" if listing_id else "",
         location=location,
     )
+
+
+def component_subcategory(component_name: str, category: str) -> str:
+    """Infer the user's intended subcategory from the component name.
+
+    Reuses SUBCATEGORY_KEYWORDS so listing-side and component-side
+    classification stay in sync.
+    """
+    return _normalize_to_aida_subcategory(category, component_name)
 
 
 def search_listings_for_component(
@@ -333,12 +412,17 @@ def search_listings_for_component(
 ) -> list[PalatsListing]:
     """Find Palats listings matching an AIda component.
 
+    Two-stage relevance: listings whose subcategory matches the component's
+    intended subcategory come first, then other listings in the same
+    category. Lets a search for "Toalettstol" surface toilets ahead of
+    handfat/dusch/etc. within the same sanitet bucket.
+
     Args:
-        component_name: AIda component name (e.g. 'Fönster', 'Golv vinyl')
+        component_name: AIda component name (e.g. 'Toalettstol', 'Golv vinyl')
         all_listings: Pre-fetched raw listings (avoids re-fetching per component)
 
     Returns:
-        Matched listings, sorted by relevance (category match first).
+        Matched listings, ordered subcategory-match first.
     """
     from aida.data.climate_data import normalize_component_name
 
@@ -352,13 +436,20 @@ def search_listings_for_component(
     if not all_listings:
         return []
 
-    matched = []
+    target_subcategory = component_subcategory(component_name, target_category)
+
+    primary: list[PalatsListing] = []
+    secondary: list[PalatsListing] = []
     for raw in all_listings:
         listing = _extract_listing(raw)
-        if listing.category == target_category:
-            matched.append(listing)
+        if listing.category != target_category:
+            continue
+        if target_subcategory and listing.subcategory == target_subcategory:
+            primary.append(listing)
+        else:
+            secondary.append(listing)
 
-    return matched
+    return primary + secondary
 
 
 # Reuse CO2e assumptions (kg CO2e per unit) — transport and minor refurbishment only

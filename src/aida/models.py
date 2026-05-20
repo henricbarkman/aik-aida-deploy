@@ -14,6 +14,12 @@ class Component:
     quantity: float
     unit: str
     category: str = ""  # e.g. "golv", "vägg", "installation"
+    quantity_source: str = "estimated"  # "user_specified" or "estimated"
+
+    def __post_init__(self):
+        # Normalize unknown values to "estimated" — keeps UI logic simple
+        if self.quantity_source not in ("user_specified", "estimated"):
+            self.quantity_source = "estimated"
 
     def to_dict(self) -> dict:
         return asdict(self)

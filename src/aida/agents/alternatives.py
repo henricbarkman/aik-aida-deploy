@@ -237,15 +237,37 @@ def _add_palats_reuse(
     from aida.data.palats_client import (
         _DEFAULT_REUSE_CO2E,
         REUSE_CO2E_PER_UNIT,
+        component_subcategory,
         search_listings_for_component,
     )
 
     matched = search_listings_for_component(component_name, palats_listings)
+    category = normalize_component_name(component_name)
+    target_subcat = component_subcategory(component_name, category) if category else ""
+
+    # Diagnostic: user asked for a specific subcategory (e.g. "Toalettstol")
+    # but no listing matches that subcategory. Surface what *is* available
+    # instead of silently showing handfat/dusch when toilet was wanted.
+    subcat_hits = sum(1 for m in matched if target_subcat and m.subcategory == target_subcat)
+    if target_subcat and subcat_hits == 0 and matched:
+        alternatives.append(Alternative(
+            name=f"Inget specifikt för {component_name} på Palats just nu",
+            co2e_kg=0,
+            cost_sek=0,
+            source="[Palats] palats.app",
+            reasoning=(
+                f"Hittade {len(matched)} produkter i kategorin {category} på Palats, "
+                f"men inget som matchade just {component_name}. Övriga {category}-produkter "
+                "visas nedan — kolla om något passar, eller kom tillbaka när nya annonser "
+                "publicerats."
+            ),
+            alternative_type="info",
+        ))
+
     if not matched:
         return
 
     existing_names = {a.name.lower() for a in alternatives}
-    category = normalize_component_name(component_name)
     co2e_per_unit = REUSE_CO2E_PER_UNIT.get(category, _DEFAULT_REUSE_CO2E)
     units_match = project_unit.lower() in ("st", "styck", "stk")
 

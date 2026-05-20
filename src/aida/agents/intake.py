@@ -30,7 +30,7 @@ Svara ALLTID med giltig JSON i detta format:
   "name": "projektnamn om nämnt",
   "description": "original beskrivning",
   "components": [
-    {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm", "category": "kategori"}
+    {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm", "category": "kategori", "quantity_source": "user_specified" eller "estimated"}
   ],
   "clarification_needed": null eller "fråga"
 }
@@ -42,6 +42,12 @@ Regler:
 - Category ska vara en av: golv, innervägg, yttervägg, betongvägg, tak, fönster, dörr, isolering, belysning, ventilation, hiss, kylanläggning, sanitet, vitvaror, storköksutrustning
 - Om area inte anges, uppskatta baserat på byggnadstyp och komponenter
 - Svara på svenska
+
+QUANTITY_SOURCE — sätt per komponent:
+- "user_specified" om antalet kommer DIREKT från användarens beskrivning kopplat till just den komponenten. Ex: "4 toalettstolar", "tre fönster", "Spegel 4 st".
+- "estimated" om du gissar antalet från area, byggnadstyp eller schablon. Även om beskrivningen ger area (t.ex. "300 m²") räknas det som "estimated" om komponenten är något annat än yta (t.ex. lampor på 300 m² → estimated, eftersom användaren inte sa hur många lampor).
+- Yta-baserade komponenter (golv, väggar, tak) där area_bta används direkt: "user_specified" om användaren gav arean explicit, annars "estimated".
+- Vid tvekan: "estimated".
 
 FÖRTYDLIGANDEN:
 - Fråga INTE om specifika materialval (t.ex. vilken typ av golv eller vilken isolering). Du ska fokusera på behov, inte material. Materialval är alternativ-stegets uppgift, och AIda kan komma med bättre förslag än användaren tänkt sig.

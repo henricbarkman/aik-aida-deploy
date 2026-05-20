@@ -52,6 +52,13 @@ FÖRTYDLIGANDEN:
   * Budget- eller tidplansramar om de inte nämnts
 - Sätt clarification_needed till null om beskrivningen ger tillräckligt för en rimlig analys.
 - Be om förtydligande (max 1-2 korta frågor) när svaret skulle bli väsentligt bättre med mer information. Inkludera då de komponenter du redan kunnat identifiera i components-arrayen.
+
+TIDIGARE DISKUSSION:
+- Om beskrivningen innehåller en sektion märkt "Tidigare diskussion i sessionen" eller "Korrigering från användaren": läs den noggrant.
+- Fråga ALDRIG om något användaren redan besvarat tidigare OCH som inte ändras i korrigeringen. Återanvänd det tidigare svaret för sådana fält (t.ex. byggnadsår, certifieringskrav, omfattning).
+- Om korrigeringen explicit ändrar ett tidigare besvarat fält, använd det NYA värdet från korrigeringen — inte det gamla från diskussionen.
+- Sätt clarification_needed till null om tidigare svar (eventuellt ändrade av korrigeringen) fyller informationsbehovet, även om värdena inte upprepas i den nya korrigeringstexten.
+- Bevara projektnamn från tidigare beskrivning om det inte uttryckligen ändras.
 """
 
 

@@ -462,11 +462,16 @@ class ClimateProvider:
             logger.warning("Environdec EPD fetch failed: %s", e)
             return None
 
-        if detail is None or (detail.gwp_fossil_a1a3 is None and detail.gwp_total_a1a3 is None):
+        if detail is None:
             return None
 
-        # Cache the result
+        # Cache the result. epd_to_cache_entry returns None when GWP-fossil is
+        # missing (e.g. legacy EPDs with only GWP-total). We drop those rather
+        # than serve a misleading zero — they are not comparable to the
+        # Boverket baseline.
         entry = client.epd_to_cache_entry(detail, key)
+        if entry is None:
+            return None
         self._cache.put(entry)
 
         result = _entry_to_result(entry)

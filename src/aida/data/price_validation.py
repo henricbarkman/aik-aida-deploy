@@ -141,6 +141,52 @@ def validate_unit_price(
     return price_per_unit, note
 
 
+def coerce_per_unit_as_total(
+    cost_sek: float,
+    quantity: float,
+    category: str,
+) -> tuple[float, str]:
+    """Detect "per-unit price stored as total" and correct it.
+
+    Guards against a recurring bug class: an upstream lookup returns a
+    price per m² / per st, and the caller forgets to multiply by quantity
+    before storing it in cost_sek. Symptom: a 45 m² floor showing 725 kr
+    instead of 45 × 725 = 32 625 kr.
+
+    Heuristic (intentionally strict — only triggers when the mix-up is
+    virtually certain):
+      - cost_sek falls inside the per-unit PRICE_RANGE for this category
+      - AND cost_sek / quantity is absurdly low (below per_unit_min / CLAMP_FACTOR)
+
+    In that window, the chance that cost_sek is a legitimate total is
+    near zero — totals are always ≥ quantity × per_unit_min.
+
+    Returns (corrected_cost, note). Note is empty if no correction needed.
+    """
+    if cost_sek <= 0 or quantity <= 0:
+        return cost_sek, ""
+
+    bounds = PRICE_RANGES.get(category.lower().strip())
+    if not bounds:
+        return cost_sek, ""
+
+    per_unit_min, per_unit_max, _unit = bounds
+
+    looks_like_per_unit = per_unit_min <= cost_sek <= per_unit_max
+    derived_per_unit_absurd = (cost_sek / quantity) < per_unit_min / CLAMP_FACTOR
+
+    if looks_like_per_unit and derived_per_unit_absurd:
+        corrected = round(cost_sek * quantity)
+        logger.warning(
+            "Per-unit-as-total detected for %s: %.0f SEK × %g %s → %d SEK "
+            "(cost_sek looked like per-unit price, not total)",
+            category, cost_sek, quantity, _unit, corrected,
+        )
+        return corrected, "Korrigerat: priset tolkades som per enhet, inte total"
+
+    return cost_sek, ""
+
+
 def validate_total_price(
     total_cost: float,
     quantity: float,
@@ -153,17 +199,28 @@ def validate_total_price(
     If the per-unit price was clamped (extreme outlier), the returned total
     is recalculated from the clamped per-unit × quantity.
 
+    First pass: detect per-unit-as-total bug and correct it before range
+    validation, so the corrected value gets validated cleanly.
+
     Returns (total_cost, note).
     """
     if total_cost <= 0 or quantity <= 0:
         return total_cost, "Pris ej tillgängligt" if total_cost <= 0 else ""
+
+    total_cost, coerce_note = coerce_per_unit_as_total(total_cost, quantity, category)
 
     per_unit = total_cost / quantity
     validated_per_unit, note = validate_unit_price(per_unit, category, is_estimate=is_estimate)
 
     if validated_per_unit != per_unit:
         # Price was clamped — recalculate total
-        return round(validated_per_unit * quantity), note
+        total_cost = round(validated_per_unit * quantity)
+
+    # Merge notes — correction note takes precedence if present
+    if coerce_note and note:
+        note = f"{coerce_note}. {note}"
+    elif coerce_note:
+        note = coerce_note
 
     return total_cost, note
 

@@ -139,10 +139,26 @@ class EnvirondecClient:
         data = resp.json()
         return self._parse_epd_detail(data, uuid)
 
-    def epd_to_cache_entry(self, detail: EPDDetail, product_name: str) -> CacheEntry:
-        """Convert an EPDDetail to a CacheEntry for the climate cache."""
+    def epd_to_cache_entry(self, detail: EPDDetail, product_name: str) -> CacheEntry | None:
+        """Convert an EPDDetail to a CacheEntry for the climate cache.
+
+        Returns None when GWP-fossil A1-A3 is missing. We do NOT fall back to
+        GWP-total (which includes biogenic credit) since that is not
+        comparable to the Boverket baseline. A None return signals callers to
+        skip this EPD entirely rather than caching a misleading 0.0 value
+        that downstream might treat as a real CO2e reading.
+        """
+        if detail.gwp_fossil_a1a3 is None:
+            if detail.gwp_total_a1a3 is not None:
+                logger.info(
+                    "Skipping EPD %s (no GWP-fossil; only GWP-total available, "
+                    "which is not comparable to Boverket baseline).",
+                    detail.reg_no or detail.uuid[:8],
+                )
+            return None
+
         now = time.time()
-        gwp = detail.gwp_fossil_a1a3 or detail.gwp_total_a1a3 or 0.0
+        gwp = detail.gwp_fossil_a1a3
 
         extra = {
             "uuid": detail.uuid,

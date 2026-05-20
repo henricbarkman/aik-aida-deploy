@@ -772,6 +772,7 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .source-verified { background: #F0E0E0; color: var(--kk-burgundy); }
 .source-estimate { background: var(--kk-gold-light); color: #8B6914; }
 .source-legend { display: flex; gap: 16px; margin: 4px 0 12px; font-size: 12px; color: var(--kk-gray-500); }
+.method-label { margin: 4px 0 8px; font-size: 11px; color: var(--kk-gray-500); font-style: italic; }
 
 /* === Buttons === */
 .btn { padding: 10px 20px; background: var(--kk-dark-red); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; margin-top: 12px; transition: background 0.2s; }
@@ -860,6 +861,12 @@ html { scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
 @keyframes typingBounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }
 .elapsed-time { font-size: 11px; color: var(--kk-gray-400); margin-left: 4px; }
+.typing-text { font-size: 12px; color: var(--kk-gray-500); margin-left: 8px; font-style: italic; }
+.action-btn { padding: 6px 14px; background: var(--kk-charcoal); color: white; border: none; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.2s; }
+.action-btn:hover:not(:disabled) { background: var(--kk-dark-red); }
+.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.project-rename-input { background: transparent; border: 1px solid var(--kk-gray-300); border-radius: 4px; padding: 2px 6px; font-size: inherit; font-family: inherit; color: inherit; outline: none; min-width: 120px; }
+.project-rename-input:focus { border-color: var(--kk-charcoal); }
 
 /* === Reasoning expander (Feature 2) === */
 .reasoning-toggle { background: none; border: none; color: var(--kk-gray-400); font-size: 11px; cursor: pointer; padding: 0; font-family: inherit; text-decoration: underline; white-space: nowrap; }
@@ -945,6 +952,7 @@ html { scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent; }
       <div class="dropdown-header">Senaste projekt</div>
       <div id="projectList"></div>
       <div class="dropdown-divider"></div>
+      <button class="dropdown-item" onclick="startRenameProject()">Byt namn på projektet</button>
       <button class="dropdown-item" onclick="createNewProject()">+ Skapa nytt projekt</button>
     </div>
   </div>
@@ -1223,12 +1231,18 @@ function setLoading(on) {
     _loadingStart = Date.now();
     const el = document.createElement('div');
     el.className = 'msg bot'; el.id = 'typingBubble';
-    el.innerHTML = '<div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div><span class="elapsed-time" id="elapsedTime"></span></div>';
+    el.innerHTML = '<div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div><span class="typing-text" id="typingText">AIda jobbar...</span><span class="elapsed-time" id="elapsedTime"></span></div>';
     document.getElementById('messages').appendChild(el);
     el.scrollIntoView({behavior:'smooth'});
     _loadingTimer = setInterval(() => {
+      const s = Math.floor((Date.now() - _loadingStart) / 1000);
       const t = document.getElementById('elapsedTime');
-      if (t) { const s = Math.floor((Date.now() - _loadingStart) / 1000); if (s >= 3) t.textContent = s + 's'; }
+      if (t && s >= 3) t.textContent = s + 's';
+      const tx = document.getElementById('typingText');
+      if (tx && s >= 5 && !tx.dataset.long) {
+        tx.textContent = 'AIda jobbar. Detta kan ta cirka 1-3 minuter.';
+        tx.dataset.long = '1';
+      }
     }, 1000);
   } else {
     updatePlaceholder();
@@ -1255,8 +1269,51 @@ function switchTab(name) {
 }
 
 // === Chat input ===
-const ADVANCE_RE = /\b(vidare|nästa|fortsätt|kör|ok|okej|gå vidare|next|confirm|bekräfta)\b/i;
+// Note: "kör" tas medvetet bort — det matchade "Kör omräkningen" och triggade
+// oavsiktligt nästa steg. "kör vidare" fungerar fortfarande via "vidare".
+const ADVANCE_RE = /\b(vidare|nästa|fortsätt|gå vidare|next|confirm|bekräfta)\b/i;
+const ADVANCE_EXACT_RE = /^(ok|okej|ja)$/i;
 const CORRECTION_RE = /\b(ändra|nej|fel|byt|korrigera|gör om|uppdatera|ta bort|lägg till|ändring|rätta|fixa|nytt? antal|inte \d|ska vara|stämmer inte|borde vara)\b/i;
+
+// Build the context string we feed back into intake when the user makes a
+// correction. Includes everything intake might otherwise re-ask about:
+// projektnamn, byggnadstyp, area, komponenter, plus a tail of chat history so
+// previously-answered clarifications (byggnadsår, krav, omfattning) are not
+// re-asked. Reason: intake.py runs stateless on a single string description,
+// so anything the model needs must travel in that string.
+// Strip delimiter strings from message content so user or model text cannot
+// impersonate the structural headers in the prompt below. Without this, a chat
+// turn containing "Korrigering från användaren:" would inject a fake
+// correction section into the next intake call.
+function _scrubCtxDelimiters(s) {
+  if (typeof s !== 'string') return '';
+  return s
+    .replace(/Korrigering från användaren:/gi, '[korrigering]')
+    .replace(/Tidigare diskussion i sessionen:/gi, '[diskussion]')
+    .replace(/^(Användare|AIda):/gim, '$1​:');  // zero-width space prevents role-line spoofing
+}
+
+function buildCorrectionContext(text) {
+  // Guard: without core project fields we cannot build a useful ctx; pass the
+  // raw correction text so intake at least sees the user's intent without
+  // "undefined, undefined m2" garbage.
+  if (!state.project || !state.project.building_type || state.project.area_bta == null) {
+    return text;
+  }
+  const compSummary = (state.project.components || []).map(c => c.name + ' (' + c.quantity + ' ' + c.unit + ')').join(', ');
+  let ctx = '';
+  if (state.project.name) ctx += 'Projektnamn: ' + state.project.name + '. ';
+  ctx += state.project.building_type + ', ' + state.project.area_bta + ' m2. Komponenter: ' + compSummary + '.';
+  if (state.chatHistory && state.chatHistory.length > 0) {
+    const tail = state.chatHistory.slice(-8).map(m => {
+      const role = (m.role === 'user') ? 'Användare' : 'AIda';
+      return role + ': ' + _scrubCtxDelimiters(m.content || '');
+    }).join('\n');
+    ctx += '\n\nTidigare diskussion i sessionen:\n' + tail;
+  }
+  ctx += '\n\nKorrigering från användaren: ' + _scrubCtxDelimiters(text);
+  return ctx;
+}
 
 async function sendMessage() {
   const input = document.getElementById('userInput');
@@ -1267,7 +1324,7 @@ async function sendMessage() {
   setLoading(true);
 
   // Detect "advance to next step" intent at confirmation gates
-  const wantsAdvance = ADVANCE_RE.test(text);
+  const wantsAdvance = ADVANCE_RE.test(text) || ADVANCE_EXACT_RE.test(text.trim());
   const wantsCorrection = CORRECTION_RE.test(text);
 
   switch (state.step) {
@@ -1284,11 +1341,7 @@ async function sendMessage() {
         confirmStep();
       } else {
         addMsg('Uppdaterar projektbeskrivning...', 'system');
-        {
-          const compSummary = state.project.components.map(c => c.name + ' (' + c.quantity + ' ' + c.unit + ')').join(', ');
-          const ctx = state.project.building_type + ', ' + state.project.area_bta + ' m2. Komponenter: ' + compSummary;
-          await runIntake(ctx + '\n\nKorrigering fr\u00e5n anv\u00e4ndaren: ' + text);
-        }
+        await runIntake(buildCorrectionContext(text));
       }
       break;
     case 'baseline_done':
@@ -1298,9 +1351,7 @@ async function sendMessage() {
       } else if (wantsCorrection) {
         // Re-run intake with correction, then auto-trigger baseline
         addMsg('Uppdaterar projektet och r\u00e4knar om baslinjen...', 'system');
-        const compSummary = state.project.components.map(c => c.name + ' (' + c.quantity + ' ' + c.unit + ')').join(', ');
-        const ctx = state.project.building_type + ', ' + state.project.area_bta + ' m2. Komponenter: ' + compSummary;
-        await runIntake(ctx + '\n\nKorrigering fr\u00e5n anv\u00e4ndaren: ' + text);
+        await runIntake(buildCorrectionContext(text));
         if (state.step === 'intake_done') {
           await runBaseline();
         }
@@ -1331,9 +1382,7 @@ async function sendMessage() {
       if (wantsCorrection) {
         // Re-run from intake with correction
         addMsg('G\u00f6r om analysen med dina kommentarer...', 'system');
-        const cs = state.project.components.map(c => c.name + ' (' + c.quantity + ' ' + c.unit + ')').join(', ');
-        const cx = state.project.building_type + ', ' + state.project.area_bta + ' m2. Komponenter: ' + cs;
-        await runIntake(cx + '\n\nKorrigering fr\u00e5n anv\u00e4ndaren: ' + text);
+        await runIntake(buildCorrectionContext(text));
         if (state.step === 'intake_done') {
           await runBaseline();
           if (state.step === 'baseline_done') {
@@ -1398,7 +1447,7 @@ async function runIntake(desc) {
     state.reportMarkdown = null;
     state.chatHistory = [];
     state.step = 'intake_done';
-    if (HAS_SUPABASE) { document.getElementById('projectName').textContent = d.building_type || d.name || 'Nytt projekt'; }
+    if (HAS_SUPABASE) { document.getElementById('projectName').textContent = d.name || d.building_type || 'Nytt projekt'; }
     scheduleAutoSave();
 
     enableTab('projekt');
@@ -1417,10 +1466,19 @@ async function runIntake(desc) {
 }
 
 // === Pipeline: Baseline ===
+// Remove any lingering recompute action-row buttons. Used when we start a
+// fresh baseline/alternatives run so an orphaned "S\u00f6k nya alternativ" button
+// (rendered from a stale state earlier) does not stay clickable after we have
+// already cleared state.alternatives.
+function clearActionRows() {
+  document.querySelectorAll('.msg.action-row').forEach(el => el.remove());
+}
+
 async function runBaseline() {
   addMsg('Ber\u00e4knar baslinje (NollCO2)...', 'system');
   setProgressStep('baslinje');
   setLoading(true);
+  clearActionRows();
   try {
     const r = await authFetch('/api/baseline', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({project: state.project})});
     const d = await r.json();
@@ -1464,6 +1522,7 @@ async function runAlternatives(userFeedback) {
   addMsg('S\u00f6ker alternativ...', 'system');
   setProgressStep('aterbruk');
   setLoading(true);
+  clearActionRows();
   const subStepTimer = setTimeout(() => {
     setProgressStep('nyproduktion');
   }, 2000);
@@ -1587,11 +1646,28 @@ function applyAgentStateUpdates(updates) {
   // and no stale warning is needed. Otherwise we flag stale on project mutation.
   let baselineStale = false;
   let altsStale = false;
+  let materialChanged = false;
 
   if (updates.project) {
     const prevIds = new Set((state.project?.components || []).map(c => c.id));
     const newIds = new Set((updates.project.components || []).map(c => c.id));
     const sameIds = prevIds.size === newIds.size && [...prevIds].every(id => newIds.has(id));
+    // Detect material/category change vs pure quantity change. If category or
+    // name changed on any matching component, the baseline value for it is
+    // stale and only a recompute restores correctness.
+    if (state.project && sameIds) {
+      const prevById = new Map(state.project.components.map(c => [c.id, c]));
+      for (const c of updates.project.components) {
+        const p = prevById.get(c.id);
+        if (p && (p.category !== c.category || p.name !== c.name)) {
+          materialChanged = true;
+          break;
+        }
+      }
+    } else if (state.project && !sameIds) {
+      // Added or removed component => baseline coverage changed.
+      materialChanged = true;
+    }
     state.project = updates.project;
     touched = true;
     if (!('baseline' in updates)) baselineStale = true;
@@ -1632,12 +1708,50 @@ function applyAgentStateUpdates(updates) {
   }
 
   // Surface staleness only when the agent couldn't scale — i.e. project changed but baseline/alternatives didn't come back.
+  // For material/category changes we surface a concrete action button so the user does not have to guess
+  // (chat agent's prompt promises a "Räkna om baslinjen"-button after such changes).
   if (baselineStale && state.baseline) {
-    addMsg('⚠️ Baslinjen är nu inaktuell efter ändringen. Kör om den för att få nya värden.', 'system');
+    if (materialChanged) {
+      renderRecomputeBaselineAction();
+    } else {
+      addMsg('⚠️ Baslinjen är nu inaktuell efter ändringen. Kör om den för att få nya värden.', 'system');
+    }
   }
   if (altsStale && state.alternatives) {
-    addMsg('⚠️ Alternativen är nu inaktuella efter ändringen. Kör om dem för aktuella förslag.', 'system');
+    if (materialChanged) {
+      renderRecomputeAlternativesAction();
+    } else {
+      addMsg('⚠️ Alternativen är nu inaktuella efter ändringen. Kör om dem för aktuella förslag.', 'system');
+    }
   }
+}
+
+// Action-button row inside the chat. Used after material/category change so the user can recompute
+// without typing or hunting for a hidden control.
+function renderActionRow(label, handler) {
+  document.querySelectorAll('.msg.action-row[data-label="' + label + '"]').forEach(el => el.remove());
+  const el = document.createElement('div');
+  el.className = 'msg bot action-row';
+  el.dataset.label = label;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'action-btn';
+  btn.textContent = label;
+  btn.onclick = async () => {
+    btn.disabled = true;
+    try { await handler(); } finally { el.remove(); }
+  };
+  el.appendChild(btn);
+  document.getElementById('messages').appendChild(el);
+  el.scrollIntoView({behavior:'smooth'});
+}
+
+function renderRecomputeBaselineAction() {
+  renderActionRow('Räkna om baslinjen', async () => { await runBaseline(); });
+}
+
+function renderRecomputeAlternativesAction() {
+  renderActionRow('Sök nya alternativ', async () => { await runAlternatives(); });
 }
 
 // === Helpers ===
@@ -1695,6 +1809,7 @@ function renderBaslinjeContent() {
   const total = d.components.reduce((s,c) => s + c.co2e_kg, 0);
   const totalCost = d.components.reduce((s,c) => s + c.cost_sek, 0);
   let html = '<div class="section-title">Baslinje (NollCO2-metoden)</div>';
+  html += '<div class="method-label">Klimatmetod: GWP-fossil, livscykelskedena A1-A3 (Boverkets klimatdatabas)</div>';
   html += '<div class="source-legend"><span><span class="source-badge source-verified">EPD</span> Verifierad k\u00e4lla</span><span><span class="source-badge source-estimate">Est.</span> Uppskattning</span></div>';
   html += '<div class="summary">';
   html += '<div class="card"><div class="card-title">Total CO\u2082e</div><div class="value">' + Math.round(total).toLocaleString('sv') + '</div><div class="sublabel">kg CO\u2082e</div></div>';
@@ -1713,6 +1828,7 @@ function renderBaslinjeContent() {
 function renderAlternativContent() {
   const data = state.alternatives;
   let html = '<div class="section-title">J\u00e4mf\u00f6relse per komponent</div>';
+  html += '<div class="method-label">Klimatmetod: GWP-fossil, livscykelskedena A1-A3 (Boverkets klimatdatabas)</div>';
   html += '<div class="source-legend"><span><span class="source-badge source-verified">EPD</span> Verifierad k\u00e4lla</span><span><span class="source-badge source-estimate">Est.</span> Uppskattning</span></div>';
   data.components.forEach(comp => {
     html += '<div class="comp-card"><div class="comp-card-header"><h3>' + esc(comp.component_name) + '</h3></div>';
@@ -2018,6 +2134,41 @@ function toggleProjectMenu() {
   m.style.display = m.style.display === 'none' ? 'block' : 'none';
 }
 
+// === Project rename ===
+function startRenameProject() {
+  document.getElementById('projectMenu').style.display = 'none';
+  const span = document.getElementById('projectName');
+  if (!span) return;
+  const current = (state.project && state.project.name) ? state.project.name : span.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'project-rename-input';
+  input.value = current === 'Nytt projekt' ? '' : current;
+  input.placeholder = 'Projektnamn';
+  input.maxLength = 80;
+  span.style.display = 'none';
+  span.parentNode.insertBefore(input, span);
+  input.focus();
+  input.select();
+  const commit = (save) => {
+    if (!input.parentNode) return;
+    const next = input.value.trim();
+    if (save && next) {
+      if (!state.project) state.project = {name: next};
+      else state.project.name = next;
+      span.textContent = next;
+      if (HAS_SUPABASE && currentUser) scheduleAutoSave();
+    }
+    input.remove();
+    span.style.display = '';
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+  });
+  input.addEventListener('blur', () => commit(true));
+}
+
 function toggleUserMenu() {
   const m = document.getElementById('userMenu');
   const p = document.getElementById('projectMenu');
@@ -2192,7 +2343,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description='AIda Web UI')
     parser.add_argument('--port', type=int, default=5002)
-    parser.add_argument('--host', type=str, default='0.0.0.0')
+    parser.add_argument('--host', type=str, default='127.0.0.1')
     args = parser.parse_args()
 
     print(f"AIda web UI: http://{args.host}:{args.port}")

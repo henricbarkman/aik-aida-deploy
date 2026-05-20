@@ -60,7 +60,7 @@ PRINCIPER FÖR ALTERNATIV:
 TEKNISKA REGLER:
 - VÄLJ BARA alternativ från EPD-listan du får. Fabricera INGA egna alternativ.
 - Om ingen EPD i listan passar komponenten, returnera en tom array [].
-- Använd GWP-värdena från EPD-listan — de är verifierade, inte uppskattningar.
+- Använd GWP-värdena från EPD-listan — de är GWP-fossil A1-A3 (samma metod som Boverket-baslinjen), verifierade och direkt jämförbara.
 - Om ett omräknat värde visas (efter →), använd det omräknade värdet för beräkningar.
 - Ange EPD-registreringsnummer i source-fältet.
 - Prioritera svenska/nordiska produkter (SE, NORD, RER).
@@ -111,17 +111,15 @@ def _format_epd_list(epds: list[dict]) -> str:
         reg = epd.get("reg_no", "")
         reg_str = f" ({reg})" if reg else ""
 
-        # Show converted functional unit value when available
-        gwp_str = f"GWP A1-A3: {epd['gwp_a1a3']} kg CO2e/{epd['unit']}"
+        # GWP-fossil A1-A3 only \u2014 matches Boverket's standard so alternatives
+        # are comparable to the baseline. GWP-total (which includes biogenic
+        # carbon credit and can be negative for bio-based products) is
+        # intentionally not shown to avoid mixing units in the same list.
+        gwp_str = f"GWP-fossil A1-A3: {epd['gwp_a1a3']} kg CO2e/{epd['unit']}"
         fu_gwp = epd.get("gwp_per_functional_unit")
         fu_unit = epd.get("functional_unit")
         if fu_gwp is not None and fu_unit:
             gwp_str += f" \u2192 {fu_gwp} kg CO2e/{fu_unit}"
-
-        # Show GWP-total when it differs significantly (e.g. bio-based products)
-        gwp_total = epd.get("gwp_total_a1a3")
-        if gwp_total is not None and gwp_total != epd["gwp_a1a3"]:
-            gwp_str += f" (GWP-total: {gwp_total})"
 
         source = epd.get("source_registry", "environdec")
         source_tag = f" [{source}]" if source != "environdec" else ""
@@ -453,7 +451,7 @@ def find_alternatives(
     ]
 
     # Batch price enrichment for alternatives missing prices
-    _enrich_alternative_prices(component_results)
+    _enrich_alternative_prices(component_results, project)
 
     # DoD B1: remove alternatives still at cost_sek=0 after enrichment
     for comp in component_results:
@@ -471,14 +469,33 @@ def find_alternatives(
     return result
 
 
-def _enrich_alternative_prices(components: list[ComponentAlternatives]) -> None:
+def _enrich_alternative_prices(
+    components: list[ComponentAlternatives],
+    project: Project,
+) -> None:
     """Batch web search for alternatives that have cost_sek == 0.
+
+    Web search returns prices per unit (SEK/m², SEK/st). We multiply by
+    the project's component quantity here to produce a total in SEK —
+    storing the per-unit value as total would understate cost by the
+    quantity factor (e.g. 725 SEK vs 45 × 725 for 45 m² of flooring).
+
+    After each enrichment we run validate_total_price as a safety net:
+    it catches both out-of-range prices and the per-unit-as-total bug
+    class, in case a future change to the enrichment path regresses.
 
     Single batch call — alternatives still at 0 after this get filtered
     downstream (DoD B1). Individual sequential lookups were removed to
     avoid 5+ minute timeouts.
     """
+    from aida.data.price_validation import validate_total_price
     from aida.data.pricing_provider import lookup_prices_batch
+
+    quantity_by_cid = {c.id: c.quantity for c in project.components}
+    category_by_cid = {
+        c.component_id: normalize_component_name(c.component_name)
+        for c in components
+    }
 
     products_needing_prices: list[tuple[str, str]] = []
     alt_index: list[tuple[int, int]] = []  # (comp_idx, alt_idx) for mapping back
@@ -499,12 +516,34 @@ def _enrich_alternative_prices(components: list[ComponentAlternatives]) -> None:
         for (ci, ai), (name, _unit) in zip(alt_index, products_needing_prices):
             price_result = batch_prices.get(name.lower())
             if price_result:
-                price, unit, _source = price_result
-                alt = components[ci].alternatives[ai]
-                alt.cost_sek = round(price)
+                price_per_unit, unit, _source = price_result
+                comp = components[ci]
+                alt = comp.alternatives[ai]
+                quantity = quantity_by_cid.get(comp.component_id, 0) or 0
+                if quantity > 0:
+                    alt.cost_sek = round(price_per_unit * quantity)
+                else:
+                    alt.cost_sek = round(price_per_unit)
                 alt.reasoning = alt.reasoning.replace(". Pris ej tillgängligt.", "")
                 alt.reasoning = alt.reasoning.replace("Pris ej tillgängligt.", "")
-                logger.info("Enriched price for '%s': %d SEK (batch)", alt.name, alt.cost_sek)
+
+                # Safety net: validate the enriched total. Detects both
+                # per-unit-as-total regressions and out-of-range prices.
+                category = category_by_cid.get(comp.component_id, "")
+                if quantity > 0 and category:
+                    validated_cost, note = validate_total_price(
+                        alt.cost_sek, quantity, category,
+                        is_estimate=False,
+                    )
+                    if validated_cost != alt.cost_sek:
+                        alt.cost_sek = validated_cost
+                    if note and note.lower() not in alt.reasoning.lower():
+                        alt.reasoning = alt.reasoning.rstrip(". ") + f". {note}."
+
+                logger.info(
+                    "Enriched price for '%s': %d SEK/%s x %g = %d SEK total",
+                    alt.name, round(price_per_unit), unit, quantity, alt.cost_sek,
+                )
 
     # Pass 2: Log any still missing — individual lookups removed to avoid timeout
     still_missing = sum(

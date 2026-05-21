@@ -298,6 +298,14 @@ def _apply_update_component(inp, project, baseline, alternatives, selections, pe
     if not changed:
         return f"Ingen ändring angiven för {cid}.", False, set()
 
+    # If material identity changed (name/category), prior usage_context may no
+    # longer match — better to clear it than carry stale functional requirements
+    # into the next alternatives search. Pure quantity/unit changes preserve it.
+    # Chat-agent has no tool to set usage_context directly; rerun intake to
+    # generate a fresh one when needed.
+    if "name" in changed or "category" in changed:
+        target["usage_context"] = ""
+
     touched: set[str] = {"project"}
 
     quantity_only = set(changed.keys()) == {"quantity"}

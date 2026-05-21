@@ -597,7 +597,7 @@ Baslinje kostnad: {bl_comp.cost_sek} SEK
 ANVÄNDNINGSKONTEXT (funktionella krav från intake):
 {usage_context}
 
-→ Använd kontexten som hård filtreringsregel: alternativ som inte uppfyller kraven får inte föreslås, även om CO2e är lågt. Förklara i reasoning hur alternativet möter kraven.
+→ Använd kontexten för att filtrera bort alternativ som inte uppfyller kraven, även om CO2e är lågt. För varje alternativ du föreslår, förklara i reasoning hur det möter kraven — eller flagga explicit om en avvägning finns (t.ex. "lägre CO2e men kräver halksäkringsbehandling").
 """
 
     if epds:

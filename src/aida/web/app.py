@@ -269,12 +269,22 @@ def api_intake():
 def api_baseline():
     data = request.json
     project_data = data.get('project')
+    component_ids = data.get('component_ids')
 
     if not project_data:
         return jsonify({'error': 'Projekt saknas'}), 400
 
     try:
         project = Project.from_dict(project_data)
+
+        # Partial rerun: filter the project to a subset of components before LLM matching.
+        # An empty/missing component_ids means "all components" (full rerun, original behavior).
+        if isinstance(component_ids, list) and component_ids:
+            requested = set(component_ids)
+            project.components = [c for c in project.components if c.id in requested]
+            if not project.components:
+                return jsonify({'error': 'Inga komponenter matchade angivna component_ids'}), 400
+
         baseline = calculate_baseline(project)
         return jsonify(baseline.to_dict())
     except _TIMEOUT_ERRORS:
@@ -289,6 +299,7 @@ def api_alternatives():
     data = request.json
     project_data = data.get('project')
     baseline_data = data.get('baseline')
+    component_ids = data.get('component_ids')
 
     if not project_data or not baseline_data:
         return jsonify({'error': 'Projekt eller baslinje saknas'}), 400
@@ -296,6 +307,25 @@ def api_alternatives():
     try:
         project = Project.from_dict(project_data)
         baseline = Baseline.from_dict(baseline_data)
+
+        # Partial rerun: filter both project and baseline to the requested subset.
+        # find_alternatives iterates over baseline.components, so both must agree on which
+        # components are in scope. Empty/missing list = all components (full rerun).
+        if isinstance(component_ids, list) and component_ids:
+            requested = set(component_ids)
+            project_ids_before = {c.id for c in project.components}
+            baseline_ids_before = {c.component_id for c in baseline.components}
+            project.components = [c for c in project.components if c.id in requested]
+            baseline.components = [c for c in baseline.components if c.component_id in requested]
+            if not project.components:
+                missing = sorted(requested - project_ids_before)
+                return jsonify({'error': f'Komponent saknas i projektet: {missing}'}), 400
+            if not baseline.components:
+                missing = sorted(requested - baseline_ids_before)
+                return jsonify({
+                    'error': f'Komponent saknas i baslinjen: {missing}. Kör om baslinjen först.'
+                }), 400
+
         user_feedback = data.get('user_feedback')
         result = find_alternatives(project, baseline, user_feedback=user_feedback)
         return jsonify(result.to_dict())
@@ -1634,8 +1664,239 @@ async function runChat(text) {
 
     state.chatHistory.push({role:'assistant', content: d.reply});
     addMsg(d.reply, 'bot');
+
+    // Chat agent may have requested baseline/alternatives reruns. Execute them
+    // sequentially so each action sees state from the previous one's merge.
+    // Keep loading true throughout so the user cannot send a second message
+    // mid-rerun and race the state.baseline / state.alternatives merge.
+    const pendingActions = d.state_updates && d.state_updates.pending_actions;
+    if (Array.isArray(pendingActions) && pendingActions.length > 0) {
+      await processPendingActions(pendingActions);
+    }
     setLoading(false);
   } catch(e) { addMsg('Fel: ' + e.message, 'system'); setLoading(false); }
+}
+
+// Execute reruns requested by the chat agent. Full reruns (empty component_ids)
+// require an extra click; partial reruns run immediately since the user already
+// initiated them via the chat correction. We pass orchestrated=true so the
+// inner rerun functions do not toggle setLoading per action — runChat already
+// holds setLoading(true) for the whole sequence to prevent the user from
+// sending a second chat message that would race the state merges.
+//
+// Defense in depth against the prompt-only confirmation gate: if the agent
+// emits explicit component_ids that cover every component in the project, we
+// re-classify the action as full and route it to the confirmation button. The
+// LLM cannot bypass the confirm gate by spelling out every id.
+async function processPendingActions(actions) {
+  const totalComponents = (state.project && Array.isArray(state.project.components))
+    ? state.project.components.length : 0;
+  const knownIds = new Set(
+    (state.project && Array.isArray(state.project.components))
+      ? state.project.components.map(c => c.id) : []
+  );
+
+  // Sort: rerun_baseline before rerun_alternatives for the same scope, so the
+  // alternatives call sees the freshly recomputed baseline. The LLM can emit
+  // them in any order and nothing in the schema enforces it.
+  const ordered = [...actions].sort((a, b) => {
+    if (a.type === b.type) return 0;
+    if (a.type === 'rerun_baseline') return -1;
+    if (b.type === 'rerun_baseline') return 1;
+    return 0;
+  });
+
+  for (const action of ordered) {
+    try {
+      let cids = Array.isArray(action.component_ids) ? action.component_ids.filter(c => knownIds.has(c)) : [];
+      // Empty after filter (unknown ids) and not originally full means we have
+      // nothing actionable. Skip rather than treat as "all".
+      const originallyEmpty = !Array.isArray(action.component_ids) || action.component_ids.length === 0;
+      if (!originallyEmpty && cids.length === 0) {
+        addMsg('Hoppar över ' + action.type + ': inga giltiga komponent-id.', 'system');
+        continue;
+      }
+      // Re-classify as full when explicit list covers every component.
+      const coversAll = totalComponents > 0 && cids.length === totalComponents;
+      const isFull = originallyEmpty || coversAll;
+
+      if (action.type === 'rerun_baseline') {
+        if (isFull) {
+          renderActionRow(
+            'Bekräfta: räkna om hela baslinjen' + (action.reason ? ' (' + action.reason + ')' : ''),
+            async () => { await runBaselineForComponents([], action.reason, false); },
+          );
+        } else {
+          await runBaselineForComponents(cids, action.reason, true);
+        }
+      } else if (action.type === 'rerun_alternatives') {
+        if (isFull) {
+          renderActionRow(
+            'Bekräfta: kör om alla alternativ' + (action.reason ? ' (' + action.reason + ')' : ''),
+            async () => { await runAlternativesForComponents([], action.user_feedback, action.reason, false); },
+          );
+        } else {
+          await runAlternativesForComponents(cids, action.user_feedback, action.reason, true);
+        }
+      } else {
+        addMsg('Okänd åtgärd från chatten: ' + action.type, 'system');
+      }
+    } catch (e) {
+      addMsg('Fel vid ' + action.type + ': ' + e.message, 'system');
+    }
+  }
+}
+
+// Partial baseline rerun. `componentIds` empty = full rerun (same outcome as
+// runBaseline but without the pipeline side effects like tab switching).
+// `orchestrated=true` means runChat already holds setLoading(true) for the
+// whole pending_actions sequence — do not toggle it per call, otherwise the
+// user can fire a second chat message in the gap between two reruns.
+async function runBaselineForComponents(componentIds, reason, orchestrated) {
+  if (!state.project) {
+    addMsg('Inget projekt att räkna baslinje på.', 'system');
+    return;
+  }
+  const isFull = !componentIds || componentIds.length === 0;
+  const scope = isFull
+    ? 'hela baslinjen'
+    : 'komponent(er) ' + componentIds.join(', ');
+  const reasonNote = reason ? ' (' + reason + ')' : '';
+  addMsg('AIda räknar om ' + scope + reasonNote + '...', 'system');
+  if (!orchestrated) setLoading(true);
+  try {
+    const body = {project: state.project};
+    if (!isFull) body.component_ids = componentIds;
+    const r = await authFetch('/api/baseline', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.error) {
+      addMsg('Fel vid baslinjebberäkning: ' + d.error, 'system');
+      setLoading(false);
+      return;
+    }
+    if (isFull) {
+      state.baseline = d;
+      state.alternatives = null;
+      state.selections = {};
+      state.reportMarkdown = null;
+    } else {
+      mergeBaselineDelta(d, new Set(componentIds));
+      invalidateDownstreamFor(new Set(componentIds));
+    }
+    scheduleAutoSave();
+    if (activeTab === 'baslinje') renderBaslinjeContent();
+    else if (activeTab === 'alternativ') renderAlternativContent();
+    addMsg('Baslinje uppdaterad' + (isFull ? '' : ' för ' + componentIds.join(', ')) + '.', 'system');
+  } catch (e) {
+    addMsg('Fel vid baslinjebberäkning: ' + e.message, 'system');
+  } finally {
+    if (!orchestrated) setLoading(false);
+  }
+}
+
+async function runAlternativesForComponents(componentIds, userFeedback, reason, orchestrated) {
+  if (!state.project || !state.baseline) {
+    addMsg('Saknar projekt eller baslinje för alternativ.', 'system');
+    return;
+  }
+  const isFull = !componentIds || componentIds.length === 0;
+  const scope = isFull
+    ? 'alla alternativ'
+    : 'alternativ för komponent(er) ' + componentIds.join(', ');
+  const reasonNote = reason ? ' (' + reason + ')' : '';
+  const feedbackNote = userFeedback ? ' Önskemål: ' + userFeedback + '.' : '';
+  addMsg('AIda kör om ' + scope + reasonNote + feedbackNote + '...', 'system');
+  if (!orchestrated) setLoading(true);
+  try {
+    const body = {project: state.project, baseline: state.baseline};
+    if (!isFull) body.component_ids = componentIds;
+    if (userFeedback) body.user_feedback = userFeedback;
+    const r = await authFetch('/api/alternatives', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (d.error) {
+      addMsg('Fel vid alternativsökning: ' + d.error, 'system');
+      setLoading(false);
+      return;
+    }
+    if (isFull) {
+      state.alternatives = d;
+      state.selections = {};
+      state.reportMarkdown = null;
+    } else {
+      mergeAlternativesDelta(d, new Set(componentIds));
+      // Invalidate selections for components whose alternatives list just changed.
+      const cidSet = new Set(componentIds);
+      if (state.selections) {
+        Object.keys(state.selections).forEach(cid => { if (cidSet.has(cid)) delete state.selections[cid]; });
+      }
+      state.reportMarkdown = null;
+    }
+    scheduleAutoSave();
+    if (activeTab === 'alternativ') renderAlternativContent();
+    addMsg('Alternativ uppdaterade' + (isFull ? '' : ' för ' + componentIds.join(', ')) + '.', 'system');
+  } catch (e) {
+    addMsg('Fel vid alternativsökning: ' + e.message, 'system');
+  } finally {
+    if (!orchestrated) setLoading(false);
+  }
+}
+
+// Replace baseline entries in place, filtered to the components actually
+// requested. cidSet acts as a defensive whitelist: a server returning more
+// components than requested (regression or future code path) cannot silently
+// overwrite unrelated state.
+function mergeBaselineDelta(delta, cidSet) {
+  if (!delta || !Array.isArray(delta.components)) return;
+  const allowed = (delta.components || []).filter(c => cidSet.has(c.component_id));
+  if (!state.baseline || !Array.isArray(state.baseline.components)) {
+    state.baseline = {components: allowed};
+    return;
+  }
+  const newById = new Map(allowed.map(c => [c.component_id, c]));
+  state.baseline.components = state.baseline.components.map(c => newById.get(c.component_id) || c);
+  for (const c of allowed) {
+    if (!state.baseline.components.find(x => x.component_id === c.component_id)) {
+      state.baseline.components.push(c);
+    }
+  }
+}
+
+function mergeAlternativesDelta(delta, cidSet) {
+  if (!delta || !Array.isArray(delta.components)) return;
+  const allowed = (delta.components || []).filter(c => cidSet.has(c.component_id));
+  if (!state.alternatives || !Array.isArray(state.alternatives.components)) {
+    state.alternatives = {components: allowed, commentary: delta.commentary || ''};
+    return;
+  }
+  const newById = new Map(allowed.map(c => [c.component_id, c]));
+  state.alternatives.components = state.alternatives.components.map(c => newById.get(c.component_id) || c);
+  for (const c of allowed) {
+    if (!state.alternatives.components.find(x => x.component_id === c.component_id)) {
+      state.alternatives.components.push(c);
+    }
+  }
+  if (delta.commentary) state.alternatives.commentary = delta.commentary;
+}
+
+// When baseline is rerun for a subset of components, downstream (alternatives,
+// selections, report) for those same components is stale by definition.
+function invalidateDownstreamFor(cidSet) {
+  if (state.alternatives && Array.isArray(state.alternatives.components)) {
+    state.alternatives.components = state.alternatives.components.filter(c => !cidSet.has(c.component_id));
+    if (state.alternatives.components.length === 0) state.alternatives = null;
+  }
+  if (state.selections) {
+    Object.keys(state.selections).forEach(cid => { if (cidSet.has(cid)) delete state.selections[cid]; });
+  }
+  state.reportMarkdown = null;
 }
 
 // Apply state deltas returned by the chat agent.

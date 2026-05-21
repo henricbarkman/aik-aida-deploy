@@ -22,6 +22,7 @@ Du ska identifiera:
 1. Byggnadstyp (t.ex. skola, kontor, förskola, bostadshus)
 2. Ungefärlig area i BTA (bruttoarea i kvadratmeter)
 3. En lista av renoveringskomponenter (vad som ska bytas/renoveras)
+4. För varje komponent: ett kort resonemang om brukar- och miljökrav som styr vilka material som är lämpliga ("usage_context")
 
 Svara ALLTID med giltig JSON i detta format:
 {
@@ -30,7 +31,7 @@ Svara ALLTID med giltig JSON i detta format:
   "name": "projektnamn om nämnt",
   "description": "original beskrivning",
   "components": [
-    {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm", "category": "kategori", "quantity_source": "user_specified" eller "estimated"}
+    {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm", "category": "kategori", "quantity_source": "user_specified" eller "estimated", "usage_context": "1-3 meningar om brukare + miljö + funktionella krav"}
   ],
   "clarification_needed": null eller "fråga"
 }
@@ -49,13 +50,33 @@ QUANTITY_SOURCE — sätt per komponent:
 - Yta-baserade komponenter (golv, väggar, tak) där area_bta används direkt: "user_specified" om användaren gav arean explicit, annars "estimated".
 - Vid tvekan: "estimated".
 
+USAGE_CONTEXT — funktionella krav per komponent:
+Du är byggnadsexpert med materialkunskap och brukarsförståelse. Det betyder att du ska resonera om komponentens *användning* — inte välja material, men identifiera de krav som styr vilka material som ens är lämpliga.
+
+För varje komponent, fyll i usage_context med 1-3 meningar som täcker:
+- VEM använder utrymmet/komponenten (brukare: barn, vårdpersonal, allmänhet, ofta-besökare, sällan-besökare)
+- VILKEN MILJÖLAST den utsätts för (våtbelastning, slitage, kemikalier, sand, salt, värme, ljud, hygienkrav)
+- VILKA FUNKTIONELLA KRAV det implicerar (halksäker, lätt rengörbar, slittålig, brandklass, ljudklass, vattentät, antibakteriell)
+
+Exempel — förskole-tambur golv:
+"Entré på förskola, dagligt slitage från barn 1-6 år som kommer in med blöt snö, sand och saltslask vintertid. Kräver halksäker yta, mycket lätt att våtmoppa, tål kemikalier från städmedel, och slittålig mot abrasiv smuts. Material som absorberar fukt (obehandlat trä, oljat parkett) är olämpliga; gummi, linoleum, klinker med halkfri yta passar bättre."
+
+Exempel — klassrumsgolv:
+"Klassrum för 6-12 år, högt slitage från möbler och dagligt fottryck, krav på god akustik och dammbinding. Behöver tåla regelbunden mopprengöring."
+
+Exempel — kontorsbadrum WC:
+"Personaltoalett för förvaltning, måttlig brukarfrekvens, hygienkrav på lätt rengörbara ytor, kvalitetskrav på vattenbesparing och tystgång. BBR-tillgänglighet bör verifieras."
+
+VIKTIGT: Detta är inte ett materialval — du namnger eventuellt OLÄMPLIGA material och vilka egenskaper som krävs, men låter alternativ-steget göra själva valet. Om ingen särskild kontext kan utläsas (t.ex. "tak" utan vidare info i ett bostadshus), skriv en kort generisk rad ("Vanligt bostadshus-tak, standardkrav för väderbeständighet och isolering") snarare än att hitta på.
+
 FÖRTYDLIGANDEN:
-- Fråga INTE om specifika materialval (t.ex. vilken typ av golv eller vilken isolering). Du ska fokusera på behov, inte material. Materialval är alternativ-stegets uppgift, och AIda kan komma med bättre förslag än användaren tänkt sig.
+- Fråga INTE om specifika materialval (t.ex. vilken typ av golv eller vilken isolering). Du ska fokusera på behov och funktionella krav, inte material. Materialval är alternativ-stegets uppgift, och AIda kan komma med bättre förslag än användaren tänkt sig.
 - Fråga däremot gärna om saker som påverkar analysen:
   * Byggnadsår (påverkar befintliga material och förutsättningar)
   * Särskilda krav (t.ex. Miljöbyggnad, tillgänglighet, ljudkrav, fuktproblem)
   * Om renoveringen är total eller partiell
   * Budget- eller tidplansramar om de inte nämnts
+  * Verksamhetstyp om byggnadstypen är otydlig (lokalkontor vs callcenter vs läkarmottagning i samma "kontor"-skal styr olika usage_context)
 - Sätt clarification_needed till null om beskrivningen ger tillräckligt för en rimlig analys.
 - Be om förtydligande (max 1-2 korta frågor) när svaret skulle bli väsentligt bättre med mer information. Inkludera då de komponenter du redan kunnat identifiera i components-arrayen.
 
@@ -65,6 +86,7 @@ TIDIGARE DISKUSSION:
 - Om korrigeringen explicit ändrar ett tidigare besvarat fält, använd det NYA värdet från korrigeringen — inte det gamla från diskussionen.
 - Sätt clarification_needed till null om tidigare svar (eventuellt ändrade av korrigeringen) fyller informationsbehovet, även om värdena inte upprepas i den nya korrigeringstexten.
 - Bevara projektnamn från tidigare beskrivning om det inte uttryckligen ändras.
+- Bevara usage_context från tidigare iteration om komponenten inte ändrats — uppdatera bara när komponenten ändrats eller ny info påverkar funktionella krav.
 """
 
 
@@ -74,7 +96,9 @@ def run_intake(description: str) -> dict:
 
     response = client.messages.create(
         model=DEFAULT_MODEL,
-        max_tokens=2000 + THINKING_LOW,
+        # Bumped 2000 → 4000 to accommodate usage_context per component
+        # without truncating multi-component projects.
+        max_tokens=4000 + THINKING_LOW,
         thinking=thinking_config(THINKING_LOW),
         system=SYSTEM_PROMPT,
         messages=[

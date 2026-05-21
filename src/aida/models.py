@@ -15,6 +15,11 @@ class Component:
     unit: str
     category: str = ""  # e.g. "golv", "vägg", "installation"
     quantity_source: str = "estimated"  # "user_specified" or "estimated"
+    # Functional requirements derived from usage/users/environment. Drives
+    # alternative selection — not a material choice, but constraints that
+    # rule out unsuitable materials (e.g. förskole-tambur → halksäker,
+    # rengörbar, slittålig mot blöt sand och salt).
+    usage_context: str = ""
 
     def __post_init__(self):
         # Normalize unknown values to "estimated" — keeps UI logic simple
@@ -23,6 +28,19 @@ class Component:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Component:
+        # Tolerant of extra keys from older payloads or future fields.
+        return cls(
+            id=data.get("id", ""),
+            name=data.get("name", ""),
+            quantity=data.get("quantity", 0),
+            unit=data.get("unit", ""),
+            category=data.get("category", ""),
+            quantity_source=data.get("quantity_source", "estimated"),
+            usage_context=data.get("usage_context", ""),
+        )
 
 
 @dataclass
@@ -47,7 +65,7 @@ class Project:
 
     @classmethod
     def from_dict(cls, data: dict) -> Project:
-        components = [Component(**c) for c in data.get("components", [])]
+        components = [Component.from_dict(c) for c in data.get("components", [])]
         return cls(
             building_type=data.get("building_type", ""),
             area_bta=data.get("area_bta", 0),

@@ -591,6 +591,15 @@ Baslinje CO2e: {bl_comp.co2e_kg} kg (Boverket Typical)
 Baslinje kostnad: {bl_comp.cost_sek} SEK
 """
 
+    usage_context = getattr(proj_comp, "usage_context", "")
+    if usage_context:
+        prompt += f"""
+ANVÄNDNINGSKONTEXT (funktionella krav från intake):
+{usage_context}
+
+→ Använd kontexten som hård filtreringsregel: alternativ som inte uppfyller kraven får inte föreslås, även om CO2e är lågt. Förklara i reasoning hur alternativet möter kraven.
+"""
+
     if epds:
         prompt += f"""
 TILLGÄNGLIGA EPD:er FÖR DENNA KATEGORI ({len(epds)} st):
@@ -686,11 +695,20 @@ def _generate_commentary(
     """Generate a natural language commentary about the alternatives found."""
     client = get_client()
 
+    # Map component_id -> usage_context so commentary can reason about
+    # whether alternatives actually meet the functional requirements.
+    usage_by_id = {
+        c.id: getattr(c, "usage_context", "") for c in project.components
+    }
+
     summary_lines = []
     for comp in result.components:
         bl_co2 = comp.baseline_co2e_kg
         bl_cost = comp.baseline_cost_sek
         summary_lines.append(f"\n{comp.component_name} (baslinje: {bl_co2:.0f} kg CO2e, {bl_cost:.0f} SEK):")
+        usage = usage_by_id.get(comp.component_id, "")
+        if usage:
+            summary_lines.append(f"  Användning: {usage}")
         for alt in comp.alternatives:
             pct = ((bl_co2 - alt.co2e_kg) / bl_co2 * 100) if bl_co2 > 0 else 0
             cost_str = f"{alt.cost_sek:.0f} SEK" if alt.cost_sek > 0 else "Pris ej tillgängligt"

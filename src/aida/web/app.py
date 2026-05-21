@@ -784,6 +784,8 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .alt-row:hover { background: var(--kk-gray-50); }
 .alt-row.selected { background: var(--kk-gold-light) !important; }
 .alt-row input[type=radio] { accent-color: var(--kk-charcoal); }
+.usage-context { font-size: 11px; color: var(--kk-gray-500); font-style: italic; line-height: 1.4; margin-top: 4px; padding: 6px 10px; background: var(--kk-cream); border-left: 2px solid var(--kk-gold-light); border-radius: 2px; }
+.usage-context-label { font-style: normal; font-weight: 600; color: var(--kk-charcoal); margin-right: 4px; }
 .type-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
 .type-baseline { background: var(--kk-gray-100); color: var(--kk-charcoal); }
 .type-reuse { background: var(--kk-gold-light); color: #7A6000; }
@@ -2061,8 +2063,10 @@ function renderProjektContent() {
   html += '<div class="comp-card"><div class="comp-card-header"><h3>' + esc(d.building_type) + ', ' + esc(d.area_bta) + ' m\u00b2 BTA' + (d.name ? ' (' + esc(d.name) + ')' : '') + '</h3></div>';
   html += '<table class="comp-table"><thead><tr><th>Komponent</th><th>Antal</th><th>Enhet</th><th>Kategori</th><th>K\u00e4lla</th></tr></thead><tbody>';
   d.components.forEach(c => {
+    const nameCell = '<div style="font-weight:500">' + esc(c.name) + '</div>' +
+      (c.usage_context ? '<div class="usage-context"><span class="usage-context-label">Anv\u00e4ndning:</span>' + esc(c.usage_context) + '</div>' : '');
     html += '<tr>' +
-      '<td style="font-weight:500">' + esc(c.name) + '</td>' +
+      '<td>' + nameCell + '</td>' +
       '<td>' + esc(c.quantity) + '</td>' +
       '<td>' + esc(c.unit) + '</td>' +
       '<td>' + esc(c.category || '\u2013') + '</td>' +
@@ -2106,7 +2110,8 @@ function renderAlternativContent() {
   data.components.forEach(comp => {
     const pc = projComps.find(p => p.id === comp.component_id);
     const qtyLabel = pc ? esc(pc.quantity) + ' ' + esc(pc.unit) + ' ' + quantitySourceBadge(pc.quantity_source) : '';
-    const header = '<h3>' + esc(comp.component_name) + '</h3>' + (qtyLabel ? '<div style="font-size:12px;color:var(--kk-gray-500);margin-top:2px">Antal: ' + qtyLabel + '</div>' : '');
+    const usageBlock = (pc && pc.usage_context) ? '<div class="usage-context"><span class="usage-context-label">Användning:</span>' + esc(pc.usage_context) + '</div>' : '';
+    const header = '<h3>' + esc(comp.component_name) + '</h3>' + (qtyLabel ? '<div style="font-size:12px;color:var(--kk-gray-500);margin-top:2px">Antal: ' + qtyLabel + '</div>' : '') + usageBlock;
     html += '<div class="comp-card"><div class="comp-card-header">' + header + '</div>';
     html += '<table class="comp-table"><thead><tr><th style="width:32px"></th><th>Typ</th><th>Material</th><th>K\u00e4lla</th><th style="text-align:right">CO\u2082e (kg)</th><th style="text-align:right">Kostnad</th><th></th></tr></thead><tbody>';
     const blSel = state.selections[comp.component_id] && state.selections[comp.component_id].selected_alternative.name === 'Baslinje';

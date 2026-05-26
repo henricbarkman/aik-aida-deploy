@@ -132,6 +132,11 @@ def calculate_baseline(project: Project) -> Baseline:
     boverket_products = provider._cache.get_all_boverket()
     results = _match_components_to_boverket(project, boverket_products)
 
+    # Phase 1b: For components where the LLM fell back to "Uppskattning"
+    # (no Boverket material proxy fit), substitute an EPD-median where the
+    # component's category has reliable aggregated data.
+    _apply_epd_median_fallback(results, project)
+
     # Phase 2: Batch price enrichment
     from aida.data.pricing_provider import lookup_price, lookup_prices_batch
 
@@ -167,6 +172,50 @@ def calculate_baseline(project: Project) -> Baseline:
 
     results = _validate_baseline(results, project.components)
     return Baseline(components=results)
+
+
+def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) -> None:
+    """Substitute LLM-uppskattning with EPD-median where available (in-place).
+
+    Three-tier baseline strategy:
+    1. Boverket material proxy (handled in _match_components_to_boverket)
+    2. EPD-median per category (this function)
+    3. LLM uppskattning (kept when neither tier 1 nor 2 fits)
+
+    Only kicks in when the LLM returned source="Uppskattning". Boverket
+    matches are left alone — they're more precise.
+    """
+    from aida.data.epd_baseline_medians import get_baseline_median
+
+    comp_map = {c.id: c for c in project.components}
+    for r in results:
+        if "uppskattning" not in (r.source or "").lower():
+            continue
+        if r.boverket_product:
+            continue  # already a Boverket-proxy hit, don't touch
+        comp = comp_map.get(r.component_id)
+        if not comp:
+            continue
+        category = normalize_component_name(comp.name)
+        if not category:
+            continue
+        median_data = get_baseline_median(category, comp.unit)
+        if not median_data:
+            continue  # no usable EPD-median for this (category, unit) — keep LLM uppskattning
+
+        median_per_unit = median_data["median_co2e_per_unit"]
+        n = median_data["sample_size"]
+        new_co2e = round(median_per_unit * comp.quantity, 1)
+
+        r.co2e_kg = new_co2e
+        r.source = "Environdec EPD-medel"
+        r.boverket_product = ""  # signal: not a Boverket proxy
+        r.description = (
+            f"Baslinje från EPD-medel: median av {n} Environdec EPD:er i "
+            f"kategorin {category} ({median_per_unit} kg CO2e/{comp.unit}) × "
+            f"{comp.quantity} {comp.unit}. Boverket saknar proxy för denna "
+            f"komponenttyp; EPD-medel är ett kategori-aggregat (inte produktspecifikt)."
+        )
 
 
 def _is_price_cached(provider: ClimateProvider, product_name: str) -> bool:

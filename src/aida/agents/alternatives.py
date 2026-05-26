@@ -51,7 +51,7 @@ Din uppgift:
 3. Resonera om varför alternativet är bättre — beskriv BÅDE klimatvinsten och hur det uppfyller praktiska behov
 
 PRINCIPER FÖR ALTERNATIV:
-- Alla alternativ ska normalt ha lägre klimatpåverkan än baslinjen. UNDANTAG: om baslinjen är märkt som "uppskattning" (ingen Boverket-proxy), föreslå verkliga EPD-alternativ även om deras CO2e är högre — flagga jämförelsen som osäker i reasoning. Tomt resultat är värre än en transparent jämförelse.
+- Användaren optimerar TOTALEN över hela projektet, inte per komponent. En komponent kan välja ett dyrare eller högre CO2e-alternativ om totalen blir bättre tack vare stora vinster på andra komponenter. Filtrera därför INTE bort alternativ enbart för att deras CO2e råkar vara högre än baslinjen — visa relevanta valmöjligheter med tydlig +/- jämförelse i reasoning. Rangordna gärna med lägst CO2e först så användaren ser besparingen, men inkludera även likvärdiga eller marginellt högre alternativ när de är funktionellt relevanta.
 - Uttryckta behov är oförhandlingsbara — inget alternativ som inte uppfyller dem.
 - Resonera om hur alternativen möter behov: både uttryckta och antagna (ljudmiljö, inomhusklimat, underhåll, estetik, arbetsmiljö vid installation).
 - Presentera spridning i pris — det är användarens beslut att väga ekonomi mot klimat.
@@ -598,16 +598,19 @@ def _find_alternatives_with_epds(
     """Use LLM to select best alternatives from EPD data."""
     client = get_client()
 
-    baseline_is_estimate = "uppskattning" in (getattr(bl_comp, "source", "") or "").lower()
-    baseline_label = "uppskattning" if baseline_is_estimate else "Boverket Typical"
+    baseline_source = (getattr(bl_comp, "source", "") or "").lower()
+    if "uppskattning" in baseline_source:
+        baseline_label = "uppskattning"
+    elif "epd-medel" in baseline_source or "epd-median" in baseline_source:
+        baseline_label = "EPD-medel"
+    else:
+        baseline_label = "Boverket Typical"
     prompt = f"""Komponent: {proj_comp.name}
 Antal: {proj_comp.quantity} {proj_comp.unit}
 Baslinje CO2e: {bl_comp.co2e_kg} kg ({baseline_label})
 Baslinje kostnad: {bl_comp.cost_sek} SEK
-"""
-    if baseline_is_estimate:
-        prompt += """
-OBS: Baslinjen är en uppskattning (ingen Boverket-proxy fanns för denna komponenttyp). Uppskattningen kan vara orimligt låg — föreslå därför EPD-alternativ från listan nedan ÄVEN OM deras CO2e ser högre ut än baslinjen. Flagga jämförelsen som osäker i reasoning ("baslinjen är uppskattning, jämförelsen indikativ"). Bättre att visa verkliga produkter än att returnera tomt.
+
+Föreslå 2-4 relevanta alternativ från EPD-listan nedan. Inkludera hela spannet av CO2e-värden — användaren optimerar totalen över hela projektet, inte per komponent, så ett alternativ som ligger något över baslinjen kan vara värt att visa om det möter behoven bättre. Rangordna med lägst CO2e först. I reasoning: ange explicit hur alternativet jämför mot baslinjen (t.ex. "−45% CO2e" eller "+12% CO2e — men kortare leveranskedja och tystare drift").
 """
 
     # Project-level needs (user-approved) — overarching framing for the whole

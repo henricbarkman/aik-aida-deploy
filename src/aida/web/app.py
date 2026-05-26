@@ -860,6 +860,7 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 /* === Source badges === */
 .source-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-right: 3px; }
 .source-verified { background: #F0E0E0; color: var(--kk-burgundy); }
+.source-aggregate { background: #FFE9D6; color: #7A4810; }
 .source-estimate { background: var(--kk-gold-light); color: #8B6914; }
 .source-legend { display: flex; gap: 16px; margin: 4px 0 12px; font-size: 12px; color: var(--kk-gray-500); }
 .method-label { margin: 4px 0 8px; font-size: 11px; color: var(--kk-gray-500); font-style: italic; }
@@ -2096,6 +2097,9 @@ function formatSource(source) {
   if (source.startsWith('[EPD]')) return '<span class="source-badge source-verified">EPD</span>' + esc(source.replace('[EPD] ', ''));
   if (source.startsWith('[Palats]')) return '<span class="source-badge source-verified">Palats</span>' + esc(source.replace('[Palats] ', ''));
   if (source.includes('Boverket')) return '<span class="source-badge source-verified">BVK</span>' + esc(source);
+  // EPD-medel is a category-aggregated median — better than Uppskattning,
+  // less precise than a single verified EPD. Own badge so user can tell.
+  if (source.includes('EPD-medel') || source.includes('EPD-median')) return '<span class="source-badge source-aggregate">EPD-medel</span>' + esc(source);
   if (source.includes('EPD') || source.includes('Environdec')) return '<span class="source-badge source-verified">EPD</span>' + esc(source);
   if (source.startsWith('[Uppskattning]')) return '<span class="source-badge source-estimate">Est.</span>' + esc(source.replace('[Uppskattning] ', ''));
   if (source.includes('Uppskattning')) return '<span class="source-badge source-estimate">Est.</span>' + esc(source);
@@ -2267,7 +2271,7 @@ function renderBaslinjeContent() {
   const totalCost = d.components.reduce((s,c) => s + c.cost_sek, 0);
   let html = '<div class="section-title">Baslinje (NollCO2-metoden)</div>';
   html += '<div class="method-label">Klimatmetod: GWP-fossil, livscykelskedena A1-A3 (Boverkets klimatdatabas)</div>';
-  html += '<div class="source-legend"><span><span class="source-badge source-verified">EPD</span> Verifierad k\u00e4lla</span><span><span class="source-badge source-estimate">Est.</span> Uppskattning</span></div>';
+  html += '<div class="source-legend"><span><span class="source-badge source-verified">EPD</span> Verifierad k\u00e4lla</span><span><span class="source-badge source-aggregate">EPD-medel</span> Kategori-aggregat</span><span><span class="source-badge source-estimate">Est.</span> Uppskattning</span></div>';
   html += '<div class="summary">';
   html += '<div class="card"><div class="card-title">Total CO\u2082e</div><div class="value">' + Math.round(total).toLocaleString('sv') + '</div><div class="sublabel">kg CO\u2082e</div></div>';
   html += '<div class="card"><div class="card-title">Total kostnad</div><div class="value">' + Math.round(totalCost).toLocaleString('sv') + '</div><div class="sublabel">SEK</div></div>';
@@ -2291,7 +2295,7 @@ function renderAlternativContent() {
   const data = state.alternatives;
   let html = '<div class="section-title">J\u00e4mf\u00f6relse per komponent</div>';
   html += '<div class="method-label">Klimatmetod: GWP-fossil, livscykelskedena A1-A3 (Boverkets klimatdatabas)</div>';
-  html += '<div class="source-legend"><span><span class="source-badge source-verified">EPD</span> Verifierad k\u00e4lla</span><span><span class="source-badge source-estimate">Est.</span> Uppskattning</span></div>';
+  html += '<div class="source-legend"><span><span class="source-badge source-verified">EPD</span> Verifierad k\u00e4lla</span><span><span class="source-badge source-aggregate">EPD-medel</span> Kategori-aggregat</span><span><span class="source-badge source-estimate">Est.</span> Uppskattning</span></div>';
   const projComps = (state.project && state.project.components) || [];
   data.components.forEach(comp => {
     const pc = projComps.find(p => p.id === comp.component_id);
@@ -2347,7 +2351,7 @@ function renderAlternativContent() {
         '<td>' + getTypeBadge(alt) + '</td>' +
         '<td style="font-weight:500">' + esc(alt.name) + '</td>' +
         '<td style="font-size:11px">' + formatSource(alt.source) + '</td>' +
-        '<td style="text-align:right">' + Math.round(alt.co2e_kg) + ' <span style="color:var(--green-saving);font-size:11px">\u2193' + saving + '%</span></td>' +
+        '<td style="text-align:right">' + Math.round(alt.co2e_kg) + ' <span style="color:' + (saving >= 0 ? 'var(--green-saving)' : 'var(--kk-red-orange)') + ';font-size:11px">' + (saving >= 0 ? '\u2193' : '\u2191') + Math.abs(saving) + '%</span></td>' +
         '<td style="text-align:right">' + costCell + '</td>' +
         '<td>' + (alt.reasoning ? '<button class="reasoning-toggle" onclick="toggleReasoning(\'' + rowId + '\',event)">Visa mer</button>' : '') + '</td></tr>';
       if (alt.reasoning) {

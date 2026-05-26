@@ -2057,9 +2057,117 @@ function quantitySourceBadge(src) {
   return '<span class="source-badge source-estimate" title="AIda uppskattade antalet utifr\u00e5n area och byggnadstyp \u2014 granska om n\u00e5got verkar fel">AIda uppskattat</span>';
 }
 
+// Snapshot of the inferred text at the moment edit was opened. Restores
+// on Cancel even if state.project was swapped by a concurrent chat-agent
+// update mid-edit.
+let _naEditSnapshot = null;
+
+function renderNeedsAnalysis(na) {
+  // Show a discreet placeholder when needs_analysis is missing entirely.
+  // Distinguishes "this is a legacy analysis from before this feature" from
+  // "intake produced an empty analysis" \u2014 both look the same to the user
+  // otherwise, hiding a real regression.
+  const hasAny = na && (
+    (na.from_user || '').trim() ||
+    (na.inferred || '').trim() ||
+    (Array.isArray(na.assumptions) && na.assumptions.length) ||
+    (Array.isArray(na.would_clarify) && na.would_clarify.length)
+  );
+  if (!hasAny) {
+    return '<div class="comp-card needs-analysis-card" style="margin-bottom:16px">' +
+      '<div class="comp-card-header"><h3>AIdas behovsanalys</h3>' +
+      '<div style="font-size:11px;color:var(--kk-gray-500);margin-top:2px">Ingen behovsanalys finns f\u00f6r det h\u00e4r projektet \u2014 analysen tillkom efter att projektet skapades. K\u00f6ra om intake i chatten ger en analys som styr alternativvalet.</div></div></div>';
+  }
+  const fromUser = na.from_user || '';
+  const inferred = na.inferred || '';
+  const assumptions = Array.isArray(na.assumptions) ? na.assumptions : [];
+  const clarify = Array.isArray(na.would_clarify) ? na.would_clarify : [];
+  let html = '<div class="comp-card needs-analysis-card" style="margin-bottom:16px">';
+  html += '<div class="comp-card-header"><h3>AIdas behovsanalys</h3>';
+  html += '<div style="font-size:11px;color:var(--kk-gray-500);margin-top:2px">Granska f\u00f6re baslinje. Korrigera "Inferens" om n\u00e5got \u00e4r fel \u2014 den styr vilka alternativ AIda f\u00f6resl\u00e5r.</div></div>';
+  html += '<div style="padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+  html += '<div><div class="usage-context-label" style="margin-bottom:4px">Fr\u00e5n din beskrivning</div>';
+  html += '<div style="font-size:13px;line-height:1.5;color:var(--kk-charcoal);background:var(--kk-gray-50);padding:8px 10px;border-radius:4px">' + (fromUser ? esc(fromUser) : '<em style="color:var(--kk-gray-400)">(inget direkt fr\u00e5n din beskrivning)</em>') + '</div></div>';
+  html += '<div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+  html += '<div class="usage-context-label">AIdas inferens</div>';
+  html += '<button type="button" id="naEditBtn" onclick="toggleNeedsEdit()" style="font-size:11px;background:none;border:1px solid var(--kk-gray-300);border-radius:3px;padding:2px 8px;cursor:pointer">Redigera</button></div>';
+  html += '<div id="naInferredView" style="font-size:13px;line-height:1.5;color:var(--kk-charcoal);background:#fffbe6;border:1px solid #ffe8a3;padding:8px 10px;border-radius:4px">' + (inferred ? esc(inferred) : '<em style="color:var(--kk-gray-400)">(ingen inferens)</em>') + '</div>';
+  // Textarea content is intentionally empty in HTML \u2014 populated via .value below
+  // to avoid HTML-entity decoding issues with quotes/ampersands.
+  html += '<textarea id="naInferredEdit" style="display:none;width:100%;min-height:120px;font-size:13px;line-height:1.5;font-family:inherit;padding:8px 10px;border:1px solid var(--kk-gray-300);border-radius:4px;box-sizing:border-box"></textarea>';
+  html += '<div id="naEditActions" style="display:none;margin-top:6px;gap:6px;justify-content:flex-end">';
+  html += '<button type="button" onclick="cancelNeedsEdit()" style="font-size:11px;background:none;border:1px solid var(--kk-gray-300);border-radius:3px;padding:3px 10px;cursor:pointer">Avbryt</button>';
+  html += '<button type="button" onclick="saveNeedsEdit()" style="font-size:11px;background:var(--kk-charcoal);color:white;border:none;border-radius:3px;padding:3px 10px;cursor:pointer">Spara</button>';
+  html += '</div></div>';
+  html += '</div>';
+  if (assumptions.length || clarify.length) {
+    html += '<div style="padding:0 16px 12px;display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+    if (assumptions.length) {
+      html += '<div><div class="usage-context-label" style="margin-bottom:4px">Antaganden AIda gjort</div>';
+      html += '<ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.5;color:var(--kk-gray-500)">';
+      assumptions.forEach(a => { html += '<li>' + esc(a) + '</li>'; });
+      html += '</ul></div>';
+    } else { html += '<div></div>'; }
+    if (clarify.length) {
+      html += '<div><div class="usage-context-label" style="margin-bottom:4px">AIda hade g\u00e4rna vetat</div>';
+      html += '<ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.5;color:var(--kk-gray-500)">';
+      clarify.forEach(q => { html += '<li>' + esc(q) + '</li>'; });
+      html += '</ul></div>';
+    } else { html += '<div></div>'; }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function _populateNeedsTextarea() {
+  // Populate the textarea via .value (not innerHTML) so the raw inferred
+  // text \u2014 including quotes and ampersands \u2014 is preserved verbatim.
+  const ta = document.getElementById('naInferredEdit');
+  if (!ta) return;
+  const na = state.project && state.project.needs_analysis;
+  ta.value = (na && na.inferred) || '';
+}
+
+function toggleNeedsEdit() {
+  const ta = document.getElementById('naInferredEdit');
+  if (!ta) return;
+  _naEditSnapshot = ta.value;  // remember pre-edit value
+  document.getElementById('naInferredView').style.display = 'none';
+  ta.style.display = 'block';
+  document.getElementById('naEditActions').style.display = 'flex';
+  document.getElementById('naEditBtn').style.display = 'none';
+  ta.focus();
+}
+
+function cancelNeedsEdit() {
+  const ta = document.getElementById('naInferredEdit');
+  if (!ta) return;
+  // Restore from the pre-edit snapshot \u2014 not from state.project, which may
+  // have been mutated by a concurrent chat-agent update during the edit.
+  ta.value = _naEditSnapshot != null ? _naEditSnapshot : ta.value;
+  _naEditSnapshot = null;
+  document.getElementById('naInferredView').style.display = '';
+  ta.style.display = 'none';
+  document.getElementById('naEditActions').style.display = 'none';
+  document.getElementById('naEditBtn').style.display = '';
+}
+
+function saveNeedsEdit() {
+  const ta = document.getElementById('naInferredEdit');
+  if (!ta) return;
+  const newVal = ta.value.trim();
+  if (!state.project.needs_analysis) state.project.needs_analysis = {from_user:'',inferred:'',assumptions:[],would_clarify:[]};
+  state.project.needs_analysis.inferred = newVal;
+  _naEditSnapshot = null;
+  if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+  renderProjektContent();
+}
+
 function renderProjektContent() {
   const d = state.project;
   let html = '<div class="section-title">Projektinformation</div>';
+  html += renderNeedsAnalysis(d.needs_analysis);
   html += '<div class="comp-card"><div class="comp-card-header"><h3>' + esc(d.building_type) + ', ' + esc(d.area_bta) + ' m\u00b2 BTA' + (d.name ? ' (' + esc(d.name) + ')' : '') + '</h3></div>';
   html += '<table class="comp-table"><thead><tr><th>Komponent</th><th>Antal</th><th>Enhet</th><th>Kategori</th><th>K\u00e4lla</th></tr></thead><tbody>';
   d.components.forEach(c => {
@@ -2078,6 +2186,7 @@ function renderProjektContent() {
     html += '<div class="comp-card" style="margin-top:12px"><div class="comp-card-header"><h3>Beskrivning</h3></div><div style="padding:12px 16px;font-size:13px;color:var(--kk-gray-500);line-height:1.5">' + esc(d.description) + '</div></div>';
   }
   document.getElementById('resultContent').innerHTML = html;
+  _populateNeedsTextarea();
 }
 
 function renderBaslinjeContent() {

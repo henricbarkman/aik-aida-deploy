@@ -30,6 +30,7 @@ from aida.models import (
     AlternativesResult,
     Baseline,
     ComponentAlternatives,
+    NeedsAnalysis,
     Project,
 )
 
@@ -369,7 +370,8 @@ def find_alternatives(
         epds_for_category = epd_data.get(comp_key, [])
 
         alternatives = _find_alternatives_with_epds(
-            proj_comp, bl_comp, epds_for_category, user_feedback
+            proj_comp, bl_comp, epds_for_category, user_feedback,
+            needs_analysis=project.needs_analysis,
         )
 
         # Validate data quality: filter zero CO2, component-only parts, flag prices
@@ -581,6 +583,7 @@ def _find_alternatives_with_epds(
     bl_comp,
     epds: list[dict],
     user_feedback: str | None = None,
+    needs_analysis: NeedsAnalysis | None = None,
 ) -> list[Alternative]:
     """Use LLM to select best alternatives from EPD data."""
     client = get_client()
@@ -591,10 +594,22 @@ Baslinje CO2e: {bl_comp.co2e_kg} kg (Boverket Typical)
 Baslinje kostnad: {bl_comp.cost_sek} SEK
 """
 
+    # Project-level needs (user-approved) — overarching framing for the whole
+    # selection. Per-component usage_context below is the targeted derivation
+    # of these for this specific component.
+    inferred = getattr(needs_analysis, "inferred", "") if needs_analysis else ""
+    if inferred:
+        prompt += f"""
+PROJEKTETS BEHOV (godkänt av användaren):
+{inferred}
+
+→ Detta är överordnad kontext för hela urvalsprocessen. Alternativ som tydligt inte klarar dessa krav ska antingen utelämnas eller flaggas explicit med motivering om varför just denna produkt ändå klarar miljön.
+"""
+
     usage_context = getattr(proj_comp, "usage_context", "")
     if usage_context:
         prompt += f"""
-ANVÄNDNINGSKONTEXT (funktionella krav från intake):
+ANVÄNDNINGSKONTEXT FÖR DENNA KOMPONENT (funktionella krav från intake):
 {usage_context}
 
 → Använd kontexten för att filtrera bort alternativ som inte uppfyller kraven, även om CO2e är lågt. För varje alternativ du föreslår, förklara i reasoning hur det möter kraven — eller flagga explicit om en avvägning finns (t.ex. "lägre CO2e men kräver halksäkringsbehandling").
@@ -717,7 +732,16 @@ def _generate_commentary(
                 f"{cost_str} ({pct:+.0f}% CO2e) | {alt.source}"
             )
 
-    prompt = f"""Projekt: {project.building_type}, {project.area_bta} m2
+    needs_block = ""
+    inferred = getattr(project.needs_analysis, "inferred", "") if project.needs_analysis else ""
+    if inferred:
+        needs_block = f"""
+
+Projektets behov (användargodkänt):
+{inferred}
+"""
+
+    prompt = f"""Projekt: {project.building_type}, {project.area_bta} m2{needs_block}
 
 Alternativ som hittats:
 {''.join(summary_lines)}

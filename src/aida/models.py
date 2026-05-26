@@ -44,12 +44,41 @@ class Component:
 
 
 @dataclass
+class NeedsAnalysis:
+    # Project-level reasoning about user needs. Travels with the Project
+    # through the pipeline; consumed by alternatives.py to constrain suggestions
+    # to materials suitable for the actual use case (not just CO2-optimal).
+    #
+    # Split into "what the user said" vs "what the agent inferred" so the user
+    # can spot bad inferences before they propagate downstream.
+    from_user: str = ""        # Paraphrase of user's input — no agent inference
+    inferred: str = ""         # Agent's conclusions about users + environment + functional requirements
+    assumptions: list[str] = field(default_factory=list)   # Things the agent assumed without asking — user can correct
+    would_clarify: list[str] = field(default_factory=list) # Questions the agent would ask if critical — optional for user
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict | None) -> NeedsAnalysis:
+        if not data:
+            return cls()
+        return cls(
+            from_user=data.get("from_user", ""),
+            inferred=data.get("inferred", ""),
+            assumptions=list(data.get("assumptions", []) or []),
+            would_clarify=list(data.get("would_clarify", []) or []),
+        )
+
+
+@dataclass
 class Project:
     building_type: str
     area_bta: float
     components: list[Component] = field(default_factory=list)
     name: str = ""
     description: str = ""
+    needs_analysis: NeedsAnalysis = field(default_factory=NeedsAnalysis)
 
     def to_dict(self) -> dict:
         return {
@@ -58,6 +87,7 @@ class Project:
             "name": self.name,
             "description": self.description,
             "components": [c.to_dict() for c in self.components],
+            "needs_analysis": self.needs_analysis.to_dict(),
         }
 
     def to_json(self) -> str:
@@ -72,6 +102,7 @@ class Project:
             name=data.get("name", ""),
             description=data.get("description", ""),
             components=components,
+            needs_analysis=NeedsAnalysis.from_dict(data.get("needs_analysis")),
         )
 
     @classmethod

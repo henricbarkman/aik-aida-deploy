@@ -23,6 +23,7 @@ Du ska identifiera:
 2. Ungefärlig area i BTA (bruttoarea i kvadratmeter)
 3. En lista av renoveringskomponenter (vad som ska bytas/renoveras)
 4. För varje komponent: ett kort resonemang om brukar- och miljökrav som styr vilka material som är lämpliga ("usage_context")
+5. En projektövergripande behovsanalys (`needs_analysis`) — separerad i (a) vad användaren faktiskt sagt och (b) vad du som agent inferrat. Användaren kommer granska och godkänna detta innan downstream-stegen körs.
 
 Svara ALLTID med giltig JSON i detta format:
 {
@@ -33,6 +34,12 @@ Svara ALLTID med giltig JSON i detta format:
   "components": [
     {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm", "category": "kategori", "quantity_source": "user_specified" eller "estimated", "usage_context": "1-3 meningar om brukare + miljö + funktionella krav"}
   ],
+  "needs_analysis": {
+    "from_user": "Parafras av användarens input — bara det användaren faktiskt sagt om byggnaden, användningen, kraven. Ingen agent-tolkning.",
+    "inferred": "Dina slutsatser om brukare, miljöbelastning och funktionella krav baserat på byggnadstyp och beskrivning. Markera tydligt med 'Eftersom...' eller 'Troligen...' när du resonerar bortom användarens input.",
+    "assumptions": ["lista över saker du antagit utan att fråga — t.ex. 'antar att skolan har normal elevtrafik (200-400 elever)'"],
+    "would_clarify": ["frågor du gärna hade ställt om de varit kritiska, men som du gått vidare utan svar på"]
+  },
   "clarification_needed": null eller "fråga"
 }
 
@@ -69,6 +76,19 @@ Exempel — kontorsbadrum WC:
 
 VIKTIGT: Detta är inte ett materialval — du namnger eventuellt OLÄMPLIGA material och vilka egenskaper som krävs, men låter alternativ-steget göra själva valet. Om ingen särskild kontext kan utläsas (t.ex. "tak" utan vidare info i ett bostadshus), skriv en kort generisk rad ("Vanligt bostadshus-tak, standardkrav för väderbeständighet och isolering") snarare än att hitta på.
 
+KONSISTENS: Per-komponent `usage_context` SKA följa av projekt-level `needs_analysis.inferred`. Om needs_analysis säger "lågstadieskola, hög elevtrafik, blöt sand vintertid", får ingen komponents usage_context säga något som motsäger det. Tänk top-down: skriv needs_analysis först, härled sedan per-komponent.
+
+NEEDS_ANALYSIS — separationen citat vs. inferens:
+`from_user` ska vara så nära användarens egen text som möjligt — parafrasera bara för att städa språket. Skriv ALDRIG där: "Eftersom det är en skola antar vi...", "Troligen är detta...", "Det implicerar att...". Sådant hör i `inferred`.
+
+`inferred` är där du resonerar som byggnadsexpert. Var explicit med dina antaganden ("Eftersom byggnadsåret är 2015 förmodar jag att grundkonstruktionen är intakt"). Använd `assumptions`-listan för diskreta antaganden som inte ryms i prosan ("antar 4 brukare per kontor"). Använd `would_clarify` för det du gärna hade vetat men gick vidare utan ("verksamhetstyp i denna kontorsbyggnad — callcenter eller specialistmottagning ändrar slitageprofilen").
+
+Exempel — input "byta golv i tamburen på en lågstadieskola":
+- from_user: "Användaren vill byta golvet i tamburen på en lågstadieskola."
+- inferred: "Lågstadieskola innebär elever 6-9 år, hög dagligt slitage från cirka 100-300 elever som passerar entrén minst två gånger per dag. Vintertid kommer blöta skor med snö, salt och sand in i tamburen — golvet behöver tåla fukt, vara halksäkert och lätt att våtmoppa. Hygienkrav på tålighet mot rengöringskemikalier. Olja behandlat trä och oljat parkett är därför olämpligt. Linoleum, gummi, klinker med halkfri yta passar; vinyl med tillräcklig slitstyrka kan funka."
+- assumptions: ["Antar 100-300 elever och två passager per dag", "Antar nordiskt klimat med vinterförhållanden"]
+- would_clarify: ["Finns entrémattor som tar mest av fukten innan tamburgolvet?", "Hur lång är tamburen — påverkar hur långt blöt sand når in i byggnaden"]
+
 FÖRTYDLIGANDEN:
 - Fråga INTE om specifika materialval (t.ex. vilken typ av golv eller vilken isolering). Du ska fokusera på behov och funktionella krav, inte material. Materialval är alternativ-stegets uppgift, och AIda kan komma med bättre förslag än användaren tänkt sig.
 - Fråga däremot gärna om saker som påverkar analysen:
@@ -87,6 +107,7 @@ TIDIGARE DISKUSSION:
 - Sätt clarification_needed till null om tidigare svar (eventuellt ändrade av korrigeringen) fyller informationsbehovet, även om värdena inte upprepas i den nya korrigeringstexten.
 - Bevara projektnamn från tidigare beskrivning om det inte uttryckligen ändras.
 - Bevara usage_context från tidigare iteration om komponenten inte ändrats — uppdatera bara när komponenten ändrats eller ny info påverkar funktionella krav.
+- Bevara needs_analysis från tidigare iteration om varken byggnadstyp eller huvudsaklig användning ändrats. Uppdatera `from_user` om användaren tillfört ny direkt-info; uppdatera `inferred` bara om någon förutsättning faktiskt skiftat.
 """
 
 
@@ -96,9 +117,11 @@ def run_intake(description: str) -> dict:
 
     response = client.messages.create(
         model=DEFAULT_MODEL,
-        # Bumped 2000 → 4000 to accommodate usage_context per component
-        # without truncating multi-component projects.
-        max_tokens=4000 + THINKING_LOW,
+        # Bumped 4000 → 8000 to accommodate project-level needs_analysis
+        # (from_user + inferred + assumptions + would_clarify) on top of
+        # per-component usage_context. Multi-bathroom / multi-room projects
+        # with many components were truncating at 6000.
+        max_tokens=8000 + THINKING_LOW,
         thinking=thinking_config(THINKING_LOW),
         system=SYSTEM_PROMPT,
         messages=[

@@ -121,6 +121,10 @@ class BaselineResult:
     description: str = ""
     source: str = ""
     cost_source: str = ""
+    # Exact Boverket product name used as proxy for this component
+    # (e.g. "Takduk, PVC" for a vinylgolv). Empty when source is
+    # "Uppskattning" (no Boverket proxy available).
+    boverket_product: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -149,6 +153,7 @@ class Baseline:
                 description=c.get("description", ""),
                 source=c.get("source", ""),
                 cost_source=c.get("cost_source", ""),
+                boverket_product=c.get("boverket_product", ""),
             ))
         return cls(components=components)
 

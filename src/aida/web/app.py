@@ -2276,7 +2276,8 @@ function renderBaslinjeContent() {
   html += '<div class="comp-card"><div class="comp-card-header"><h3>Per komponent</h3></div>';
   html += '<table class="comp-table"><thead><tr><th>Komponent</th><th style="text-align:right">CO\u2082e (kg)</th><th>Klimatk\u00e4lla</th><th style="text-align:right">Kostnad (SEK)</th><th>Prisk\u00e4lla</th></tr></thead><tbody>';
   d.components.forEach(c => {
-    html += '<tr><td style="font-weight:500">' + esc(c.component_name) + '</td><td style="text-align:right">' + Math.round(c.co2e_kg).toLocaleString('sv') + '</td><td style="font-size:11px">' + formatSource(c.source) + '</td><td style="text-align:right">' + Math.round(c.cost_sek).toLocaleString('sv') + '</td><td style="font-size:11px">' + esc(c.cost_source || '') + '</td></tr>';
+    const productLine = c.boverket_product ? '<div style="font-size:11px;color:var(--kk-gray-500);margin-top:3px;font-style:italic">' + esc(c.boverket_product) + '</div>' : '';
+    html += '<tr><td style="font-weight:500">' + esc(c.component_name) + '</td><td style="text-align:right">' + Math.round(c.co2e_kg).toLocaleString('sv') + '</td><td style="font-size:11px">' + formatSource(c.source) + productLine + '</td><td style="text-align:right">' + Math.round(c.cost_sek).toLocaleString('sv') + '</td><td style="font-size:11px">' + esc(c.cost_source || '') + '</td></tr>';
   });
   html += '</tbody></table></div>';
   document.getElementById('resultContent').innerHTML = html;
@@ -2296,10 +2297,19 @@ function renderAlternativContent() {
     html += '<div class="comp-card"><div class="comp-card-header">' + header + '</div>';
     html += '<table class="comp-table"><thead><tr><th style="width:32px"></th><th>Typ</th><th>Material</th><th>K\u00e4lla</th><th style="text-align:right">CO\u2082e (kg)</th><th style="text-align:right">Kostnad</th><th></th></tr></thead><tbody>';
     const blSel = state.selections[comp.component_id] && state.selections[comp.component_id].selected_alternative.name === 'Baslinje';
+    // Look up the Boverket product used for this component's baseline so the
+    // baseline row in the alternatives table shows the actual proxy product
+    // (e.g. "Takduk, PVC") rather than just the generic "Konventionellt".
+    const blBaselineComp = (state.baseline && state.baseline.components) ? state.baseline.components.find(b => b.component_id === comp.component_id) : null;
+    const blProduct = (blBaselineComp && blBaselineComp.boverket_product) ? blBaselineComp.boverket_product : '';
+    const blSource = (blBaselineComp && blBaselineComp.source) ? blBaselineComp.source : 'NollCO2';
+    const blMaterialCell = blProduct
+      ? '<div style="font-weight:500">Konventionellt</div><div style="font-size:11px;color:var(--kk-gray-500);font-style:italic;margin-top:2px">' + esc(blProduct) + '</div>'
+      : '<div style="font-weight:500">Konventionellt</div>';
     html += '<tr class="alt-row' + (blSel ? ' selected' : '') + '" data-comp="' + comp.component_id + '" data-alt="baseline">' +
       '<td><input type="radio" name="' + comp.component_id + '"' + (blSel ? ' checked' : '') + '></td>' +
       '<td><span class="type-badge type-baseline">Baslinje</span></td>' +
-      '<td style="font-weight:500">Konventionellt</td><td style="font-size:11px">NollCO2</td>' +
+      '<td>' + blMaterialCell + '</td><td style="font-size:11px">' + (blSource.includes('Boverket') ? '<span class="source-badge source-verified">BVK</span>' : '<span class="source-badge source-estimate">Est.</span>') + ' NollCO2</td>' +
       '<td style="text-align:right">' + Math.round(comp.baseline_co2e_kg) + '</td>' +
       '<td style="text-align:right">' + Math.round(comp.baseline_cost_sek).toLocaleString('sv') + ' kr</td><td></td></tr>';
     comp.alternatives.forEach((alt, i) => {

@@ -270,6 +270,7 @@ Matcha varje komponent ovan mot bästa Boverket-produkt. Använd EXAKT de compon
             description=description,
             source=source,
             cost_source=cost_source,
+            boverket_product=boverket_match or "",
         ))
 
     return results

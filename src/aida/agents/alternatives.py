@@ -603,7 +603,7 @@ Baslinje kostnad: {bl_comp.cost_sek} SEK
 PROJEKTETS BEHOV (godkänt av användaren):
 {inferred}
 
-→ Detta är överordnad kontext för hela urvalsprocessen. Alternativ som tydligt inte klarar dessa krav ska antingen utelämnas eller flaggas explicit med motivering om varför just denna produkt ändå klarar miljön.
+→ Detta är överordnad kontext. Föreslå alternativ från EPD-listan som vanligt och flagga i reasoning hur varje alternativ möter eller utmanar dessa behov. Utelämna ENDAST om alternativet är uppenbart fel byggdel för funktionen (t.ex. utomhusgolv för innerentré). I tveksamma fall: föreslå med tydlig caveat i reasoning — användaren har sista ordet, inte agenten.
 """
 
     usage_context = getattr(proj_comp, "usage_context", "")
@@ -612,7 +612,7 @@ PROJEKTETS BEHOV (godkänt av användaren):
 ANVÄNDNINGSKONTEXT FÖR DENNA KOMPONENT (funktionella krav från intake):
 {usage_context}
 
-→ Använd kontexten för att filtrera bort alternativ som inte uppfyller kraven, även om CO2e är lågt. För varje alternativ du föreslår, förklara i reasoning hur det möter kraven — eller flagga explicit om en avvägning finns (t.ex. "lägre CO2e men kräver halksäkringsbehandling").
+→ Använd kontexten för att resonera om hur varje alternativ möter kraven. Föreslå alternativ från EPD-listan även om någon egenskap är osäker — flagga osäkerheten i reasoning (t.ex. "lägre CO2e men kräver halksäkringsbehandling"). Utelämna bara om alternativet är uppenbart fel byggdel.
 """
 
     if epds:

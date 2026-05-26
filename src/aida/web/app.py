@@ -2162,7 +2162,7 @@ function renderNeedsAnalysis(na) {
   html += '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 2l3 3-9 9H2v-3l9-9z"/></svg>';
   html += 'Justera AIdas l\u00e4sning</button>';
   html += '</div>';
-  html += '<div class="voice-label"><span class="dot"></span>AIda inferer</div>';
+  html += '<div class="voice-label"><span class="dot"></span>AIda tolkar</div>';
   html += '<div class="voice-text" id="naInferredView">' + (inferred ? esc(inferred) : '<em class="empty">(ingen inferens)</em>') + '</div>';
   // Empty textarea \u2014 value populated via .value to preserve quotes/ampersands
   html += '<textarea class="voice-aida-textarea" id="naInferredEdit"></textarea>';

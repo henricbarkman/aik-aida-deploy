@@ -175,17 +175,24 @@ def calculate_baseline(project: Project) -> Baseline:
 
 
 def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) -> None:
-    """Substitute LLM-uppskattning with EPD-median where available (in-place).
+    """Substitute LLM-uppskattning with EPD-typvärde where available (in-place).
 
     Three-tier baseline strategy:
     1. Boverket material proxy (handled in _match_components_to_boverket)
-    2. EPD-median per category (this function)
+    2. EPD-typvärde per category — median of upper-half EPDs by GWP, matching
+       NollCO2's "Typical" framing for conventional standard materials
     3. LLM uppskattning (kept when neither tier 1 nor 2 fits)
 
     Only kicks in when the LLM returned source="Uppskattning". Boverket
     matches are left alone — they're more precise.
+
+    Why upper-half (not full) median: EPD databases skew toward climate-
+    conscious producers (selection bias — voluntary disclosure). Full-median
+    underestimates "standardval utan klimathänsyn", which is the NollCO2
+    reference point. Upper-half median better approximates the conventional
+    default a user would pick if they weren't actively climate-optimizing.
     """
-    from aida.data.epd_baseline_medians import get_baseline_median
+    from aida.data.epd_baseline_medians import get_baseline_typvärde
 
     comp_map = {c.id: c for c in project.components}
     for r in results:
@@ -199,22 +206,27 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
         category = normalize_component_name(comp.name)
         if not category:
             continue
-        median_data = get_baseline_median(category, comp.unit)
-        if not median_data:
-            continue  # no usable EPD-median for this (category, unit) — keep LLM uppskattning
+        typvärde_data = get_baseline_typvärde(category, comp.unit)
+        if not typvärde_data:
+            continue  # no usable EPD-typvärde for this (category, unit) — keep LLM uppskattning
 
-        median_per_unit = median_data["median_co2e_per_unit"]
-        n = median_data["sample_size"]
-        new_co2e = round(median_per_unit * comp.quantity, 1)
+        baseline_per_unit = typvärde_data["baseline_co2e_per_unit"]
+        n = typvärde_data["sample_size"]
+        full_med = typvärde_data["full_median"]
+        new_co2e = round(baseline_per_unit * comp.quantity, 1)
 
         r.co2e_kg = new_co2e
-        r.source = "Environdec EPD-medel"
+        r.source = "Environdec EPD-typvärde"
         r.boverket_product = ""  # signal: not a Boverket proxy
         r.description = (
-            f"Baslinje från EPD-medel: median av {n} Environdec EPD:er i "
-            f"kategorin {category} ({median_per_unit} kg CO2e/{comp.unit}) × "
-            f"{comp.quantity} {comp.unit}. Boverket saknar proxy för denna "
-            f"komponenttyp; EPD-medel är ett kategori-aggregat (inte produktspecifikt)."
+            f"Baslinje från EPD-typvärde: median av övre halvan av "
+            f"{n} Environdec EPD:er i kategorin {category} "
+            f"({baseline_per_unit} kg CO2e/{comp.unit}) × {comp.quantity} {comp.unit}. "
+            f"Övre halvan används för att approximera 'standardval utan "
+            f"klimathänsyn' — full median ({full_med}) hade underskattat "
+            f"konventionellt val pga selection bias i EPD-databasen. "
+            f"Boverket saknar proxy för denna komponenttyp; typvärdet är ett "
+            f"kategori-aggregat (inte produktspecifikt)."
         )
 
 

@@ -601,8 +601,8 @@ def _find_alternatives_with_epds(
     baseline_source = (getattr(bl_comp, "source", "") or "").lower()
     if "uppskattning" in baseline_source:
         baseline_label = "uppskattning"
-    elif "epd-medel" in baseline_source or "epd-median" in baseline_source:
-        baseline_label = "EPD-medel"
+    elif "epd-typvärde" in baseline_source or "epd-medel" in baseline_source or "epd-median" in baseline_source:
+        baseline_label = "EPD-typvärde (kategori-aggregat)"
     else:
         baseline_label = "Boverket Typical"
     prompt = f"""Komponent: {proj_comp.name}

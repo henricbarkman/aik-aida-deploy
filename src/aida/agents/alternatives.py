@@ -246,24 +246,34 @@ def _add_palats_reuse(
     category = normalize_component_name(component_name)
     target_subcat = component_subcategory(component_name, category) if category else ""
 
-    # Diagnostic: user asked for a specific subcategory (e.g. "Toalettstol")
-    # but no listing matches that subcategory. Surface what *is* available
-    # instead of silently showing handfat/dusch when toilet was wanted.
-    subcat_hits = sum(1 for m in matched if target_subcat and m.subcategory == target_subcat)
-    if target_subcat and subcat_hits == 0 and matched:
-        alternatives.append(Alternative(
-            name=f"Inget specifikt för {component_name} på Palats just nu",
-            co2e_kg=0,
-            cost_sek=0,
-            source="[Palats] palats.app",
-            reasoning=(
-                f"Hittade {len(matched)} produkter i kategorin {category} på Palats, "
-                f"men inget som matchade just {component_name}. Övriga {category}-produkter "
-                "visas nedan — kolla om något passar, eller kom tillbaka när nya annonser "
-                "publicerats."
-            ),
-            alternative_type="info",
-        ))
+    # Strict subcategory filter: when the user asked for a specific subcategory
+    # (e.g. "Toalettstol" → subcat "toalett"), drop listings from other
+    # subcategories (handfat, dusch, etc.) entirely. They're wrong product
+    # type for this component — showing them as "alternatives" is misleading,
+    # not graceful degradation. Only fall back to broader category matches
+    # when no subcategory keyword was inferable from the component name.
+    if target_subcat:
+        subcat_matches = [m for m in matched if m.subcategory == target_subcat]
+        if not subcat_matches and matched:
+            # Tell the user nothing matches, list what *is* available in the
+            # broader category so they can decide if a related part fits.
+            other_subcats = sorted({m.subcategory for m in matched if m.subcategory})
+            other_label = ", ".join(other_subcats) if other_subcats else "annan typ"
+            alternatives.append(Alternative(
+                name=f"Inget {component_name.lower()} på Palats just nu",
+                co2e_kg=0,
+                cost_sek=0,
+                source="[Palats] palats.app",
+                reasoning=(
+                    f"Palats har {len(matched)} produkter i kategorin {category} just nu "
+                    f"({other_label}) — men inget specifikt {component_name.lower()}. "
+                    "Kolla tillbaka när nya annonser publicerats, eller bredda sökningen "
+                    "manuellt på palats.app."
+                ),
+                alternative_type="info",
+            ))
+            return
+        matched = subcat_matches
 
     if not matched:
         return

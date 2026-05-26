@@ -180,7 +180,13 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
         # get caught by the "tvättställ" keyword in handfat.
         ("blandare", ["duschblandare", "tvättställsblandare", "badkarsblandare",
                       "köksblandare", "tvättställsarmatur"]),
-        ("toalett", ["toalettstol", "toalett", "wc-stol", "wc stol"]),
+        # Seats split out before "toalett" subcat — "Toalettsits" contains
+        # "toalett" and would otherwise be classified as a toilet bowl.
+        ("toalettsits", ["toalettsits", "toilet seat", "wc-sits"]),
+        # Toilet bowl only — no generic "toalett" keyword (it would catch
+        # sits/lock/papper/etc that contain the word).
+        ("toalett", ["toalettstol", "wc-stol", "wc stol", "wc-toalett",
+                     "vägghängd toalett"]),
         ("handfat", ["handfat", "tvättställ", "washbasin"]),
         ("dusch", ["duschvägg", "duschdörr", "duschkabin", "dusch"]),
         ("badkar", ["badkar", "bathtub"]),

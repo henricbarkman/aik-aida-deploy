@@ -784,8 +784,66 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .alt-row:hover { background: var(--kk-gray-50); }
 .alt-row.selected { background: var(--kk-gold-light) !important; }
 .alt-row input[type=radio] { accent-color: var(--kk-charcoal); }
-.usage-context { font-size: 11px; color: var(--kk-gray-500); font-style: italic; line-height: 1.4; margin-top: 4px; padding: 6px 10px; background: var(--kk-cream); border-left: 2px solid var(--kk-gold-light); border-radius: 2px; }
-.usage-context-label { font-style: normal; font-weight: 600; color: var(--kk-charcoal); margin-right: 4px; }
+/* Per-component usage_context — subtle callout under component name in tables */
+.usage-context { margin-top: 6px; padding: 8px 12px 8px 14px; background: var(--kk-gray-50); border-left: 2px solid var(--kk-gray-300); border-radius: 0 3px 3px 0; font-size: 12.5px; line-height: 1.5; color: var(--kk-gray-500); font-style: normal; }
+.usage-context-label { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; color: var(--kk-gray-400); margin: 0 0 3px; }
+
+/* === Needs analysis card (editorial pairing) === */
+.needs-card { background: white; border: 1px solid var(--kk-gray-200); border-radius: 6px; overflow: hidden; margin-bottom: 16px; }
+.needs-card-head { padding: 14px 20px 12px; border-bottom: 1px solid var(--kk-gray-100); display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.needs-card-title { font-size: 15px; font-weight: 500; color: var(--kk-charcoal); }
+.needs-card-sub { font-size: 11.5px; color: var(--kk-gray-500); font-style: italic; }
+.needs-body { padding: 20px 24px 22px; }
+.needs-empty { padding: 16px 20px; font-size: 12px; color: var(--kk-gray-500); }
+
+/* Voice blocks */
+.voice-block { position: relative; padding: 4px 0 4px 22px; }
+.voice-block + .voice-block { margin-top: 0; }
+.voice-block::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 2px; }
+.voice-user::before { background: var(--kk-gray-300); }
+.voice-aida::before { background: var(--kk-red); }
+.voice-label { font-size: 10.5px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.voice-user .voice-label { color: var(--kk-gray-500); }
+.voice-aida .voice-label { color: var(--kk-red); }
+.voice-label .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.7; }
+.voice-text { font-size: 14.5px; line-height: 1.6; color: var(--kk-charcoal); }
+.voice-user .voice-text { color: #5a5854; }
+.voice-text em.empty { color: var(--kk-gray-400); }
+
+/* Transition between user and aida */
+.voice-transition { margin: 12px 0 12px 22px; font-size: 11.5px; color: var(--kk-gray-400); display: flex; align-items: center; gap: 8px; letter-spacing: 0.3px; }
+.voice-transition::before { content: ''; height: 16px; border-left: 1.5px dashed var(--kk-gray-300); margin-left: -22px; width: 22px; }
+
+/* Inferens edit affordance */
+.voice-aida { position: relative; }
+.voice-aida-actions { position: absolute; top: 0; right: 0; }
+.voice-aida-edit { background: none; border: 1px solid var(--kk-gray-200); border-radius: 100px; padding: 4px 11px 4px 9px; font-size: 11px; color: var(--kk-gray-500); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; transition: all 0.15s; }
+.voice-aida-edit:hover { background: #FDF7F7; border-color: var(--kk-red); color: var(--kk-red); }
+.voice-aida-edit svg { width: 11px; height: 11px; }
+.voice-aida.is-editing .voice-text { display: none; }
+.voice-aida.is-editing .voice-aida-edit { display: none; }
+.voice-aida-textarea { display: none; width: 100%; min-height: 140px; border: 1.5px solid var(--kk-red); border-radius: 4px; padding: 12px 14px; font-family: inherit; font-size: 14.5px; line-height: 1.6; color: var(--kk-charcoal); background: white; resize: vertical; box-sizing: border-box; }
+.voice-aida.is-editing .voice-aida-textarea { display: block; }
+.voice-aida-textarea:focus { outline: none; box-shadow: 0 0 0 3px rgba(181, 32, 31, 0.15); }
+.voice-aida-edit-actions { display: none; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+.voice-aida.is-editing .voice-aida-edit-actions { display: flex; }
+.btn-na-cancel { background: none; border: 1px solid var(--kk-gray-300); color: var(--kk-gray-500); padding: 5px 14px; font-size: 11.5px; border-radius: 3px; cursor: pointer; font-family: inherit; }
+.btn-na-save { background: var(--kk-charcoal); border: 1px solid var(--kk-charcoal); color: white; padding: 5px 14px; font-size: 11.5px; border-radius: 3px; cursor: pointer; font-family: inherit; }
+.btn-na-save:hover { background: #2a2a2a; }
+
+/* Meta blocks (assumptions + would_clarify) */
+.needs-meta-row { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--kk-gray-100); display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.needs-meta-label { font-size: 10.5px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; color: var(--kk-gray-400); margin-bottom: 6px; }
+.needs-meta-list { list-style: none; margin: 0; padding: 0; font-size: 12.5px; line-height: 1.55; color: var(--kk-gray-500); }
+.needs-meta-list li { position: relative; padding: 3px 0 3px 18px; }
+.needs-meta-list li::before { position: absolute; left: 0; top: 3px; }
+.needs-meta-assumptions li::before { content: '·'; font-size: 18px; line-height: 1; color: var(--kk-gray-300); }
+.needs-meta-clarify li::before { content: '?'; font-style: italic; color: var(--kk-red); opacity: 0.55; }
+@media (max-width: 640px) {
+  .needs-meta-row { grid-template-columns: 1fr; gap: 16px; }
+  .needs-card-head { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .voice-aida-actions { position: static; margin-bottom: 6px; }
+}
 .type-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
 .type-baseline { background: var(--kk-gray-100); color: var(--kk-charcoal); }
 .type-reuse { background: var(--kk-gold-light); color: #7A6000; }
@@ -2063,10 +2121,8 @@ function quantitySourceBadge(src) {
 let _naEditSnapshot = null;
 
 function renderNeedsAnalysis(na) {
-  // Show a discreet placeholder when needs_analysis is missing entirely.
-  // Distinguishes "this is a legacy analysis from before this feature" from
-  // "intake produced an empty analysis" \u2014 both look the same to the user
-  // otherwise, hiding a real regression.
+  // Editorial pairing: user voice (gray) \u2194 AIda voice (red), with vertical
+  // accent stripes and a clear visual transition between them.
   const hasAny = na && (
     (na.from_user || '').trim() ||
     (na.inferred || '').trim() ||
@@ -2074,49 +2130,69 @@ function renderNeedsAnalysis(na) {
     (Array.isArray(na.would_clarify) && na.would_clarify.length)
   );
   if (!hasAny) {
-    return '<div class="comp-card needs-analysis-card" style="margin-bottom:16px">' +
-      '<div class="comp-card-header"><h3>AIdas behovsanalys</h3>' +
-      '<div style="font-size:11px;color:var(--kk-gray-500);margin-top:2px">Ingen behovsanalys finns f\u00f6r det h\u00e4r projektet \u2014 analysen tillkom efter att projektet skapades. K\u00f6ra om intake i chatten ger en analys som styr alternativvalet.</div></div></div>';
+    return '<div class="needs-card">' +
+      '<div class="needs-card-head"><div class="needs-card-title">AIdas behovsanalys</div></div>' +
+      '<div class="needs-empty">Ingen behovsanalys finns f\u00f6r det h\u00e4r projektet \u2014 analysen tillkom efter att projektet skapades. K\u00f6ra om intake i chatten ger en analys som styr alternativvalet.</div></div>';
   }
   const fromUser = na.from_user || '';
   const inferred = na.inferred || '';
   const assumptions = Array.isArray(na.assumptions) ? na.assumptions : [];
   const clarify = Array.isArray(na.would_clarify) ? na.would_clarify : [];
-  let html = '<div class="comp-card needs-analysis-card" style="margin-bottom:16px">';
-  html += '<div class="comp-card-header"><h3>AIdas behovsanalys</h3>';
-  html += '<div style="font-size:11px;color:var(--kk-gray-500);margin-top:2px">Granska f\u00f6re baslinje. Korrigera "Inferens" om n\u00e5got \u00e4r fel \u2014 den styr vilka alternativ AIda f\u00f6resl\u00e5r.</div></div>';
-  html += '<div style="padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">';
-  html += '<div><div class="usage-context-label" style="margin-bottom:4px">Fr\u00e5n din beskrivning</div>';
-  html += '<div style="font-size:13px;line-height:1.5;color:var(--kk-charcoal);background:var(--kk-gray-50);padding:8px 10px;border-radius:4px">' + (fromUser ? esc(fromUser) : '<em style="color:var(--kk-gray-400)">(inget direkt fr\u00e5n din beskrivning)</em>') + '</div></div>';
-  html += '<div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
-  html += '<div class="usage-context-label">AIdas inferens</div>';
-  html += '<button type="button" id="naEditBtn" onclick="toggleNeedsEdit()" style="font-size:11px;background:none;border:1px solid var(--kk-gray-300);border-radius:3px;padding:2px 8px;cursor:pointer">Redigera</button></div>';
-  html += '<div id="naInferredView" style="font-size:13px;line-height:1.5;color:var(--kk-charcoal);background:#fffbe6;border:1px solid #ffe8a3;padding:8px 10px;border-radius:4px">' + (inferred ? esc(inferred) : '<em style="color:var(--kk-gray-400)">(ingen inferens)</em>') + '</div>';
-  // Textarea content is intentionally empty in HTML \u2014 populated via .value below
-  // to avoid HTML-entity decoding issues with quotes/ampersands.
-  html += '<textarea id="naInferredEdit" style="display:none;width:100%;min-height:120px;font-size:13px;line-height:1.5;font-family:inherit;padding:8px 10px;border:1px solid var(--kk-gray-300);border-radius:4px;box-sizing:border-box"></textarea>';
-  html += '<div id="naEditActions" style="display:none;margin-top:6px;gap:6px;justify-content:flex-end">';
-  html += '<button type="button" onclick="cancelNeedsEdit()" style="font-size:11px;background:none;border:1px solid var(--kk-gray-300);border-radius:3px;padding:3px 10px;cursor:pointer">Avbryt</button>';
-  html += '<button type="button" onclick="saveNeedsEdit()" style="font-size:11px;background:var(--kk-charcoal);color:white;border:none;border-radius:3px;padding:3px 10px;cursor:pointer">Spara</button>';
-  html += '</div></div>';
+
+  let html = '<div class="needs-card">';
+  html += '<div class="needs-card-head">';
+  html += '<div class="needs-card-title">AIdas behovsanalys</div>';
+  html += '<div class="needs-card-sub">Granska f\u00f6re baslinje \u00b7 korrigera om AIdas l\u00e4sning \u00e4r fel</div>';
   html += '</div>';
+  html += '<div class="needs-body">';
+
+  // User voice block
+  html += '<div class="voice-block voice-user">';
+  html += '<div class="voice-label"><span class="dot"></span>Du sa</div>';
+  html += '<div class="voice-text">' + (fromUser ? esc(fromUser) : '<em class="empty">(inget direkt fr\u00e5n din beskrivning)</em>') + '</div>';
+  html += '</div>';
+
+  // Transition
+  html += '<div class="voice-transition">\u2193 AIdas l\u00e4sning av detta</div>';
+
+  // AIda voice block with edit affordance
+  html += '<div class="voice-block voice-aida" id="aidaVoiceBlock">';
+  html += '<div class="voice-aida-actions">';
+  html += '<button type="button" class="voice-aida-edit" id="naEditBtn" onclick="toggleNeedsEdit()">';
+  html += '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 2l3 3-9 9H2v-3l9-9z"/></svg>';
+  html += 'Justera AIdas l\u00e4sning</button>';
+  html += '</div>';
+  html += '<div class="voice-label"><span class="dot"></span>AIda inferer</div>';
+  html += '<div class="voice-text" id="naInferredView">' + (inferred ? esc(inferred) : '<em class="empty">(ingen inferens)</em>') + '</div>';
+  // Empty textarea \u2014 value populated via .value to preserve quotes/ampersands
+  html += '<textarea class="voice-aida-textarea" id="naInferredEdit"></textarea>';
+  html += '<div class="voice-aida-edit-actions" id="naEditActions">';
+  html += '<button type="button" class="btn-na-cancel" onclick="cancelNeedsEdit()">Avbryt</button>';
+  html += '<button type="button" class="btn-na-save" onclick="saveNeedsEdit()">Spara</button>';
+  html += '</div>';
+  html += '</div>';
+
+  // Meta row \u2014 assumptions + would_clarify
   if (assumptions.length || clarify.length) {
-    html += '<div style="padding:0 16px 12px;display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+    html += '<div class="needs-meta-row">';
+    html += '<div>';
     if (assumptions.length) {
-      html += '<div><div class="usage-context-label" style="margin-bottom:4px">Antaganden AIda gjort</div>';
-      html += '<ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.5;color:var(--kk-gray-500)">';
+      html += '<div class="needs-meta-label">Antaganden AIda gjort</div>';
+      html += '<ul class="needs-meta-list needs-meta-assumptions">';
       assumptions.forEach(a => { html += '<li>' + esc(a) + '</li>'; });
-      html += '</ul></div>';
-    } else { html += '<div></div>'; }
+      html += '</ul>';
+    }
+    html += '</div><div>';
     if (clarify.length) {
-      html += '<div><div class="usage-context-label" style="margin-bottom:4px">AIda hade g\u00e4rna vetat</div>';
-      html += '<ul style="margin:0;padding-left:18px;font-size:12px;line-height:1.5;color:var(--kk-gray-500)">';
+      html += '<div class="needs-meta-label">AIda hade g\u00e4rna vetat</div>';
+      html += '<ul class="needs-meta-list needs-meta-clarify">';
       clarify.forEach(q => { html += '<li>' + esc(q) + '</li>'; });
-      html += '</ul></div>';
-    } else { html += '<div></div>'; }
-    html += '</div>';
+      html += '</ul>';
+    }
+    html += '</div></div>';
   }
-  html += '</div>';
+
+  html += '</div></div>';
   return html;
 }
 
@@ -2131,26 +2207,22 @@ function _populateNeedsTextarea() {
 
 function toggleNeedsEdit() {
   const ta = document.getElementById('naInferredEdit');
-  if (!ta) return;
+  const block = document.getElementById('aidaVoiceBlock');
+  if (!ta || !block) return;
   _naEditSnapshot = ta.value;  // remember pre-edit value
-  document.getElementById('naInferredView').style.display = 'none';
-  ta.style.display = 'block';
-  document.getElementById('naEditActions').style.display = 'flex';
-  document.getElementById('naEditBtn').style.display = 'none';
+  block.classList.add('is-editing');
   ta.focus();
 }
 
 function cancelNeedsEdit() {
   const ta = document.getElementById('naInferredEdit');
-  if (!ta) return;
+  const block = document.getElementById('aidaVoiceBlock');
+  if (!ta || !block) return;
   // Restore from the pre-edit snapshot \u2014 not from state.project, which may
   // have been mutated by a concurrent chat-agent update during the edit.
   ta.value = _naEditSnapshot != null ? _naEditSnapshot : ta.value;
   _naEditSnapshot = null;
-  document.getElementById('naInferredView').style.display = '';
-  ta.style.display = 'none';
-  document.getElementById('naEditActions').style.display = 'none';
-  document.getElementById('naEditBtn').style.display = '';
+  block.classList.remove('is-editing');
 }
 
 function saveNeedsEdit() {
@@ -2172,7 +2244,7 @@ function renderProjektContent() {
   html += '<table class="comp-table"><thead><tr><th>Komponent</th><th>Antal</th><th>Enhet</th><th>Kategori</th><th>K\u00e4lla</th></tr></thead><tbody>';
   d.components.forEach(c => {
     const nameCell = '<div style="font-weight:500">' + esc(c.name) + '</div>' +
-      (c.usage_context ? '<div class="usage-context"><span class="usage-context-label">Anv\u00e4ndning:</span>' + esc(c.usage_context) + '</div>' : '');
+      (c.usage_context ? '<div class="usage-context"><span class="usage-context-label">Anv\u00e4ndning</span>' + esc(c.usage_context) + '</div>' : '');
     html += '<tr>' +
       '<td>' + nameCell + '</td>' +
       '<td>' + esc(c.quantity) + '</td>' +
@@ -2219,7 +2291,7 @@ function renderAlternativContent() {
   data.components.forEach(comp => {
     const pc = projComps.find(p => p.id === comp.component_id);
     const qtyLabel = pc ? esc(pc.quantity) + ' ' + esc(pc.unit) + ' ' + quantitySourceBadge(pc.quantity_source) : '';
-    const usageBlock = (pc && pc.usage_context) ? '<div class="usage-context"><span class="usage-context-label">Användning:</span>' + esc(pc.usage_context) + '</div>' : '';
+    const usageBlock = (pc && pc.usage_context) ? '<div class="usage-context"><span class="usage-context-label">Användning</span>' + esc(pc.usage_context) + '</div>' : '';
     const header = '<h3>' + esc(comp.component_name) + '</h3>' + (qtyLabel ? '<div style="font-size:12px;color:var(--kk-gray-500);margin-top:2px">Antal: ' + qtyLabel + '</div>' : '') + usageBlock;
     html += '<div class="comp-card"><div class="comp-card-header">' + header + '</div>';
     html += '<table class="comp-table"><thead><tr><th style="width:32px"></th><th>Typ</th><th>Material</th><th>K\u00e4lla</th><th style="text-align:right">CO\u2082e (kg)</th><th style="text-align:right">Kostnad</th><th></th></tr></thead><tbody>';

@@ -51,7 +51,7 @@ Din uppgift:
 3. Resonera om varför alternativet är bättre — beskriv BÅDE klimatvinsten och hur det uppfyller praktiska behov
 
 PRINCIPER FÖR ALTERNATIV:
-- Alla alternativ ska ha lägre klimatpåverkan än baslinjen.
+- Alla alternativ ska normalt ha lägre klimatpåverkan än baslinjen. UNDANTAG: om baslinjen är märkt som "uppskattning" (ingen Boverket-proxy), föreslå verkliga EPD-alternativ även om deras CO2e är högre — flagga jämförelsen som osäker i reasoning. Tomt resultat är värre än en transparent jämförelse.
 - Uttryckta behov är oförhandlingsbara — inget alternativ som inte uppfyller dem.
 - Resonera om hur alternativen möter behov: både uttryckta och antagna (ljudmiljö, inomhusklimat, underhåll, estetik, arbetsmiljö vid installation).
 - Presentera spridning i pris — det är användarens beslut att väga ekonomi mot klimat.
@@ -588,10 +588,16 @@ def _find_alternatives_with_epds(
     """Use LLM to select best alternatives from EPD data."""
     client = get_client()
 
+    baseline_is_estimate = "uppskattning" in (getattr(bl_comp, "source", "") or "").lower()
+    baseline_label = "uppskattning" if baseline_is_estimate else "Boverket Typical"
     prompt = f"""Komponent: {proj_comp.name}
 Antal: {proj_comp.quantity} {proj_comp.unit}
-Baslinje CO2e: {bl_comp.co2e_kg} kg (Boverket Typical)
+Baslinje CO2e: {bl_comp.co2e_kg} kg ({baseline_label})
 Baslinje kostnad: {bl_comp.cost_sek} SEK
+"""
+    if baseline_is_estimate:
+        prompt += """
+OBS: Baslinjen är en uppskattning (ingen Boverket-proxy fanns för denna komponenttyp). Uppskattningen kan vara orimligt låg — föreslå därför EPD-alternativ från listan nedan ÄVEN OM deras CO2e ser högre ut än baslinjen. Flagga jämförelsen som osäker i reasoning ("baslinjen är uppskattning, jämförelsen indikativ"). Bättre att visa verkliga produkter än att returnera tomt.
 """
 
     # Project-level needs (user-approved) — overarching framing for the whole

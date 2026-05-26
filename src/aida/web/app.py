@@ -2276,7 +2276,11 @@ function renderBaslinjeContent() {
   html += '<div class="comp-card"><div class="comp-card-header"><h3>Per komponent</h3></div>';
   html += '<table class="comp-table"><thead><tr><th>Komponent</th><th style="text-align:right">CO\u2082e (kg)</th><th>Klimatk\u00e4lla</th><th style="text-align:right">Kostnad (SEK)</th><th>Prisk\u00e4lla</th></tr></thead><tbody>';
   d.components.forEach(c => {
-    const productLine = c.boverket_product ? '<div style="font-size:11px;color:var(--kk-gray-500);margin-top:3px;font-style:italic">' + esc(c.boverket_product) + '</div>' : '';
+    // Frame Boverket products as proxies — Boverket has ~200 material entries,
+    // not building-component entries, so almost all matches are material-based
+    // proxies (e.g. vinylgolv → "Takduk, PVC"). Showing the bare product name
+    // reads as a category mismatch.
+    const productLine = c.boverket_product ? '<div style="font-size:11px;color:var(--kk-gray-500);margin-top:3px;font-style:italic"><span style="font-style:normal;font-weight:500;color:var(--kk-gray-400);font-size:9.5px;letter-spacing:0.8px;text-transform:uppercase;display:block;margin-bottom:1px">Materialproxy</span>' + esc(c.boverket_product) + '</div>' : '';
     html += '<tr><td style="font-weight:500">' + esc(c.component_name) + '</td><td style="text-align:right">' + Math.round(c.co2e_kg).toLocaleString('sv') + '</td><td style="font-size:11px">' + formatSource(c.source) + productLine + '</td><td style="text-align:right">' + Math.round(c.cost_sek).toLocaleString('sv') + '</td><td style="font-size:11px">' + esc(c.cost_source || '') + '</td></tr>';
   });
   html += '</tbody></table></div>';
@@ -2304,7 +2308,7 @@ function renderAlternativContent() {
     const blProduct = (blBaselineComp && blBaselineComp.boverket_product) ? blBaselineComp.boverket_product : '';
     const blSource = (blBaselineComp && blBaselineComp.source) ? blBaselineComp.source : 'NollCO2';
     const blMaterialCell = blProduct
-      ? '<div style="font-weight:500">Konventionellt</div><div style="font-size:11px;color:var(--kk-gray-500);font-style:italic;margin-top:2px">' + esc(blProduct) + '</div>'
+      ? '<div style="font-weight:500">Konventionellt</div><div style="font-size:11px;color:var(--kk-gray-500);font-style:italic;margin-top:2px"><span style="font-style:normal;font-weight:500;color:var(--kk-gray-400);font-size:9.5px;letter-spacing:0.8px;text-transform:uppercase;display:block;margin-bottom:1px">Materialproxy</span>' + esc(blProduct) + '</div>'
       : '<div style="font-weight:500">Konventionellt</div>';
     html += '<tr class="alt-row' + (blSel ? ' selected' : '') + '" data-comp="' + comp.component_id + '" data-alt="baseline">' +
       '<td><input type="radio" name="' + comp.component_id + '"' + (blSel ? ' checked' : '') + '></td>' +

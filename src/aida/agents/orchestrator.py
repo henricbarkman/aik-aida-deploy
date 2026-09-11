@@ -24,6 +24,7 @@ from __future__ import annotations
 import logging
 
 from aida import knowledge
+from aida import sheet as sheet_mod
 from aida.agents.alternatives import _format_epd_list, _load_epd_alternatives
 from aida.agents.chat_agent import _format_state, _sanitize_history
 from aida.api_client import DEFAULT_MODEL, extract_text, get_client
@@ -87,11 +88,11 @@ Vägledning:
 
 _ADVISORY_SYSTEM = """Du är Aida, en byggnadsexpert som hjälper förvaltare och byggledare att hitta renoveringslösningar med kraftigt minskad klimatpåverkan utan att ge avkall på praktiska behov.
 
-Användaren ställer en RÅDGIVNINGSFRÅGA. Du ska svara, inte ändra något i projektet. Du har inga verktyg som muterar state.
+Användaren ställer en RÅDGIVNINGSFRÅGA. Du ska svara, inte ändra något i projektet. Du har inga verktyg som ändrar projektet.
 
 PRINCIPER:
 - Svara på svenska, kortfattat och konkret.
-- Varje siffra ska ha en källa. Använd verktyget `lookup_materials` för att hämta verkliga EPD-värden (kg CO2e per enhet) när användaren frågar om ett materialslag (golv, innervägg, fönster, dörr, isolering, tak, belysning, ventilation, sanitet m.fl.). Fabricera aldrig siffror.
+- Varje siffra ska ha en källa. Använd verktyget `lookup_materials` för att hämta verkliga EPD-värden (kg CO2e per enhet) när användaren frågar om ett materialslag (golv, innervägg, fönster, dörr, isolering, tak, belysning, ventilation, sanitet m.fl.). Använd verktygen först. Finns inget underlag, ge hellre en uppskattning än inget svar, men säg att det är en uppskattning och vad den bygger på.
 - Frågor om Karlstads byggriktlinjer eller om hur Aida räknar: sök med `search_knowledge` innan du svarar. Ange dokument, utgåva och avsnitt, till exempel "Riktlinje Bygg, utgåva 8, Plastmattor". Citera bara hela meningar, ordagrant ur utdragen du fått och inom citattecken, och tillskriv aldrig riktlinjerna ett krav som inte står där.
 - Om frågan rör ett pågående projekt: använd projektets state (komponenter, baslinje, alternativ, val) i ditt svar.
 - Klimatmåttet är GWP-fossil för skedena A1-A3 (produktskedet), samma som i Boverkets klimatdatabas och i Aidas beräkningar.
@@ -218,8 +219,14 @@ def answer_advisory(
     alternatives: dict | None = None,
     selections: dict | None = None,
     attachments: list[dict] | None = None,
+    sheet: dict | None = None,
 ) -> dict:
-    """Answer an advisory question without mutating state. Returns {reply, tool_calls}.
+    """Answer an advisory question without touching the project.
+
+    Returns {reply, tool_calls, state_updates}. `sheet` is the open sheet in
+    Chatt (§13.7), None in the other modes. With it the answer goes on the sheet
+    through the block tools and comes back in state_updates, and the reply is a
+    line about what went where. Without it state_updates is always empty.
 
     `attachments` are content blocks from aida.attachments.load_blocks. This is
     the branch "vad står det om ventilationen?" lands in, so it is the one that
@@ -232,6 +239,16 @@ def answer_advisory(
     clean = _sanitize_history(history or [])
 
     system_prompt = with_rule(_ADVISORY_SYSTEM, blocks)
+    tools, max_turns, max_tokens = _ADVISORY_TOOLS, _MAX_ADVISORY_TURNS, 1200
+    touched = False
+    if sheet is not None:
+        # Normalizing also copies, so a rejected write never reaches the caller.
+        sheet = sheet_mod.normalize_sheet(sheet)
+        system_prompt += "\n\n" + sheet_mod.prompt(sheet)
+        # A comparison table is several times the tokens of a chat answer, and
+        # every block is a write of its own.
+        tools = _ADVISORY_TOOLS + sheet_mod.SHEET_TOOLS
+        max_turns, max_tokens = _MAX_ADVISORY_TURNS + sheet_mod.EXTRA_TURNS, 8000
     if project:
         state_block = _format_state(project, baseline, alternatives, selections or {})
         system_prompt += "\n\nNUVARANDE PROJEKT-STATE:\n" + state_block
@@ -253,23 +270,32 @@ def answer_advisory(
     # question — re-creating the exact idle crash this feature exists to kill. So
     # an API error returns a graceful advisory reply instead.
     try:
-        for _ in range(_MAX_ADVISORY_TURNS):
+        for _ in range(max_turns):
             response = client.messages.create(
                 model=ADVISORY_MODEL,
-                max_tokens=1200,
+                max_tokens=max_tokens,
                 system=system_prompt,
-                tools=_ADVISORY_TOOLS,
+                tools=tools,
                 messages=messages,
             )
 
+            if sheet_mod.cut_off(response):
+                logger.warning("answer_advisory: reply cut off inside a tool call")
+                sheet_mod.nudge(messages)
+                continue
             if response.stop_reason != "tool_use":
-                return {"reply": (extract_text(response) or "").strip(), "tool_calls": tool_calls}
+                reply = (extract_text(response) or "").strip()
+                if not reply and sheet is not None:
+                    reply = sheet_mod.DONE if touched else "Jag hann inte färdigt med svaret. Försök formulera om frågan."
+                return {"reply": reply, "tool_calls": tool_calls,
+                        "state_updates": {"sheet": sheet} if touched else {}}
 
             messages.append({"role": "assistant", "content": response.content})
             tool_results = []
             for block in response.content:
                 if getattr(block, "type", None) != "tool_use":
                     continue
+                ok = True
                 if block.name == "lookup_materials":
                     category = (block.input or {}).get("category", "")
                     result_text = _lookup_materials(category)
@@ -277,12 +303,20 @@ def answer_advisory(
                 elif block.name == "search_knowledge":
                     result_text = knowledge.run_search(block.input)
                     tool_calls.append({"name": "search_knowledge", "input": block.input})
+                elif sheet is not None and block.name in sheet_mod.SHEET_HANDLERS:
+                    # Writes the sheet in place. A rejected write changes nothing
+                    # and goes back as an error that names what to fix.
+                    result_text, ok, _ = sheet_mod.SHEET_HANDLERS[block.name](block.input, sheet)
+                    touched = touched or ok
+                    tool_calls.append({"name": block.name, "input": block.input, "ok": ok})
                 else:
                     result_text = f"Okänt verktyg: {block.name}"
+                    ok = False
                 tool_results.append({
                     "type": "tool_result",
                     "tool_use_id": block.id,
                     "content": result_text,
+                    **({} if ok else {"is_error": True}),
                 })
             messages.append({"role": "user", "content": tool_results})
     except Exception as e:
@@ -290,13 +324,15 @@ def answer_advisory(
         return {
             "reply": "Jag kunde inte hämta ett svar just nu. Försök igen om en stund.",
             "tool_calls": tool_calls,
+            "state_updates": {"sheet": sheet} if touched else {},
             "error": str(e),
         }
 
     logger.warning("answer_advisory hit max turns")
     return {
-        "reply": "Jag hann inte färdigt med svaret. Försök formulera om frågan.",
+        "reply": sheet_mod.UNFINISHED if touched else "Jag hann inte färdigt med svaret. Försök formulera om frågan.",
         "tool_calls": tool_calls,
+        "state_updates": {"sheet": sheet} if touched else {},
     }
 
 
@@ -309,6 +345,7 @@ def route(
     selections: dict | None = None,
     attachments: list[dict] | None = None,
     attachment_note: str = "",
+    sheet: dict | None = None,
 ) -> dict:
     """Classify, and answer in the same call when the intent is advisory.
 
@@ -328,12 +365,14 @@ def route(
         answer = answer_advisory(
             message, history=history, project=project, baseline=baseline,
             alternatives=alternatives, selections=selections, attachments=attachments,
+            sheet=sheet,
         )
         return {
             "intent": intent,
             "reply": answer["reply"],
             "reason": classification.get("reason", ""),
             "tool_calls": answer.get("tool_calls", []),
+            "state_updates": answer.get("state_updates", {}),
         }
 
     return {"intent": intent, "reason": classification.get("reason", "")}

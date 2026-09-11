@@ -15,6 +15,8 @@ from __future__ import annotations
 import copy
 import logging
 
+from aida import knowledge
+from aida import sheet as sheet_mod
 from aida.api_client import DEFAULT_MODEL, extract_text, get_client
 
 logger = logging.getLogger(__name__)
@@ -450,6 +452,7 @@ def run_chat_agent(
     as_built: dict | None = None,
     epd_resolver=None,
     attachments: list[dict] | None = None,
+    sheet: dict | None = None,
 ) -> dict:
     """Run chat with tool-use loop.
 
@@ -457,6 +460,10 @@ def run_chat_agent(
     first in the first user turn and stay there through the tool loop, so the
     second to fifth call of a turn read them from the prompt cache instead of
     paying for the whole PDF again.
+
+    `sheet` is the open sheet in Chatt (§13.7), None in the other modes. With it
+    the agent also gets the block tools and search_knowledge, and a changed
+    sheet comes back in state_updates.
 
     Returns dict with:
       - reply: str — assistant's final text reply
@@ -476,6 +483,13 @@ def run_chat_agent(
     selections = copy.deepcopy(selections) if selections else {}
     overrides = copy.deepcopy(overrides) if overrides else {}
     as_built = copy.deepcopy(as_built) if as_built else {}
+    # Normalizing also copies, so the caller's sheet is never written to.
+    sheet = sheet_mod.normalize_sheet(sheet) if sheet is not None else None
+    tools = TOOLS + sheet_mod.SHEET_TOOLS + [knowledge.SEARCH_TOOL] if sheet is not None else TOOLS
+    max_tokens = 1500
+    if sheet is not None:
+        # An answer on the sheet is several writes, and a table is long.
+        max_turns, max_tokens = max_turns + sheet_mod.EXTRA_TURNS, 8000
 
     touched_bags: set[str] = set()
     tool_calls: list[dict] = []
@@ -483,6 +497,8 @@ def run_chat_agent(
 
     state_block = _format_state(project, baseline, alternatives, selections)
     system_prompt = with_rule(SYSTEM_PROMPT, blocks) + "\n\nNUVARANDE STATE:\n" + state_block
+    if sheet is not None:
+        system_prompt += "\n\n" + sheet_mod.prompt(sheet)
 
     # Anthropic requires the first message to be 'user' and forbids two same-role
     # turns in a row. _sanitize_history guarantees internal alternation but not
@@ -499,19 +515,25 @@ def run_chat_agent(
     for _ in range(max_turns):
         response = client.messages.create(
             model=DEFAULT_MODEL,
-            max_tokens=1500,
+            max_tokens=max_tokens,
             system=system_prompt,
-            tools=TOOLS,
+            tools=tools,
             messages=messages,
         )
 
+        if sheet_mod.cut_off(response):
+            logger.warning("chat_agent: reply cut off inside a tool call")
+            sheet_mod.nudge(messages)
+            continue
         if response.stop_reason != "tool_use":
             reply = extract_text(response) or ""
+            if not reply.strip() and "sheet" in touched_bags:
+                reply = sheet_mod.DONE
             return {
                 "reply": reply.strip(),
                 "state_updates": _build_state_updates(
                     touched_bags, project, baseline, alternatives, selections,
-                    pending_actions, overrides=overrides, as_built=as_built,
+                    pending_actions, overrides=overrides, as_built=as_built, sheet=sheet,
                 ),
                 "tool_calls": tool_calls,
             }
@@ -527,7 +549,14 @@ def run_chat_agent(
             # registry because they take a different bag, and a dispatch that
             # only knew the first one would reject them here as unknown - before
             # ever reaching the seam that does know them.
-            known = block.name in _HANDLERS or block.name in _AS_BUILT_HANDLERS
+            # A lookup, not a mutation, so it does not go through the seam.
+            if block.name == "search_knowledge" and sheet is not None:
+                result_text = knowledge.run_search(block.input)
+                tool_calls.append({"name": block.name, "input": block.input, "ok": True})
+                tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result_text})
+                continue
+            known = (block.name in _HANDLERS or block.name in _AS_BUILT_HANDLERS
+                     or (sheet is not None and block.name in sheet_mod.SHEET_HANDLERS))
             if not known:
                 tool_results.append({
                     "type": "tool_result",
@@ -558,7 +587,7 @@ def run_chat_agent(
                 result_text, ok, handler_touched = _run_handler(
                     block.name, tool_input, project, baseline, alternatives,
                     selections, pending_actions, overrides=overrides,
-                    as_built=as_built,
+                    as_built=as_built, sheet=sheet,
                 )
             except Exception as e:
                 logger.exception("Tool %s failed", block.name)
@@ -587,10 +616,11 @@ def run_chat_agent(
     # Exhausted turns without a stop — force a final reply.
     logger.warning("chat_agent hit max_turns=%d", max_turns)
     return {
-        "reply": "Jag fastnade i en loop. Försök formulera om, eller använd knapparna för att köra om stegen.",
+        "reply": (sheet_mod.UNFINISHED if "sheet" in touched_bags else
+                  "Jag fastnade i en loop. Försök formulera om, eller använd knapparna för att köra om stegen."),
         "state_updates": _build_state_updates(
             touched_bags, project, baseline, alternatives, selections,
-            pending_actions, overrides=overrides, as_built=as_built,
+            pending_actions, overrides=overrides, as_built=as_built, sheet=sheet,
         ),
         "tool_calls": tool_calls,
     }

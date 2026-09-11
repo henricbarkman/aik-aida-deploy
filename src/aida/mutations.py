@@ -595,14 +595,25 @@ def _drop_stale_as_built(tool, inp, as_built) -> str:
 
 
 def run_handler(tool, inp, project, baseline, alternatives, selections,
-                pending_actions, overrides=None, as_built=None):
+                pending_actions, overrides=None, as_built=None, sheet=None):
     """The one seam both doors pass through.
 
     The chat loop needs the per-call touched set and cannot go through
     `apply_mutation`, so without this the override lifecycle would live on the
     cell side only and the two doors would disagree about when a manual figure
     stops being true. That is the exact failure the extraction in step 3 was for.
+
+    The sheet tools (§13) take the open sheet and nothing else. The sheet only
+    exists in Chatt, so without one they refuse rather than write somewhere
+    nobody sees.
     """
+    from aida.sheet import SHEET_HANDLERS
+
+    if tool in SHEET_HANDLERS:
+        if sheet is None:
+            return f"{tool} kräver bladet, som bara finns i läget Chatt.", False, set()
+        return SHEET_HANDLERS[tool](inp, sheet)
+
     if tool in OVERRIDE_HANDLERS:
         if overrides is None:
             return f"{tool} kräver överskrivningar i anropet.", False, set()
@@ -635,7 +646,7 @@ def run_handler(tool, inp, project, baseline, alternatives, selections,
 
 def build_state_updates(
     touched: set[str], project, baseline, alternatives, selections,
-    pending_actions: list[dict] | None = None, overrides=None, as_built=None,
+    pending_actions: list[dict] | None = None, overrides=None, as_built=None, sheet=None,
 ) -> dict:
     updates: dict = {}
     if "project" in touched:
@@ -653,6 +664,10 @@ def build_state_updates(
     # client keep showing what the server just dropped.
     if "as_built" in touched:
         updates["as_built"] = as_built if as_built is not None else {}
+    # Touched only by a sheet tool that succeeded, so the sheet is there. Sent
+    # whole even when Aida removed her last block: the empty sheet is the edit.
+    if "sheet" in touched and sheet is not None:
+        updates["sheet"] = sheet
     if pending_actions:
         updates["pending_actions"] = pending_actions
     return updates

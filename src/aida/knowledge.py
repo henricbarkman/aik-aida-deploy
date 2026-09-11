@@ -187,6 +187,12 @@ def _label(s: dict) -> str:
     return f"{s['source']} › {heading}"
 
 
+def label(sid: str) -> str:
+    """How a section is named where it is cited: document, edition and heading path."""
+    s = section(sid)
+    return _label(s) if s else ""
+
+
 def _excerpt(text: str, terms: list[str]) -> str:
     """The whole section, or the paragraphs around the best match with gaps marked."""
     if len(text) <= EXCERPT_MAX:

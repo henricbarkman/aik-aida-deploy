@@ -793,8 +793,11 @@ def api_route():
     own flow switch: an advisory reply is rendered and stops; new_project and
     flow_action fall through to the existing flow.
 
-    Request:  {message, history?, project?, baseline?, alternatives?, selections?}
-    Response: {intent: 'advisory_question', reply, ...} | {intent: 'new_project'|'flow_action'}
+    Request:  {message, history?, project?, baseline?, alternatives?, selections?, sheet?}
+    Response: {intent: 'advisory_question', reply, state_updates, ...} | {intent: 'new_project'|'flow_action'}
+
+    `sheet` comes only from Chatt, and with it the answer is written to the
+    sheet (§13.7). The project is never touched either way.
     """
     from aida.agents.orchestrator import route
 
@@ -815,6 +818,7 @@ def api_route():
             selections=data.get('selections'),
             attachments=blocks,
             attachment_note=note,
+            sheet=data.get('sheet'),
         )
         return jsonify(result)
     except _TIMEOUT_ERRORS:
@@ -919,6 +923,7 @@ def api_chat():
             as_built=data.get('as_built'),
             epd_resolver=resolve_epd,
             attachments=blocks,
+            sheet=data.get('sheet'),
         )
         return jsonify(result)
     except _TIMEOUT_ERRORS:
@@ -1436,6 +1441,9 @@ def create_analysis():
         # Storage. Own column for the same reason as the two above: a file
         # usually arrives before intake, while project_data is still null.
         'attachments_data': data.get('attachments_data'),
+        # The open sheet in Chatt (§13.2). Own column because a sheet needs no
+        # project, and in Chatt that is the normal case.
+        'sheet_data': data.get('sheet_data'),
         # Which building this analysis is about, and roughly when the work is
         # planned. Both optional. They exist so analyses stop being isolated
         # events: two analyses on the same school can be related, and the set
@@ -1489,7 +1497,7 @@ def update_analysis(analysis_id):
     update = {}
     for key in ('name', 'status', 'project_data', 'baseline_data',
                 'alternatives_data', 'selections_data', 'report_markdown',
-                'conversation_data', 'as_built_data', 'attachments_data'):
+                'conversation_data', 'as_built_data', 'attachments_data', 'sheet_data'):
         if key in data:
             update[key] = data[key]
     # Kept apart from the loop above because '' has to become NULL rather than
@@ -1968,6 +1976,40 @@ html { scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent; }
 .sheet-empty p { font-size: 12.5px; color: var(--kk-gray-500); line-height: 1.5; max-width: 60ch; }
 .sheet-empty .btn { margin-top: 14px; }
 
+/* === The open sheet (§13) ===
+   Still a document, not a card kit: blocks follow each other with space between
+   and nothing around them. Three things carry meaning and are marked. A quote is
+   the guideline's own words, set off by a rule. A note is the user's, in the soft
+   marker tint the sketch used for "från dig". A figure says where it comes from:
+   a superscript number, explained under its block. Those notes are a sequence,
+   which is the one reason anything here is numbered. Estimates reuse the badge
+   the tables already use for Est., so one mark means one thing across Aida. */
+.open-sheet { max-width: 72ch; }
+.sheet-block + .sheet-block { margin-top: 22px; }
+.sheet-text { font-size: 13.5px; line-height: 1.6; color: var(--kk-charcoal); }
+.sheet-text h1, .sheet-text h2, .sheet-text h3 { font-size: 14px; font-weight: 600; margin: 14px 0 6px; }
+.sheet-text > :first-child { margin-top: 0; }
+.sheet-text p { margin: 0 0 8px; }
+.sheet-text ul, .sheet-text ol { padding-left: 20px; margin: 0 0 8px; }
+.sheet-table-wrap { overflow-x: auto; }
+.sheet-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+.sheet-table th { text-align: left; font-weight: 600; color: var(--kk-gray-500); padding: 6px 12px 6px 0; border-bottom: 1px solid var(--kk-gray-300); }
+.sheet-table td { padding: 7px 12px 7px 0; border-bottom: 1px solid var(--kk-gray-200); vertical-align: top; color: var(--kk-charcoal); }
+.sheet-quote { margin: 0; padding: 2px 0 2px 14px; border-left: 3px solid var(--kk-dark-red); }
+.sheet-quote p { font-size: 13.5px; line-height: 1.6; color: var(--kk-charcoal); margin: 0 0 6px; }
+.sheet-quote footer { font-size: 11.5px; color: var(--kk-gray-500); }
+.sheet-block-note { background: #FBF6DF; border-radius: 6px; padding: 10px 14px; }
+.sheet-block-who { font-size: 11px; color: #6F5A00; margin-bottom: 4px; }
+.claim { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.claim .source-badge { margin-left: 3px; }
+.claim-ref { font-size: 9.5px; color: var(--kk-gray-500); margin-left: 1px; }
+.claim-missing { color: var(--kk-red-orange); }
+.claim-notes { margin: 8px 0 0; padding-left: 18px; font-size: 11.5px; line-height: 1.5; color: var(--kk-gray-500); }
+.sheet-add { margin-top: 24px; }
+.note-input { width: 100%; font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 1px solid var(--kk-gray-300); border-radius: 6px; resize: vertical; }
+.note-input:focus-visible { outline: 2px solid var(--kk-dark-red); outline-offset: 1px; }
+.note-actions { margin-top: 8px; }
+
 /* === Editable cells (orchestration-redesign §12.4) ===
    A cell reads as text until you touch it. Drawing every editable value as an
    input box would turn a results table into a form, and most of the time the
@@ -2427,6 +2469,10 @@ let state = {
   // implementation of the figure that ends up in a klimatredovisning instead of
   // one per language that have to be kept honest about each other.
   followup: null,
+  // Orchestration §13: the open sheet in Chatt, {title, seq, blocks}. Aida writes
+  // it through the block tools on the server; the user adds notes here. Its own
+  // column (sheet_data), because a sheet needs no project.
+  sheet: {title: '', seq: 0, blocks: []},
   get step() { return _step; },
   set step(v) { _step = v; updatePlaceholder(); },
 };
@@ -3431,10 +3477,14 @@ async function sendMessage() {
   // router only fires on messages neither regex catches — exactly the pure
   // questions we want it for. Any routing error falls through (fail-safe).
   if (!wantsAdvance && !wantsCorrection) {
+    const epoch = analysisEpoch;
     try {
       const routed = await routeMessage(text);
+      if (lateReply(epoch)) { setLoading(false); return; }
       if (routed && routed.intent === 'advisory_question') {
         userEntry.role = 'user';
+        // In Chatt the answer itself went on the sheet, and the reply says where.
+        if (routed.state_updates) applyAgentStateUpdates(routed.state_updates);
         addMsg(routed.reply, 'bot', 'assistant');  // saves both entries
         setLoading(false);
         return;
@@ -4016,6 +4066,14 @@ async function recordFollowupFacts() {
   }
 }
 
+// True, after telling the user, when a reply arrives for an analysis the view
+// has since left. See analysisEpoch.
+function lateReply(epoch) {
+  if (epoch === analysisEpoch) return false;
+  addMsg('Svaret kom efter att du bytt analys, så det lades inte in här.', 'system');
+  return true;
+}
+
 // Orchestration increment 1: classify a message server-side, getting an advisory
 // answer back in the same call when applicable. Mirrors runChat's body shape.
 async function routeMessage(text) {
@@ -4027,6 +4085,9 @@ async function routeMessage(text) {
     alternatives: state.alternatives || null,
     selections: (state.selections && Object.keys(state.selections).length) ? state.selections : null,
     attachments: attachmentRefs(),
+    // Only from Chatt. Without it the server offers no block tools, so a question
+    // asked in Stegvis is answered in the chat as before.
+    sheet: isDoc() ? (state.sheet || emptySheet()) : null,
   };
   const r = await authFetch('/api/route', {method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(body)});
@@ -4058,10 +4119,13 @@ async function runChat(text, userEntry) {
       // as the same change made in a cell does.
       overrides: state.overrides,
       attachments: attachmentRefs(),
+      sheet: isDoc() ? (state.sheet || emptySheet()) : null,
     };
+    const epoch = analysisEpoch;
     const r = await authFetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(body)});
     const d = await r.json();
+    if (lateReply(epoch)) { setLoading(false); return; }
     if (d.error) { addMsg('Fel: ' + d.error, 'system'); setLoading(false); return; }
 
     applyAgentStateUpdates(d.state_updates);
@@ -4408,6 +4472,14 @@ function applyAgentStateUpdates(updates) {
     // new bag by itself. Without this the numbers on screen belong to the
     // previous edit.
     if (isFollowup()) refreshFollowup();
+  }
+  // The sheet by the same test: Aida removing her last block leaves it empty, and
+  // the empty sheet is what has to be drawn. Merged rather than replaced, so a
+  // note written while she was answering survives her answer.
+  if (Object.prototype.hasOwnProperty.call(updates, 'sheet')) {
+    const incoming = (updates.sheet && Array.isArray(updates.sheet.blocks)) ? updates.sheet : emptySheet();
+    state.sheet = mergeSheet(incoming, state.sheet);
+    touched = true;
   }
 
   if (touched) {
@@ -4954,6 +5026,7 @@ async function sendMutation(tool, input) {
   if (cellsLocked()) return;
   _mutationInFlight = true;
   setCellsDisabled(true);
+  const epoch = analysisEpoch;
   try {
     const r = await authFetch('/api/mutate', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -4962,6 +5035,7 @@ async function sendMutation(tool, input) {
                             overrides: state.overrides, as_built: state.as_built}),
     });
     const d = await r.json();
+    if (lateReply(epoch)) return;
     if (d.error) { addMsg('Fel: ' + d.error, 'system'); refreshResults(); return; }
     // A refused edit is not a failure to report as one: the handler explains why
     // ("det finns redan en komponent som heter..."), and the view goes back to
@@ -5898,9 +5972,159 @@ function sheetHtml(st, sections) {
   return html + '</div>';
 }
 
+// === The open sheet in Chatt (orchestration-redesign §13.2, §13.3) ===
+//
+// Blocks in the order they were written: Aida's text, tables and quotes, and the
+// user's notes. The server has already judged every block Aida wrote, so this
+// only draws. A {{cN}} becomes the claim's figure, and every figure is numbered
+// and explained under its block: the source, or what an estimate rests on. The
+// explanation stands in the text rather than in a tooltip, because a tooltip
+// does not exist on a phone, and an estimate is allowed only if it says so.
+
+const CLAIM_KIND_LABELS = {epd: 'EPD', boverket: 'Boverkets klimatdatabas', nollco2: 'NollCO2',
+  riktlinje: 'Riktlinje', metod: 'Aidas metod', palats: 'Palats', web: 'Webben'};
+const CLAIM_OPS = {add: 'plus', sub: 'minus', mul: 'gånger', div: 'delat med'};
+const CLAIM_REF_RE = /\{\{\s*(c\d{1,3})\s*\}\}/g;
+
+function emptySheet() { return {title: '', seq: 0, blocks: []}; }
+
+function maxBlockId(sheet) {
+  return ((sheet && sheet.blocks) || []).reduce((m, b) => Math.max(m, parseInt(String(b.id).slice(1), 10) || 0), 0);
+}
+
+// The sheet Aida sends back was read from the one sent with the question. A note
+// written while she was answering is not in it, so it is carried over, with a new
+// id if one of her blocks took the old one.
+function mergeSheet(incoming, local) {
+  const sheet = {title: incoming.title || '', seq: incoming.seq || 0, blocks: incoming.blocks.slice()};
+  const kept = new Set(sheet.blocks.filter(b => b.author === 'user').map(b => b.id));
+  ((local && local.blocks) || []).forEach(b => {
+    if (b.author !== 'user' || kept.has(b.id)) return;
+    sheet.seq = Math.max(sheet.seq, maxBlockId(sheet)) + 1;
+    sheet.blocks.push(Object.assign({}, b, {id: 'b' + sheet.seq}));
+  });
+  return sheet;
+}
+
+function _claimsById(block) {
+  const byId = {};
+  (block.claims || []).forEach(c => { if (c && c.id) byId[c.id] = c; });
+  return byId;
+}
+
+function claimNoteText(c, byId) {
+  // Grounds are the model's own words and often end in a full stop already.
+  const bare = s => esc(String(s || '').trim().replace(/[.!?:;,]+$/, ''));
+  if (!c) return 'Påståendet saknas.';
+  if (c.basis === 'source') {
+    const s = c.source || {};
+    return esc(CLAIM_KIND_LABELS[s.kind] || 'Källa') + (s.ref ? ', ' + esc(s.ref) : '') + '.';
+  }
+  if (c.basis === 'user') return 'Från dig.';
+  if (c.basis === 'estimate') return 'Uppskattning: ' + bare((c.estimate || {}).grounds) + '.';
+  const d = c.derived || {};
+  const parts = (d.from || []).map(id => byId[id] ? esc(byId[id].display) : esc(id));
+  let txt = 'Räknat: ' + parts.join(' ' + esc(CLAIM_OPS[d.op] || d.op || '') + ' ') + '.';
+  if (c.effective === 'estimate') {
+    txt += ' En uppskattning, eftersom det bygger på: ' + (c.grounds || []).map(bare).join('; ') + '.';
+  }
+  return txt;
+}
+
+// Every {{cN}} in sanitized html becomes its figure. Only the text between tags
+// is touched: a reference inside a link would otherwise put markup into an
+// attribute. `numbering` spans the block, so a claim cited twice keeps one number.
+function withClaims(html, byId, numbering) {
+  return html.split(/(<[^>]*>)/).map(part => part.charAt(0) === '<' ? part : part.replace(CLAIM_REF_RE, (m, id) => {
+    if (!(id in numbering.map)) { numbering.order.push(id); numbering.map[id] = numbering.order.length; }
+    const c = byId[id];
+    if (!c) return '<span class="claim claim-missing">[saknas]</span>';
+    const estimate = c.effective === 'estimate';
+    return '<span class="claim' + (estimate ? ' claim-estimate' : '') + '">' + esc(c.display)
+      + (estimate ? ' <span class="source-badge source-estimate">uppskattning</span>' : '')
+      + '<sup class="claim-ref">' + numbering.map[id] + '</sup></span>';
+  })).join('');
+}
+
+function claimNotesHtml(byId, numbering) {
+  if (!numbering.order.length) return '';
+  return '<ol class="claim-notes">'
+    + numbering.order.map(id => '<li>' + claimNoteText(byId[id], byId) + '</li>').join('') + '</ol>';
+}
+
+function sheetBlockHtml(block) {
+  const c = block.content || {};
+  const byId = _claimsById(block);
+  const numbering = {order: [], map: {}};
+  let body = '';
+  if (block.type === 'text') {
+    body = '<div class="sheet-text">' + withClaims(renderMd(c.markdown || ''), byId, numbering) + '</div>';
+  } else if (block.type === 'note') {
+    // The user's own words, never read as claims.
+    body = '<div class="sheet-block-who">Din anteckning</div><div class="sheet-text">' + renderMd(c.markdown || '') + '</div>';
+  } else if (block.type === 'table') {
+    const cell = (tag, t) => '<' + tag + '>' + withClaims(esc(t), byId, numbering) + '</' + tag + '>';
+    body = '<div class="sheet-table-wrap"><table class="sheet-table"><thead><tr>'
+      + (c.columns || []).map(h => cell('th', h)).join('') + '</tr></thead><tbody>'
+      + (c.rows || []).map(r => '<tr>' + r.map(t => cell('td', t)).join('') + '</tr>').join('')
+      + '</tbody></table></div>';
+  } else if (block.type === 'quote') {
+    body = '<blockquote class="sheet-quote"><p>' + esc(c.text || '') + '</p>'
+      + '<footer>' + esc(c.label || '') + '</footer></blockquote>';
+  } else {
+    return '';
+  }
+  return '<div class="sheet-block sheet-block-' + block.type + '" id="blk-' + esc(block.id) + '">'
+    + body + claimNotesHtml(byId, numbering) + '</div>';
+}
+
+function openSheetHtml(sheet) {
+  const blocks = (sheet && Array.isArray(sheet.blocks)) ? sheet.blocks : [];
+  let html = '<div class="open-sheet">';
+  if (!blocks.length) {
+    html += '<div class="sheet-empty"><p>Bladet är tomt. Ställ en fråga i chatten, så skriver Aida svaret här, '
+      + 'med källa för varje tal eller en märkt uppskattning. Du kan också skriva egna anteckningar.</p></div>';
+  }
+  html += blocks.map(sheetBlockHtml).join('');
+  html += '<div class="sheet-add"><button class="btn btn-secondary" onclick="startNote()">Lägg till anteckning</button></div>';
+  return html + '</div>';
+}
+
+function startNote() {
+  const box = document.querySelector('.sheet-add');
+  if (!box || box.querySelector('textarea')) return;
+  box.innerHTML = '<textarea class="note-input" rows="3" placeholder="Skriv en anteckning"></textarea>'
+    + '<div class="note-actions"><button class="btn" onclick="saveNote(this)">Spara</button> '
+    + '<button class="btn btn-secondary" onclick="renderSheet()">Avbryt</button></div>';
+  box.querySelector('textarea').focus();
+}
+
+function saveNote(btn) {
+  const text = btn.closest('.sheet-add').querySelector('textarea').value.trim();
+  if (text) addNote(text);
+  else renderSheet();
+}
+
+// The id comes from the counter the server also uses, so a note written here and
+// a block Aida adds in the next turn cannot share one.
+function addNote(text) {
+  if (!state.sheet || !Array.isArray(state.sheet.blocks)) state.sheet = emptySheet();
+  const sheet = state.sheet;
+  sheet.seq = Math.max(sheet.seq || 0, maxBlockId(sheet)) + 1;
+  sheet.blocks.push({id: 'b' + sheet.seq, type: 'note', author: 'user', user_edited: false,
+                     content: {markdown: text}, claims: [], at: new Date().toISOString()});
+  renderSheet();
+  scheduleAutoSave();
+}
+
 function renderSheet() {
-  document.getElementById('resultContent').innerHTML =
-    sheetHtml(effectiveState(state), sectionsForMode());
+  const st = effectiveState(state);
+  // Chatt is the open sheet (§13.6). Until step 5 turns them into model blocks, a
+  // project's sections follow the free blocks, so an analysis worked in Chatt
+  // before the sheet existed still shows its figures.
+  document.getElementById('resultContent').innerHTML = isDoc()
+    ? openSheetHtml(state.sheet) + (st.project ? sheetHtml(st, SHEET_SECTIONS) : '')
+    : sheetHtml(st, sectionsForMode());
   _populateNeedsTextarea();
   bindCells();
   bindAltRows();
@@ -6013,6 +6237,10 @@ const SUPABASE_ANON_KEY = {{ supabase_anon_key|tojson }};
 let supabaseClient = null;
 let currentUser = null;
 let currentAnalysisId = null;
+// Bumped whenever the view switches to another analysis, so a reply still on its
+// way for the one left behind can tell. Merged, it would write that analysis's
+// sheet and project into this one, and autosave would store the blend here.
+let analysisEpoch = 0;
 let isSignup = false;
 let saveTimeout = null;
 let saveInProgress = false;
@@ -6099,6 +6327,9 @@ async function autoSave() {
     // Own column (§14.3), and null when the last file is removed so the row
     // stops pointing at files that are gone.
     attachments_data: (state.attachments && state.attachments.length) ? state.attachments : null,
+    // Own column (§13.2), null for an empty sheet so the row carries nothing it
+    // does not need.
+    sheet_data: (state.sheet && state.sheet.blocks && state.sheet.blocks.length) ? state.sheet : null,
     property_ref: state.propertyRef || null,
     // The month input gives 'YYYY-MM'; the column is a DATE, so anchor it to the
     // first of the month. We only ever show the month back, so the day is a
@@ -6228,6 +6459,7 @@ async function handleLogout() {
   await supabaseClient.auth.signOut();
   currentUser = null;
   currentAnalysisId = null;
+  analysisEpoch++;
   showAuth();
 }
 
@@ -6346,6 +6578,7 @@ async function loadAnalysis(id) {
     const data = await r.json();
     if (!data || data.error) return;
     currentAnalysisId = id;
+    analysisEpoch++;
     // Increment 4: the analysis carries its own conversation, so switching
     // project swaps the whole transcript AND the model's context together. The
     // previous project's turns cannot leak in, because they are not in this
@@ -6394,6 +6627,8 @@ async function loadAnalysis(id) {
     // Before restoreUI, which draws the transcript's file chips against this list.
     state.attachments = Array.isArray(data.attachments_data) ? data.attachments_data : [];
     _resetAttachmentSession();
+    // An analysis saved before §13 has no sheet and opens with an empty one.
+    state.sheet = (data.sheet_data && Array.isArray(data.sheet_data.blocks)) ? data.sheet_data : emptySheet();
     document.getElementById('projectName').textContent = data.name || 'Nytt projekt';
     restoreUI();
     renderAttachmentTray();
@@ -6485,6 +6720,7 @@ function createNewProject() {
   // Null the id BEFORE removing, so we clear the "new" chat bucket — not the
   // previous project's saved chat log (which must survive switching back).
   currentAnalysisId = null;
+  analysisEpoch++;
   try { localStorage.removeItem(_chatStorageKey()); } catch(e) {}
   state.conversation = [];
   state.project = null; state.baseline = null; state.alternatives = null;
@@ -6497,6 +6733,7 @@ function createNewProject() {
   state.followup = null;
   state.propertyRef = '';
   state.plannedStart = '';
+  state.sheet = emptySheet();
   // The previous project keeps its files; this one starts with none.
   state.attachments = [];
   _resetAttachmentSession();

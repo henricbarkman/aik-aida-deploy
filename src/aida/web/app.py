@@ -1683,6 +1683,13 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .chat-input button:focus-visible, .att-chip button:focus-visible { outline: 2px solid var(--kk-charcoal); outline-offset: 2px; }
 .att-tray { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px 0; background: white; border-top: 1px solid var(--kk-gray-200); }
 .att-tray:empty { display: none; }
+/* Ten files must not push the conversation out of the panel, and on a phone,
+   where the panel has a fixed height, the tray must not be the thing that
+   shrinks: at 400 px it collapsed to a 22 px sliver. The conversation scrolls. */
+.att-tray { max-height: 112px; overflow-y: auto; flex-shrink: 0; }
+/* A flex item's min-width defaults to its intrinsic size, so without this the
+   text field refuses to give up the room the paperclip needs at narrow widths. */
+.chat-input input { min-width: 0; }
 .att-tray:not(:empty) + .chat-input { border-top: none; }
 .att-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 28px; padding: 3px 3px 3px 9px; border: 1px solid var(--kk-gray-200); border-radius: 999px; background: var(--kk-gray-50); font-size: 12px; line-height: 1.3; color: var(--kk-text); }
 .att-chip svg { flex-shrink: 0; color: var(--kk-gray-500); }
@@ -1694,6 +1701,7 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .att-chip.failed { border-color: var(--kk-dark-red); background: #FDF1F1; color: var(--kk-dark-red); }
 .att-chip.failed svg, .att-chip.failed .att-meta, .att-chip.failed button { color: var(--kk-dark-red); }
 .att-chip.failed .att-meta { white-space: normal; }
+.att-chip.failed .att-name { flex-shrink: 0; max-width: 40%; }
 .msg-atts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .msg-atts .att-chip { background: rgba(255,255,255,0.75); border-color: var(--kk-gold); padding-right: 9px; }
 .msg-atts .att-chip.removed .att-name { text-decoration: line-through; color: var(--kk-gray-500); }
@@ -3277,6 +3285,17 @@ async function removeAttachment(id) {
     const res = await supabaseClient.storage.from(ATTACH_BUCKET).remove([a.path]);
     if (res && res.error) console.error('Attachment delete failed:', res.error);
   } catch (e) { console.error('Attachment delete failed:', e); }
+}
+
+// On a project switch. An upload still running belongs to the analysis being
+// left: its chip must not sit in the new tray, and the new project's first
+// message must not wait for it. _uploadOne notices the switch and deletes the
+// file itself when it lands.
+function _resetAttachmentSession() {
+  _pendingAttachmentIds = [];
+  _failedUploads = [];
+  _uploading.clear();
+  _uploadsInFlight = [];
 }
 
 function dismissFailedUpload(key) {
@@ -6370,8 +6389,7 @@ async function loadAnalysis(id) {
     state.followup = null;
     // Before restoreUI, which draws the transcript's file chips against this list.
     state.attachments = Array.isArray(data.attachments_data) ? data.attachments_data : [];
-    _pendingAttachmentIds = [];
-    _failedUploads = [];
+    _resetAttachmentSession();
     document.getElementById('projectName').textContent = data.name || 'Nytt projekt';
     restoreUI();
     renderAttachmentTray();
@@ -6477,8 +6495,7 @@ function createNewProject() {
   state.plannedStart = '';
   // The previous project keeps its files; this one starts with none.
   state.attachments = [];
-  _pendingAttachmentIds = [];
-  _failedUploads = [];
+  _resetAttachmentSession();
   renderAttachmentTray();
   document.getElementById('projectName').textContent = 'Nytt projekt';
   ['projekt','baslinje','alternativ','rapport'].forEach(t => {

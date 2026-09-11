@@ -1466,6 +1466,10 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .btn-pill:hover { background: var(--kk-gray-100); border-color: var(--kk-gray-300); color: var(--kk-charcoal); }
 .btn-pill:focus-visible { outline: 2px solid var(--kk-dark-red); outline-offset: 2px; }
 .topbar-right { flex: 1 0 0; justify-content: flex-end; font-size: 12px; color: var(--kk-gray-500); }
+/* The save status keeps its place when it is empty. Shown and hidden with
+   display it pushed every button in the bar sideways on each autosave, and
+   "Sparar..." and "Sparat" are not the same width, so they jumped twice. */
+.save-indicator { display: inline-block; width: 4.6em; text-align: right; white-space: nowrap; font-size: 11px; color: var(--kk-gray-500); visibility: hidden; }
 
 /* === Pipeline rail ===
    Was six numbered circles on a connecting line, spread edge to edge. That
@@ -2033,6 +2037,10 @@ select.cell-input { cursor: pointer; }
   .progress-bar { padding: 8px 12px; gap: 8px; }
   .step-item { padding: 4px 9px; }
   .topbar { padding: 0 12px; }
+  /* No room for a fixed slot beside the buttons here: it pushed the user menu
+     off a phone screen. Below the user icon, inside the bar, it takes no space. */
+  .topbar-right { position: relative; }
+  .save-indicator { position: absolute; right: 0; top: 100%; width: auto; font-size: 10px; line-height: 1; }
   .topbar-center { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .summary { grid-template-columns: repeat(2, 1fr); }
   .card .value { font-size: 18px; }
@@ -2102,7 +2110,7 @@ select.cell-input { cursor: pointer; }
     <button class="topbar-new-btn" onclick="createNewProject()" title="Skapa nytt projekt" aria-label="Skapa nytt projekt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>Nytt projekt</span></button>
     <a href="#" class="btn-pill" id="soundToggle" onclick="toggleSound();return false" title="Pling när ett steg är klart, även om du är i en annan flik">🔔 Pling på</a>
     <a href="#" class="btn-pill" onclick="openAbout();return false">Om verktyget</a>
-    <span id="saveIndicator" style="font-size:11px;color:var(--kk-gray-500);display:none"></span>
+    <span id="saveIndicator" class="save-indicator" aria-live="polite"></span>
     <button class="user-btn" onclick="toggleUserMenu()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     </button>
@@ -2114,7 +2122,7 @@ select.cell-input { cursor: pointer; }
   </div>
   {% else %}
   <div class="topbar-center"></div>
-  <div class="topbar-right" style="display:flex;align-items:center;gap:12px"><button class="topbar-new-btn" onclick="createNewProject()" title="Skapa nytt projekt" aria-label="Skapa nytt projekt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>Nytt projekt</span></button><a href="#" class="btn-pill" id="soundToggle" onclick="toggleSound();return false" title="Pling när ett steg är klart, även om du är i en annan flik">🔔 Pling på</a><a href="#" class="btn-pill" onclick="openAbout();return false">Om verktyget</a><span id="saveIndicator" style="font-size:11px;color:var(--kk-gray-500);display:none"></span><span style="font-size:12px;color:var(--kk-gray-500)">Prototyp</span></div>
+  <div class="topbar-right" style="display:flex;align-items:center;gap:12px"><button class="topbar-new-btn" onclick="createNewProject()" title="Skapa nytt projekt" aria-label="Skapa nytt projekt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>Nytt projekt</span></button><a href="#" class="btn-pill" id="soundToggle" onclick="toggleSound();return false" title="Pling när ett steg är klart, även om du är i en annan flik">🔔 Pling på</a><a href="#" class="btn-pill" onclick="openAbout();return false">Om verktyget</a><span id="saveIndicator" class="save-indicator" aria-live="polite"></span><span style="font-size:12px;color:var(--kk-gray-500)">Prototyp</span></div>
   {% endif %}
 </div>
 
@@ -6527,7 +6535,8 @@ async function autoSave() {
   }
   saveInProgress = true;
   const indicator = document.getElementById('saveIndicator');
-  if (indicator) { indicator.textContent = 'Sparar...'; indicator.style.display = 'inline'; indicator.style.color = 'var(--kk-gray-400)'; }
+  // A timer left from the last save must not hide this one.
+  if (indicator) { clearTimeout(indicator._hide); indicator.textContent = 'Sparar...'; indicator.style.visibility = 'visible'; indicator.style.color = 'var(--kk-gray-400)'; }
   // Directives persist per analysis. Until a dedicated column exists, they ride
   // inside project_data (the server's Project.from_dict ignores unknown keys).
   // Spread so we never mutate the working state.project object.
@@ -6593,7 +6602,7 @@ async function autoSave() {
         await loadAnalysesList();
       }
     }
-    if (indicator) { indicator.textContent = 'Sparat'; setTimeout(() => { indicator.style.display = 'none'; }, 2000); }
+    if (indicator) { indicator.textContent = 'Sparat'; indicator._hide = setTimeout(() => { indicator.style.visibility = 'hidden'; }, 2000); }
   } catch (e) {
     console.error('Auto-save failed:', e);
     if (indicator) { indicator.textContent = 'Sparfel'; indicator.style.color = 'var(--kk-dark-red)'; }

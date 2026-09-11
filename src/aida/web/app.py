@@ -2009,6 +2009,20 @@ html { scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent; }
 .note-input { width: 100%; font: inherit; font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 1px solid var(--kk-gray-300); border-radius: 6px; resize: vertical; }
 .note-input:focus-visible { outline: 2px solid var(--kk-dark-red); outline-offset: 1px; }
 .note-actions { margin-top: 8px; }
+/* Co-editing (§13.5). The actions are quiet words at the block's edge, there when
+   you look for them and out of the reading line otherwise. A suggestion is not
+   yet part of the document, so it is drawn as a draft: a dashed outline in the
+   accent, around exactly what Godta would put in place. */
+.sheet-block-actions { float: right; display: flex; gap: 12px; margin: -1px 0 4px 16px; }
+.sheet-act { background: none; border: 0; padding: 2px 0; font: inherit; font-size: 11.5px; color: var(--kk-gray-500); cursor: pointer; }
+.sheet-act:hover { color: var(--kk-dark-red); text-decoration: underline; }
+.sheet-act:focus-visible { color: var(--kk-dark-red); outline: 2px solid var(--kk-dark-red); outline-offset: 2px; border-radius: 2px; }
+.sheet-block-edited { color: var(--kk-gray-500); }
+.sheet-block-suggestion { border: 1px dashed var(--kk-dark-red); border-radius: 6px; padding: 10px 14px; }
+.sheet-block-suggestion > .sheet-block-who { color: var(--kk-dark-red); }
+.sheet-edit-hint { font-size: 11.5px; color: var(--kk-gray-500); margin: 6px 0 0; }
+.sheet-table-edit th, .sheet-table-edit td { padding: 3px 6px 3px 0; }
+.sheet-cell-input { padding: 4px 6px; font-size: 12.5px; min-width: 8ch; }
 
 /* === Editable cells (orchestration-redesign §12.4) ===
    A cell reads as text until you touch it. Drawing every editable value as an
@@ -5992,6 +6006,13 @@ function maxBlockId(sheet) {
   return ((sheet && sheet.blocks) || []).reduce((m, b) => Math.max(m, parseInt(String(b.id).slice(1), 10) || 0), 0);
 }
 
+// Only well-formed ids get buttons, since the id rides in a data attribute.
+const SHEET_ID_RE = /^b\d{1,5}$/;
+// The one editor open on the sheet. It lives outside the DOM so that Aida's
+// reply, which redraws the sheet, does not throw away what is being typed.
+// id is a block id, or 'new' for a note; value is text, or a table's cells.
+let sheetDraft = null;
+
 // The sheet Aida sends back was read from the one sent with the question. A note
 // written while she was answering is not in it, so it is carried over, with a new
 // id if one of her blocks took the old one.
@@ -6052,7 +6073,9 @@ function claimNotesHtml(byId, numbering) {
     + numbering.order.map(id => '<li>' + claimNoteText(byId[id], byId) + '</li>').join('') + '</ol>';
 }
 
-function sheetBlockHtml(block) {
+// A block's content with its figures and their notes, or '' for a type there is
+// no renderer for. Suggestions draw their content through this too.
+function blockBodyHtml(block) {
   const c = block.content || {};
   const byId = _claimsById(block);
   const numbering = {order: [], map: {}};
@@ -6074,8 +6097,116 @@ function sheetBlockHtml(block) {
   } else {
     return '';
   }
+  return body + claimNotesHtml(byId, numbering);
+}
+
+function sheetBlockHtml(block) {
+  if (block.type === 'suggestion') return suggestionHtml(block);
+  const editing = !!sheetDraft && sheetDraft.id === block.id && SHEET_ID_RE.test(String(block.id))
+    && ['text', 'table', 'note'].includes(block.type);
+  const body = editing ? blockEditorHtml(block) : blockBodyHtml(block);
+  if (!body) return '';
+  const edited = block.author !== 'user' && block.user_edited && !editing
+    ? '<div class="sheet-block-who sheet-block-edited">Ändrad av dig</div>' : '';
   return '<div class="sheet-block sheet-block-' + block.type + '" id="blk-' + esc(block.id) + '">'
-    + body + claimNotesHtml(byId, numbering) + '</div>';
+    + (editing ? '' : blockActionsHtml(block)) + edited + body + '</div>';
+}
+
+// Plain words, not icons: the label says what happens. A quote is the source's
+// own words and is not edited here, but removing it is still the user's call.
+function blockActionsHtml(block) {
+  if (!SHEET_ID_RE.test(String(block.id))) return '';
+  const act = (fn, label) => '<button type="button" class="sheet-act" data-block="' + block.id
+    + '" onclick="' + fn + '(this.dataset.block)">' + label + '</button>';
+  return '<div class="sheet-block-actions">' + (block.type === 'quote' ? '' : act('editSheetBlock', 'Ändra'))
+    + act('removeSheetBlock', 'Ta bort') + '</div>';
+}
+
+// Aida's change to a block the user edited (§13.5), drawn the way the block
+// would look if accepted, and waiting for the user's word.
+function suggestionHtml(block) {
+  const c = block.content || {};
+  if (!['text', 'table', 'quote'].includes(c.type)) return '';
+  const inner = blockBodyHtml({type: c.type, content: c.content || {}, claims: block.claims || []});
+  const ok = SHEET_ID_RE.test(String(block.id));
+  const act = (fn, cls, label) => '<button type="button" class="btn' + cls + '" data-block="' + block.id
+    + '" onclick="' + fn + '(this.dataset.block)">' + label + '</button>';
+  return '<div class="sheet-block sheet-block-suggestion" id="blk-' + esc(block.id) + '">'
+    + '<div class="sheet-block-who">Aidas förslag till ändring av blocket ovan</div>' + inner
+    + (ok ? '<div class="note-actions">' + act('acceptSuggestion', '', 'Godta ändringen') + ' '
+      + act('declineSuggestion', ' btn-secondary', 'Avböj') + '</div>' : '') + '</div>';
+}
+
+function blockEditorHtml(block) {
+  const v = sheetDraft.value;
+  let field;
+  if (block.type === 'table') {
+    const input = (r, c, t) => '<input class="note-input sheet-cell-input" data-r="' + r + '" data-c="' + c
+      + '" value="' + esc(t) + '" oninput="draftCell(this)">';
+    field = '<div class="sheet-table-wrap"><table class="sheet-table sheet-table-edit"><thead><tr>'
+      + v.columns.map((t, c) => '<th>' + input(-1, c, t) + '</th>').join('') + '</tr></thead><tbody>'
+      + v.rows.map((row, r) => '<tr>' + row.map((t, c) => '<td>' + input(r, c, t) + '</td>').join('') + '</tr>').join('')
+      + '</tbody></table></div>';
+  } else {
+    const rows = Math.min(14, Math.max(3, String(v).split('\n').length + 1));
+    field = '<textarea class="note-input" rows="' + rows + '" oninput="sheetDraft.value = this.value">'
+      + esc(v) + '</textarea>';
+  }
+  const hint = block.type === 'note' ? ''
+    : '<p class="sheet-edit-hint">Tal du lämnar som de står behåller sin källa. Det du skriver själv märks som ditt.</p>';
+  return field + hint + '<div class="note-actions"><button type="button" class="btn" onclick="saveSheetEdit()">Spara</button> '
+    + '<button type="button" class="btn btn-secondary" onclick="cancelSheetEdit()">Avbryt</button></div>';
+}
+
+// A block being edited shows its figures as plain text, since a förvaltare edits
+// words and not references. On save each figure left exactly as it stood gets
+// its reference back, and with it its source. A figure the user changed is theirs.
+function editableText(src, byId) {
+  return String(src || '').replace(CLAIM_REF_RE, (m, id) => byId[id] && byId[id].display ? byId[id].display : m);
+}
+
+// Two figures can look alike and still have different sources. While they are
+// all still there, they get their references back in order. When one of them was
+// changed, the one left is known by the words beside it, and without such a
+// match it stays plain: a figure without its source beats one with the wrong one.
+function restoreRefs(text, original, byId) {
+  const out = String(text), src = String(original || '');
+  const plain = editableText(src, byId);
+  const refs = [];
+  let shift = 0;
+  for (const m of src.matchAll(CLAIM_REF_RE)) {
+    const c = byId[m[1]];
+    if (!c || !c.display) continue;
+    refs.push({id: m[1], display: c.display, at: m.index + shift});
+    shift += c.display.length - m[0].length;
+  }
+  const near = (s, at, len) => [s.slice(Math.max(0, at - 12), at), s.slice(at + len, at + len + 12)];
+  const taken = [], next = {};
+  for (const r of refs) {
+    const len = r.display.length;
+    const spots = _figuresAt(out, r.display)
+      .filter(q => q >= (next[r.display] || 0) && taken.every(t => q + len <= t.at || q >= t.at + t.len));
+    const [before, after] = near(plain, r.at, len);
+    const p = _figuresAt(plain, r.display).length === _figuresAt(out, r.display).length ? spots[0]
+      : spots.find(q => { const [b, a] = near(out, q, len); return b === before || a === after; });
+    if (p === undefined) continue;
+    taken.push({at: p, len, id: r.id});
+    next[r.display] = p + len;
+  }
+  // From the end, so each position still holds. Built in pieces: two braces in
+  // a row would be read by Jinja.
+  return taken.sort((a, b) => b.at - a.at).reduce((s, t) =>
+    s.slice(0, t.at) + '{' + '{' + t.id + '}' + '}' + s.slice(t.at + t.len), out);
+}
+
+// Every place `figure` stands on its own, not inside a longer number or word.
+function _figuresAt(text, figure) {
+  const found = [];
+  for (let at = text.indexOf(figure); at >= 0; at = text.indexOf(figure, at + 1)) {
+    const before = text.charAt(at - 1), after = text.charAt(at + figure.length);
+    if (!/[\d.,−-]/.test(before) && !/[\p{L}\p{N}]/u.test(after)) found.push(at);
+  }
+  return found;
 }
 
 function openSheetHtml(sheet) {
@@ -6085,24 +6216,156 @@ function openSheetHtml(sheet) {
     html += '<div class="sheet-empty"><p>Bladet är tomt. Ställ en fråga i chatten, så skriver Aida svaret här, '
       + 'med källa för varje tal eller en märkt uppskattning. Du kan också skriva egna anteckningar.</p></div>';
   }
-  html += blocks.map(sheetBlockHtml).join('');
-  html += '<div class="sheet-add"><button class="btn btn-secondary" onclick="startNote()">Lägg till anteckning</button></div>';
+  html += blocks.map(b => sheetBlockHtml(b)).join('');
+  html += '<div class="sheet-add">' + (sheetDraft && sheetDraft.id === 'new'
+    ? '<textarea class="note-input" rows="3" placeholder="Skriv en anteckning" oninput="sheetDraft.value = this.value">'
+      + esc(sheetDraft.value) + '</textarea>'
+      + '<div class="note-actions"><button type="button" class="btn" onclick="saveNote()">Spara</button> '
+      + '<button type="button" class="btn btn-secondary" onclick="cancelSheetEdit()">Avbryt</button></div>'
+    : '<button class="btn btn-secondary" onclick="startNote()">Lägg till anteckning</button>') + '</div>';
   return html + '</div>';
 }
 
 function startNote() {
-  const box = document.querySelector('.sheet-add');
-  if (!box || box.querySelector('textarea')) return;
-  box.innerHTML = '<textarea class="note-input" rows="3" placeholder="Skriv en anteckning"></textarea>'
-    + '<div class="note-actions"><button class="btn" onclick="saveNote(this)">Spara</button> '
-    + '<button class="btn btn-secondary" onclick="renderSheet()">Avbryt</button></div>';
-  box.querySelector('textarea').focus();
+  sheetDraft = {id: 'new', value: ''};
+  renderSheet();
+  const box = document.querySelector('.sheet-add textarea');
+  if (box) box.focus();
 }
 
-function saveNote(btn) {
-  const text = btn.closest('.sheet-add').querySelector('textarea').value.trim();
+function saveNote() {
+  const text = sheetDraft && sheetDraft.id === 'new' ? String(sheetDraft.value).trim() : '';
+  sheetDraft = null;
   if (text) addNote(text);
   else renderSheet();
+}
+
+function cancelSheetEdit() {
+  sheetDraft = null;
+  renderSheet();
+}
+
+// Removing, accepting and declining wait while Aida answers: her reply is read
+// from the sheet sent with the question, so it would bring back a block removed
+// in between. A new note is safe, since mergeSheet carries it over.
+function _sheetBusy() {
+  if (!_runInFlight) return false;
+  addMsg('Aida svarar just nu. Gör ändringen när svaret har kommit, så skriver svaret inte över den.', 'system');
+  return true;
+}
+
+function editSheetBlock(id) {
+  const block = ((state.sheet && state.sheet.blocks) || []).find(b => b.id === id);
+  if (!block || !['text', 'table', 'note'].includes(block.type)) return;
+  const byId = _claimsById(block);
+  const c = block.content || {};
+  // The version the editor's text is made from. Aida may rewrite the block before
+  // Save, and the words being typed still belong to this one.
+  const base = JSON.parse(JSON.stringify({content: c, claims: block.claims || []}));
+  sheetDraft = block.type === 'table'
+    ? {id, base, value: {columns: (c.columns || []).map(t => editableText(t, byId)),
+                         rows: (c.rows || []).map(r => r.map(t => editableText(t, byId)))}}
+    : {id, base, value: block.type === 'note' ? (c.markdown || '') : editableText(c.markdown, byId)};
+  renderSheet();
+  const field = document.querySelector('#blk-' + id + ' textarea, #blk-' + id + ' input');
+  if (field) field.focus();
+}
+
+function draftCell(input) {
+  if (!sheetDraft || !sheetDraft.value || !Array.isArray(sheetDraft.value.rows)) return;
+  const r = parseInt(input.dataset.r, 10), c = parseInt(input.dataset.c, 10);
+  if (r < 0) sheetDraft.value.columns[c] = input.value;
+  else if (sheetDraft.value.rows[r]) sheetDraft.value.rows[r][c] = input.value;
+}
+
+// An edited block of Aida's becomes the user's: user_edited, which the server
+// reads as "suggest, do not overwrite". Saving without a change changes nothing.
+// If Aida rewrote the block while the editor was open, the user's words are saved
+// against the version they were typed into, and hers goes beside it as a
+// suggestion (§13.5), the way the server would have placed it.
+function saveSheetEdit() {
+  if (!sheetDraft) return;
+  if (sheetDraft.id === 'new') { saveNote(); return; }
+  if (_sheetBusy()) return;
+  const sheet = state.sheet;
+  const index = ((sheet && sheet.blocks) || []).findIndex(b => b.id === sheetDraft.id);
+  if (index < 0) { cancelSheetEdit(); return; }
+  const block = sheet.blocks[index], v = sheetDraft.value;
+  const base = sheetDraft.base || {content: block.content || {}, claims: block.claims || []};
+  const moved = block.type !== 'note' && JSON.stringify([block.content || {}, block.claims || []])
+    !== JSON.stringify([base.content, base.claims]);
+  const c = base.content, byId = _claimsById(base);
+  let content;
+  if (block.type === 'table') {
+    content = {columns: v.columns.map((t, i) => restoreRefs(String(t).trim(), (c.columns || [])[i], byId)),
+               rows: v.rows.map((row, r) => row.map((t, i) => restoreRefs(String(t).trim(), ((c.rows || [])[r] || [])[i], byId)))};
+  } else if (block.type === 'note') {
+    content = {markdown: String(v).trim()};
+  } else {
+    content = {markdown: restoreRefs(String(v).trim(), c.markdown, byId)};
+  }
+  sheetDraft = null;
+  if (block.type !== 'table' && !content.markdown) {
+    _dropBlock(sheet, block.id);
+    scheduleAutoSave();
+  } else if (JSON.stringify(content) !== JSON.stringify(c)) {
+    sheet.blocks[index] = Object.assign({}, block, {content, claims: base.claims,
+                                                    user_edited: block.author !== 'user' || !!block.user_edited,
+                                                    at: new Date().toISOString()});
+    if (moved) _suggestBeside(sheet, block);
+    scheduleAutoSave();
+  }
+  renderSheet();
+}
+
+// `aidas` is a version of a block the user has since made their own. It goes
+// right after the block as Aida's suggestion, replacing any earlier one.
+function _suggestBeside(sheet, aidas) {
+  sheet.blocks = sheet.blocks.filter(b => !(b.type === 'suggestion' && (b.content || {}).target === aidas.id));
+  sheet.seq = Math.max(sheet.seq || 0, maxBlockId(sheet)) + 1;
+  const at = sheet.blocks.findIndex(b => b.id === aidas.id);
+  sheet.blocks.splice(at + 1, 0, {id: 'b' + sheet.seq, type: 'suggestion', author: 'aida', user_edited: false,
+    content: {target: aidas.id, type: aidas.type, content: aidas.content || {}}, claims: aidas.claims || [],
+    at: new Date().toISOString()});
+}
+
+// A block goes together with the suggestion written for it: left behind, its
+// Godta would have nothing to replace.
+function _dropBlock(sheet, id) {
+  sheet.blocks = sheet.blocks.filter(b => b.id !== id && !(b.type === 'suggestion' && (b.content || {}).target === id));
+}
+
+function removeSheetBlock(id) {
+  if (_sheetBusy() || !state.sheet) return;
+  _dropBlock(state.sheet, id);
+  if (sheetDraft && sheetDraft.id === id) sheetDraft = null;
+  renderSheet();
+  scheduleAutoSave();
+}
+
+// Accepted, the words are the user's choice, so the block stays theirs and
+// Aida's next change to it is a suggestion again.
+function acceptSuggestion(id) {
+  if (_sheetBusy() || !state.sheet) return;
+  const sheet = state.sheet;
+  const sug = sheet.blocks.find(b => b.id === id && b.type === 'suggestion');
+  if (!sug) return;
+  const c = sug.content || {};
+  const index = sheet.blocks.findIndex(b => b.id === c.target);
+  if (index >= 0 && sheet.blocks[index].type === c.type) {
+    sheet.blocks[index] = Object.assign({}, sheet.blocks[index], {content: c.content, claims: sug.claims || [],
+                                                                  user_edited: true, at: new Date().toISOString()});
+  }
+  sheet.blocks = sheet.blocks.filter(b => b.id !== id);
+  renderSheet();
+  scheduleAutoSave();
+}
+
+function declineSuggestion(id) {
+  if (_sheetBusy() || !state.sheet) return;
+  state.sheet.blocks = state.sheet.blocks.filter(b => b.id !== id);
+  renderSheet();
+  scheduleAutoSave();
 }
 
 // The id comes from the counter the server also uses, so a note written here and
@@ -6122,9 +6385,17 @@ function renderSheet() {
   // Chatt is the open sheet (§13.6). Until step 5 turns them into model blocks, a
   // project's sections follow the free blocks, so an analysis worked in Chatt
   // before the sheet existed still shows its figures.
+  // Aida's reply redraws the sheet. An open editor keeps its text through
+  // sheetDraft, and the caret comes back to it too.
+  const active = document.activeElement;
+  const typing = !!sheetDraft && !!active && typeof active.closest === 'function' && !!active.closest('.open-sheet');
   document.getElementById('resultContent').innerHTML = isDoc()
     ? openSheetHtml(state.sheet) + (st.project ? sheetHtml(st, SHEET_SECTIONS) : '')
     : sheetHtml(st, sectionsForMode());
+  if (typing) {
+    const field = document.querySelector('.open-sheet textarea, .open-sheet .sheet-cell-input');
+    if (field) { field.focus(); if (field.setSelectionRange) field.setSelectionRange(field.value.length, field.value.length); }
+  }
   _populateNeedsTextarea();
   bindCells();
   bindAltRows();
@@ -6629,6 +6900,8 @@ async function loadAnalysis(id) {
     _resetAttachmentSession();
     // An analysis saved before §13 has no sheet and opens with an empty one.
     state.sheet = (data.sheet_data && Array.isArray(data.sheet_data.blocks)) ? data.sheet_data : emptySheet();
+    // An editor left open belongs to the analysis left behind, whose ids repeat here.
+    sheetDraft = null;
     document.getElementById('projectName').textContent = data.name || 'Nytt projekt';
     restoreUI();
     renderAttachmentTray();
@@ -6734,6 +7007,7 @@ function createNewProject() {
   state.propertyRef = '';
   state.plannedStart = '';
   state.sheet = emptySheet();
+  sheetDraft = null;
   // The previous project keeps its files; this one starts with none.
   state.attachments = [];
   _resetAttachmentSession();

@@ -33,7 +33,9 @@ from datetime import UTC, datetime
 from aida import claims as claims_mod
 from aida import knowledge
 
-BLOCK_TYPES = ("text", "table", "quote", "note")
+# A suggestion is Aida's change to a block the user has edited, waiting beside
+# it for the user to accept or decline (§13.5).
+BLOCK_TYPES = ("text", "table", "quote", "note", "suggestion")
 # Notes are the user's. Aida answers in text, tables and quotes.
 AIDA_TYPES = ("text", "table", "quote")
 
@@ -185,6 +187,10 @@ def add_block(inp, sheet: dict) -> tuple[str, bool, set]:
         if index < 0:
             return _rejected([f"Blocket {after!r} finns inte, så det går inte att lägga något efter det."])
         position = index + 1
+        # A suggestion stays directly under the block it is for.
+        while (position < len(sheet["blocks"]) and sheet["blocks"][position]["type"] == "suggestion"
+               and sheet["blocks"][position]["content"].get("target") == after):
+            position += 1
     content, resolved, errors = _build(btype, inp.get("content"), inp.get("claims"))
     if errors:
         return _rejected(errors)
@@ -195,15 +201,50 @@ def add_block(inp, sheet: dict) -> tuple[str, bool, set]:
     return f"Lade till {bid}.", True, {"sheet"}
 
 
+def _suggestion_for(sheet: dict, target: str) -> tuple[int, dict | None]:
+    for i, block in enumerate(sheet["blocks"]):
+        if block["type"] == "suggestion" and block["content"].get("target") == target:
+            return i, block
+    return -1, None
+
+
+def _suggest(sheet: dict, index: int, block: dict, content: dict, resolved: list[dict]) -> tuple[str, bool, set]:
+    """Aida's change to a block the user has edited, as a suggestion beside it.
+
+    The user's block stays as it is. One suggestion per block: a new one replaces
+    the last, so the user never has to choose between two of Aida's drafts.
+    """
+    body = {"target": block["id"], "type": block["type"], "content": content}
+    at, existing = _suggestion_for(sheet, block["id"])
+    if existing is not None:
+        sheet["blocks"][at] = {**existing, "content": body, "claims": resolved, "at": _now()}
+        sid = existing["id"]
+    else:
+        if len(sheet["blocks"]) >= MAX_BLOCKS:
+            return _rejected([f"Bladet har redan {MAX_BLOCKS} block. Ta bort ett av dina egna först."])
+        sheet["seq"] = max(sheet.get("seq", 0), _max_id(sheet)) + 1
+        sid = f"b{sheet['seq']}"
+        sheet["blocks"].insert(index + 1, {"id": sid, "type": "suggestion", "author": "aida", "user_edited": False,
+                                           "content": body, "claims": resolved, "at": _now()})
+    return (f"{block['id']} har användaren ändrat, så din ändring ligger som förslaget {sid} bredvid. "
+            f"Användaren godtar eller avböjer det."), True, {"sheet"}
+
+
 def update_block(inp, sheet: dict) -> tuple[str, bool, set]:
     inp = inp if isinstance(inp, dict) else {}
     bid = inp.get("id")
     index, block = _find(sheet, bid)
     if block is None:
         return _rejected([f"Blocket {bid!r} finns inte."])
-    if _users(block):
-        return _rejected([f"{bid} har användaren skrivit eller ändrat, och det ändrar inte Aida. "
-                          f"Lägg ett nytt block efter det i stället."])
+    if block["type"] == "suggestion":
+        # Revising a suggestion is suggesting again for the block it belongs to.
+        bid = block["content"].get("target")
+        index, block = _find(sheet, bid)
+        if block is None or block["type"] == "suggestion":
+            return _rejected(["Förslaget hör inte till något block. Ta bort det med remove_block."])
+    if block["type"] == "note":
+        return _rejected([f"{bid} är användarens anteckning, och den ändrar inte Aida. "
+                          f"Lägg ett eget block efter den i stället."])
     content = inp["content"] if "content" in inp else block["content"]
     # Claims left out keep the block's own. Resolved claims go back through
     # resolve unchanged, since normalize_claim drops the computed keys.
@@ -211,6 +252,8 @@ def update_block(inp, sheet: dict) -> tuple[str, bool, set]:
     content, resolved, errors = _build(block["type"], content, raw_claims)
     if errors:
         return _rejected(errors)
+    if _users(block):
+        return _suggest(sheet, index, block, content, resolved)
     sheet["blocks"][index] = {**block, "content": content, "claims": resolved, "at": _now()}
     return f"Ändrade {bid}.", True, {"sheet"}
 
@@ -272,8 +315,18 @@ Användaren har ett blad bredvid chatten, och i det här läget hör svaret hemm
 - Varje klimattal, pris, livslängd, mängd och andel är ett påstående i blockets claims, och texten hänvisar till det med {{c1}}. Helst med källa. Finns ingen källa, ge hellre en uppskattning med grund än inget svar. Ett tal som räknas ur andra, som klimatpåverkan per år, är derived: servern räknar ut det och märker det som uppskattning om något led är det.
 - Ett tal med enhet som står direkt i texten avvisas, liksom en tabellcell med bara ett tal. Rätta det verktyget pekar ut och försök igen.
 - Citat läggs som quote med avsnittets id ur search_knowledge, och är hela meningar ordagrant.
-- Block som användaren skrivit eller ändrat rör du inte. Vill du komplettera ett sådant, lägg ett nytt block efter det.
+- Anteckningar är användarens, och dem rör du inte. Ett block användaren har ändrat skriver du inte heller över: update_block på det blir ett förslag bredvid, som användaren godtar eller avböjer. Ett tal användaren själv skrivit in blir ett påstående med basis user.
 - Rätta ett eget block med update_block i stället för att lägga en ny version bredvid."""
+
+
+def _summary(btype: str, content: dict) -> str:
+    if btype == "table":
+        columns = ", ".join(content.get("columns", []))
+        return f"tabell med kolumnerna {columns}, {len(content.get('rows', []))} rader"
+    if btype == "quote":
+        return f"citat ur {content.get('label', '')}"
+    what = " ".join(content.get("markdown", "").split())
+    return what if len(what) <= 200 else what[:200] + " …"
 
 
 def describe(sheet: dict) -> str:
@@ -282,17 +335,14 @@ def describe(sheet: dict) -> str:
         return "Bladet är tomt."
     lines = []
     for block in sheet["blocks"]:
-        who = "användaren" if _users(block) else "Aida"
         content = block["content"]
-        if block["type"] == "table":
-            columns = ", ".join(content.get("columns", []))
-            what = f"tabell med kolumnerna {columns}, {len(content.get('rows', []))} rader"
-        elif block["type"] == "quote":
-            what = f"citat ur {content.get('label', '')}"
-        else:
-            what = " ".join(content.get("markdown", "").split())
-            what = what if len(what) <= 200 else what[:200] + " …"
-        lines.append(f"{block['id']} {block['type']} ({who}): {what}")
+        if block["type"] == "suggestion":
+            lines.append(f"{block['id']} förslag (Aida) till {content.get('target')}, väntar på användaren: "
+                         f"{_summary(content.get('type', ''), content.get('content', {}))}")
+            continue
+        who = ("användaren" if block["author"] == "user"
+               else "ändrat av användaren" if block["user_edited"] else "Aida")
+        lines.append(f"{block['id']} {block['type']} ({who}): {_summary(block['type'], content)}")
     return "\n".join(lines)
 
 
@@ -308,6 +358,10 @@ def _max_id(sheet: dict) -> int:
 def _clean_content(btype: str, raw: dict) -> dict:
     """Stored content in its type's shape, without judging it: what the user wrote
     stays, and what Aida wrote was judged when it was written."""
+    if btype == "suggestion":
+        inner = raw.get("content") if isinstance(raw.get("content"), dict) else {}
+        target = raw.get("target") if isinstance(raw.get("target"), str) else ""
+        return {"target": target, "type": raw.get("type"), "content": _clean_content(raw.get("type"), inner)}
     if btype in ("text", "note"):
         return {"markdown": _text(raw.get("markdown"), TEXT_MAX)}
     if btype == "table":
@@ -320,6 +374,27 @@ def _clean_content(btype: str, raw: dict) -> dict:
     found = knowledge.section(sid)
     return {"text": _text(raw.get("text"), QUOTE_MAX), "section": sid,
             "label": knowledge.label(sid) if found else _text(raw.get("label"), 300)}
+
+
+def _placed_suggestions(blocks: list[dict]) -> list[dict]:
+    """Drop suggestions with nothing to accept into.
+
+    A suggestion belongs to a block of the same type that the user has edited,
+    one per block. Anything else is a leftover, and its Godta would replace a
+    block it was never written for.
+    """
+    targets = {b["id"]: b for b in blocks if b["type"] != "suggestion"}
+    taken: set[str] = set()
+    kept = []
+    for block in blocks:
+        if block["type"] == "suggestion":
+            target = targets.get(block["content"]["target"])
+            if (target is None or target["type"] != block["content"]["type"] or not _users(target)
+                    or target["id"] in taken):
+                continue
+            taken.add(target["id"])
+        kept.append(block)
+    return kept
 
 
 def normalize_sheet(raw) -> dict:
@@ -342,16 +417,22 @@ def normalize_sheet(raw) -> dict:
             continue
         seen.add(bid)
         content = b.get("content") if isinstance(b.get("content"), dict) else {}
-        resolved, _ = _resolved(b.get("claims") if btype in ("text", "table") else [])
+        # A suggestion's claims follow the type it would become if accepted.
+        kind = content.get("type") if btype == "suggestion" else btype
+        if btype == "suggestion" and kind not in AIDA_TYPES:
+            continue
+        resolved, _ = _resolved(b.get("claims") if kind in ("text", "table") else [])
         blocks.append({
             "id": bid, "type": btype,
-            "author": "user" if b.get("author") == "user" or btype == "note" else "aida",
-            "user_edited": b.get("user_edited") is True,
+            "author": "aida" if btype == "suggestion" else (
+                "user" if b.get("author") == "user" or btype == "note" else "aida"),
+            "user_edited": btype != "suggestion" and b.get("user_edited") is True,
             "content": _clean_content(btype, content),
             "claims": resolved,
             "at": _text(b.get("at"), 40),
         })
-    seq = raw.get("seq") if isinstance(raw.get("seq"), int) and not isinstance(raw.get("seq"), bool) else 0
+    blocks = _placed_suggestions(blocks)
+    seq =raw.get("seq") if isinstance(raw.get("seq"), int) and not isinstance(raw.get("seq"), bool) else 0
     sheet = {"title": _text(raw.get("title"), TITLE_MAX), "seq": 0, "blocks": blocks}
     sheet["seq"] = max(seq, _max_id(sheet))
     return sheet
@@ -429,8 +510,9 @@ SHEET_TOOLS = [
     {
         "name": "update_block",
         "description": (
-            "Ändra ett block Aida skrivit. Utelämnade fält behåller sitt värde. Block som användaren skrivit "
-            "eller ändrat går inte att ändra; lägg ett nytt block efter i stället."
+            "Ändra ett block. Aidas eget block ändras direkt, och utelämnade fält behåller sitt värde. På ett "
+            "block användaren har ändrat blir ändringen ett förslag bredvid, som användaren godtar eller "
+            "avböjer; ett nytt förslag ersätter det förra. Anteckningar går inte att ändra."
         ),
         "input_schema": {
             "type": "object",
@@ -444,7 +526,7 @@ SHEET_TOOLS = [
     },
     {
         "name": "remove_block",
-        "description": "Ta bort ett block Aida skrivit. Användarens block går inte att ta bort.",
+        "description": "Ta bort ett block Aida skrivit, eller ett av hennes förslag. Användarens block går inte att ta bort.",
         "input_schema": {
             "type": "object",
             "properties": {"id": {"type": "string"}},

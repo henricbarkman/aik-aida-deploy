@@ -1,0 +1,393 @@
+{
+ "doc": "specifikation-handlingar",
+ "title": "Riktlinje Specifikation handlingar",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-Specifikation-handlingar-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "specifikation-handlingar/information",
+   "path": [
+    "INFORMATION"
+   ],
+   "text": "Exempelmall som fylls i specifikt för varje projekt.\nDenna riktlinje beskriver hanteringen av relationshandlingar i byggprojekt för fastighetsavdelningen. Här beskrivs namnsättning samt placering i mappstruktur vid leverans. Dokumentet används också som en projektspecifik sammanställning av dokument, som ska levereras som relationshandling. Aktuella dokument kryssmarkeras i leveransspecifikationen, som ingår i riktlinjen."
+  },
+  {
+   "id": "specifikation-handlingar/information/fylls-i-av-kommunen-for-respektive-projekt",
+   "path": [
+    "INFORMATION",
+    "FYLLS I AV KOMMUNEN FÖR RESPEKTIVE PROJEKT"
+   ],
+   "text": "Projektnamn: Objektnummer: Datum: Klicka eller tryck här för att ange datum.\nDenna handling är kontrollerad och godkänd av:\nDatum: Klicka eller tryck här för att ange datum. Namn: Fyll i namn Befattning: fastighetsförvaltare\nDatum: Klicka eller tryck här för att ange datum. Namn: Fyll i namn Befattning: projektledare\nDatum: Klicka eller tryck här för att ange datum. Namn: Fyll i namn Befattning: informationsförvaltare"
+  },
+  {
+   "id": "specifikation-handlingar/att-tanka-pa",
+   "path": [
+    "ATT TÄNKA PÅ"
+   ],
+   "text": "• Dokumentet är styrande för relationshandlingar vid alla typer av entreprenader. Mer information finns på karlstad.se\n• Varje uppdrag är unikt och dokumentet ska kompletteras med specifika uppgifter innan anbudsförfrågan/beställning.\n• Viktigt att dokumenten benämns enligt leveransspecifikationen.\n• Levererade dokument placeras i mappstruktur enligt leveransspecifikationen.\n• Använd samma program och version som krävs för relation från start vid framtagande och revidering av modellfiler, annars krävs konvertering som kan medföra mycket merarbete.\n• Börja samla in relationshandlingar för drift, underhåll och produktinformation redan då inköpen görs – det spar tid inför slutbesiktningen.\n• Krav vad gäller märkning av system och komponenter beskrivs i ”Riktlinje märkning och numrering”."
+  },
+  {
+   "id": "specifikation-handlingar/att-tanka-pa/relation",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "RELATION"
+   ],
+   "text": "När ett uppdrag startas tillhandahålls befintliga handlingar (ett startpaket lämnas ut). När arbetet är slutfört ska relationshandlingar lämnas. Relationshandlingarna ska, i alla uppdrag om inget annat anges, tas fram enligt ”Riktlinje BIM, CAD och dokumentation”. I riktlinjen framgår även vilka dataformat som gäller för relationshandlingar.\nSå snart slutleverans av relationshandlingar skett ska entreprenören vidta åtgärder som säkerställer att eventuella senare revisioner av relationshandlingar levereras till fastighetsavdelningen. Leverans av nya revisioner och nya dokument ska ske via mejl till adressen: fastighetsdokumentation@karlstad.se.\nEntreprenörens projektplats ska stängas för uppdateringar. Kommunen har inte möjlighet att bevaka externa projektportaler efter överenskommen slutleverans."
+  },
+  {
+   "id": "specifikation-handlingar/mappstruktur",
+   "path": [
+    "MAPPSTRUKTUR"
+   ],
+   "text": "Relationshandlingar ska levereras digitalt till teknik- och fastighetsförvaltningens mappstruktur för lokalobjekt. Mappstrukturen bygger på en nationell branschgemensam dokumentklassning som beskrivs på metadata.se. Undermappar per teknikområde har skapats i vissa mappar. Fler mappar får inte skapas. Mappstrukturen tillhandahålls i zip-format. Leverans av relationshandlingar sker till nedanstående mappstruktur.\n 1A Administration Leverera löpande in dokument  2B Förteckning* till mappstrukturen allt eftersom  2C Kvalitet* byggdelar, komponenter med  CE-intyg mera köps in.  Miljö  2D Beskrivning*  2E Ritning  A - Arkitekt  Br - Brand  By - Bygg  E - El  Ep - El elproduktion  Es - El säkerhetsklassat  H - Hiss och maskin  K - Konstruktion  Ky - Kyla  M - Mark  S - Styr  Sk - Storkök  Sp - Sprinkler  V - Ventilation  W - Värme och sanitet  2G Komplement  2H Modell  A  Br  By  E  Ep  Es  H  K  Ky  M  S  Sk  Sp  V  W  2J Mätning och beräkning  2K Besiktning* *) Mappen innehåller  2L Drift och underhåll* undermappar per teknikområde  3B Juridiskt på samma vis som 2E Ritning.  4E Produktinformation*"
+  },
+  {
+   "id": "specifikation-handlingar/filnamn/forkortningar",
+   "path": [
+    "FILNAMN",
+    "FÖRKORTNINGAR"
+   ],
+   "text": "I filnamn används följande förkortningar:\nFörkortning Förklaring nnnn Fyrsiffrigt objektnr (styrid), till exempel 1141 och 2114. Vid ombyggnationer av äldre objekt kan femsiffrigt objektnummer förekomma b Byggnadsbeteckning, till exempel A, B, C och AC. För Mark anges 0 (noll) id Märkning av system/komponent/stativ, till exempel LA01, BS1, GT2, Elc A1b1 och AA01 nn Tvåsiffrigt nummer för plan, exempelvis 01 och 02. Kan vara 3 siffror om del av plan används. Ex 021= Plan 02 del 1. Planindelning enligt SIS Bygghandlingar – där första användbara plan är 01 typ Dokumenttyp, fabrikat, produkttyp, etcetera"
+  },
+  {
+   "id": "specifikation-handlingar/filnamn/modellfiler",
+   "path": [
+    "FILNAMN",
+    "MODELLFILER"
+   ],
+   "text": "Modellfiler namnsätts enligt svensk standard SS 03 22 71. Se även SIS Bygghandlingar. Som prefix används objektsnummer och byggnadsbeteckning. Om modellen gäller flera byggnader anges de byggnader som avses (ex AC och BC). Om modellen avser hela objektet eller mark, anges 0 (noll) i stället för byggnad. Princip för modellfilers filnamn:\nOrientering Modellnamn Objekt Byggnad - Teknikområde BSAB-kod - Redovisningssätt Ev. beskrivning nnnn b - A/By/Br/E/Ep/Es/G/H/K/Ky/ 00 – 99 - P/S/F/U/C/V/X/T/D nn (objektsnr) (beteckning) M/P/R/S/Sk/Sp/T/V/W/Y (se bilaga C) (se bilaga B) (ex plan) (se bilaga A)"
+  },
+  {
+   "id": "specifikation-handlingar/filnamn/ritningar",
+   "path": [
+    "FILNAMN",
+    "RITNINGAR"
+   ],
+   "text": "Ritningsfiler namnsätts som modellfiler med undantag att objektsnumret utelämnas. Som prefix används enbart byggnadsbeteckning (ex A, B och C). Om ritningen gäller flera byggnader anges de byggnader som avses (ex AC och BC). Om ritningen avser hela objektet eller mark, anges 0 (noll) i stället för byggnad. Princip för ritningars filnamn:\nOrientering Ritningsnamn Byggnad - Teknikområde BSAB-kod - Redovisningssätt Ev beskrivning b - A/By/Br/E/Ep/Es/G/H/K/Ky/ 00 – 99 - P/S/F/U/C/V/X/T/D nn - nnnn M/P/R/S/Sk/Sp/T/V/W/Y (se bilaga C) (se bilaga B) (ex plan) (ex år) (se bilaga A)\nOm en relationshandling hänvisar till en annan ritning eller modellfil, ska även denna levereras som relationshandling och namnsättas enligt principerna för modellfiler och ritningar.\nDel av plan anges bara då det behövs. I beskrivning anges år enbart där det tillkommit nya ritningar där relation endast gjorts för utfört arbete."
+  },
+  {
+   "id": "specifikation-handlingar/filnamn/ovriga-filer",
+   "path": [
+    "FILNAMN",
+    "ÖVRIGA FILER"
+   ],
+   "text": "Övriga filer namnsätts enligt följande princip:\nOrientering Filnamn Byggnad - Id - Innehåll - Beskrivning b - System+Komponent - Typ av dokument/ - ååmmdd/frekvens/ modell/etc fabrikat/etc\nAlla delar utom innehåll kan utelämnas enligt nedan:\n• Om dokumentet gäller flera byggnader anges de byggnader som avses (ex AC och BC).\n• Om dokumentet avser hela objektet anges 0 (noll) i stället för byggnad.\n• För dokument som avser flera likadana installationer eller system anges enbart installations- eller systembeteckningen.\n• För generella dokument som inte avser ett visst system eller en viss installation kan id utelämnas.\n• Dokument som ska versionshanteras, som en skötselinstruktion, kan ha en beskrivningsdel, till exempel årsservice. Ett besiktningsprotokoll ska däremot ha en beskrivningsdel bestående av ett datum, exempelvis 250223.\n• Om produktinformation och skötselinstruktion kombineras i ett gemensamt dokument, placeras det under 2L Drift och underhåll."
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation",
+   "path": [
+    "LEVERANSSPECIFIKATION"
+   ],
+   "text": "Leveransspecifikationen beskriver vilka informationsmängder som ska ingå i relation. Specifikationen fylls i innan anbudsförfrågan/beställning. När uppdraget är slutfört används den för att kontrollera att beställda relationshandlingar inkommit. Specifikationen fungerar som underlag för besiktningsmannen vad gäller dokumentation.\nLeverans av relationshandlingar omfattas av de informationsmängder som markerats som aktuella. Informationsmängderna ska sorteras in i teknik- och fastighetsförvaltningens mappstruktur med angivna filnamn."
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/p-projektgemensamt",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "P – PROJEKTGEMENSAMT"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Adresslista Docx, A4 Adresslista 1A Administration Xlsx\n☐ Rapport från* Xlsx, A4 Materiellista 2B Förteckning\\By-Bygg Byggvarubedömningen Pdf/A-1 Byggvarubedömningen- ååmmdd\n☐ Egenkontroller Pdf/A-1 A4 Egenkontroll-typ-ååmmdd 2C Kvalitet\n☐ Kontrollplaner Pdf/A-1 A4 Kontrollplan-typ-ååmmdd 2C Kvalitet\n☐ CE-intyg sammansatt Pdf/A-1 A4 b-CE-intyg-beskrivning- 2C Kvalitet\\CE-intyg maskin** ååmmdd\n☐ Energiberäkning Docx. A4 b-Energiberäkning- 2J Mätning och beräkning Xlsx ååmmdd\n☐ Energideklaration Pdf/A-1 A4 b-Energideklaration- 2J Mätning och beräkning ååmmdd\n☐ Sammanställning Xls A4 nnnn-Mätplan-ååmmdd 2J Mätning och beräkning förbrukningsmätare\n☐ Besiktningsprotokoll Pdf/A-1 A4 Typbesiktning-ååmmdd 2K Besiktning\\By-Bygg Slutbesiktning\n☐ Service under Docx, A4 Serviceåtagande- 2L Drift och underhåll garantitid***** Pdf/A-1 garantitid-ååmmdd\n☐ Garantiåtagande Pdf/A-1 A4 Garanti-fabrikat-typ- 3B Juridiskt ååmmdd\n*) Bygg samordnar byggvarubedömningen för hela projektet och ombesörjer att materiel registreras i databasen byggvarubedomningen.se. Rapport (genererad ur databasen) med samtlig använd materiel redovisas till beställaren.\n**) CE-intyg för sammansatt maskin, inklusive underliggande EU-försäkran för ingående komponenter.\n***) Ledningsplan samordnas av utsedd entreprenör inom projektet. Ledningsplanen ska innehålla information från Mark, VA, FJV, EL och Bergvärme.\n****) I skala som visar hela tomten.\n*****) Förteckning av serviceåtgärder som måste göras för att garantin ska gälla."
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/a-arkitekt",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "A – ARKITEKT"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx. Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\A-Arkitekt Xlsx Pdf/A-1\n☐ Ytsammanställning*** Docx. b-Ytsammanställning 2B Förteckning\\A-Arkitekt Xlsx Pdf/A-1\n☐ Rumsbeskrivning Docx, A4 b-Rumsbeskrivning 2D Beskrivning\\A-Arkitekt Xlsx Pdf/A-1\n☐ Kulörbeskrivning Docx, A4 b-Kulörbeskrivning 2D Beskrivning\\A-Arkitekt Xlsx Pdf/A-1\n☐ Ritning situationsplan Pdf/A-1 A1* b-A01-P 2E Ritning\\A-Arkitekt\n☐ Ritning plan Pdf/A-1 A1** b-A40-Pnn 2E Ritning\\A-Arkitekt\n☐ Ritning fasad Pdf/A-1 A1** b-A40-F 2E Ritning\\A-Arkitekt\n☐ Ritning sektion Pdf/A-1 A1** b-A40-S 2E Ritning\\A-Arkitekt\n☐ Ritning takplan Pdf/A-1 A1** b-A41-Pnn 2E Ritning\\A-Arkitekt\n☐ Ritning färgsättning Inre Pdf/A-1 A1** b-A44-Pnn 2E Ritning\\A-Arkitekt\n☐ Modell BIM Rvt Sheets: nnnnb-A40-V 2H Modell\\A (en per fastighet) − sit.plan A1* − plan A1* − sektion A1 − fasad A1\n☐ Modell fasad Dwg Layouter: nnnnb-A40-F 2H Modell\\A − fasader A1\n☐ Modell plan Dwg Layouter: nnnnb-A40-Pnn 2H Modell\\A − plan A1**\n☐ Modell sektion Dwg Layouter: nnnnb-A40-S 2H Modell\\A − sektioner A1\n☐ Modell situationsplan Dwg Layouter: nnnnb-A01-P 2H Modell\\A − sit-plan A1*\n*) A1 i skala som visar hela tomten, normalt skala 1:500.\n**) A1 i skala som visar hela plan, fasad eller sektion, normalt skala 1:200 eller 1:100.\n***) I ytsammanställningen anges yta för BTA, BRA och NTA. Ytan redovisas summerad per hus och per plan.\nExempel Förklaring 1141B-A40-V Arkitekt, BIM-modell, objekt 1141, hus B 0-A01-P Hela objektet, ritning situationsplan B-A40-P01 Hus B, ritning arkitekt, plan 1 D-A40-FS Hus D, ritning arkitekt, fasader och sektioner EF-A40-FSP Hus E och F, ritning arkitekt, fasader, sektion och plan (2 identiska förråd)"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/br-brand",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "BR – BRAND"
+   ],
+   "text": "Utrymningsskyltar (väg ut) och nödbelysning återfinns under E – El. Sprinkler återfinns under Sp – Sprinkler.\nX Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx. Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\Br-Brand Xlsx\n☐ Apparatförteckning Docx. A4 b-Apparatförteckning 2B Förteckning\\Br-Brand Xlsx\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ-ååmmdd 2C Kvalitet\\Br-Brand\n☐ Anläggarintyg Pdf/A-1 A4 Anläggarintyg-ååmmdd 2D Beskrivning\\Br-Brand\n☐ Kortfattad Docx A4 Funktionsbeskrivning- 2D Beskrivning\\Br-Brand funktionsbeskrivning ååmmdd\n☐ Brandskydds- Pdf/A-1 A4 Brandskydds- 2D Beskrivning\\Br-Brand dokumentation dokumentation-ååmmdd\n☐ Brandskyddsritning Pdf/A-1 A1** b-Br931-Pnn 2E Ritning\\Br-Brand Per plan\n☐ Orienteringsritning Pdf/A-1 A3 b-OR-Brand 2E Ritning\\Br-Brand Alla plan i en Pdf/A-1\n☐ Serviceritning Pdf/A-1 A3 b-SR-Brand 2E Ritning\\Br-Brand Alla plan i en Pdf/A-1\n☐ Utrymningsplan Pdf/A-1 A3 b-Utrymningsplan 2E Ritning\\Br-Brand Alla plan i en Pdf/A-1\n☐ Modell brandskydd Dwg Layouter: nnnnb-Br931-Pnn 2H Modell\\Br − plan A1*\n☐ Modell för OR Dwg Layouter: nnnnb-Br933-OR 2H Modell\\Br"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/br-brand/or-a3",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "BR – BRAND",
+    "− OR A3"
+   ],
+   "text": "☐ Modell för SR Dwg Layouter: nnnnb-Br933-SR 2H Modell\\Br"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/br-brand/sr-a3",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "BR – BRAND",
+    "− SR A3"
+   ],
+   "text": "☐ Modell utrymningsplan Dwg Layouter: nnnnb-Br939-Utrymning 2H Modell\\Br för hel byggnad − utrymn.pl. A3\n☐ Provningsprotokoll Pdf/A-1 A4 b-Provningsprotokoll-typ- 2K Besiktning\\Br-Brand ååmmdd\n☐ Leveransbesiktning Pdf/A-1 A4 Leveransbesiktning- 2K Besiktning\\Br-Brand ååmmdd\n☐ Manual Pdf A4 b-id-Fabrikat-Typ-Manual 2L Drift och underhåll\\Br-Brand\n☐ Drift- och Pdf, Docx A4 b-id-Fabrikat-Typ- 2L Drift och underhåll\\Br-brand skötselinstruktion Skötselinstruktion\n☐ Produktblad Pdf Standard- b-id-Fabrikat-Typ 4E Produktinformation\\ dokument från Br-Brand fabrikant eller leverantör\n☐ Byggvarudeklaration Pdf Standard- b-id-Fabrikat-Typ-BVD 4E Produktinformation\\ dokument från Br-Brand fabrikant eller leverantör\n*) A1 i skala som visar hela plan, normalt skala 1:200 eller 1:100.\nExempel Förklaring 1141A-Br933-OR Hus A, modellfil orienterings- och serviceritningar (alla plan) A-OR-brand Hus A, orienteringsritningar (samtliga plan i samma Pdf/A-1) A-SR-brand Hus A, serviceritningar (samtliga plan i samma Pdf/A-1) 1141B-Br931-P02 Hus B, modellfil brandskydd, plan 2 B-Br931-P02 Hus B, brandskyddsritning, plan 2"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/by-bygg",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "BY – BYGG"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt\n☐ Materialspecifikation Docx. Xlsx A4 b-Materialspecifikation 2B Förteckning\\By-Bygg\n☐ Låsschema Docx. Xlsx A4 b-Låsschema 2B Förteckning\\By-Bygg\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ-ååmmdd 2C Kvalitet\\By-Bygg\n☐ Teknisk beskrivning* Docx. Xlsx A4 b-Teknisk beskrivning 2D Beskrivning\\By-Bygg\n☐ Drift- och skötselinstruktion Pdf, Docx A4 b-id-Fabrikat-Typ- Skötselinstruktion 2L Drift och underhåll\\By-Bygg\n☐ Produktblad Pdf Standard- dokument från b-id-Fabrikat-Typ 4E Produktinformation\\By-Bygg fabrikant eller leverantör\n☐ Byggvarudeklaration Pdf Standard- dokument från b-id-Fabrikat-Typ-BVD 4E Produktinformation\\By-Bygg fabrikant eller leverantör\n*) I förkommande fall för att förtydliga och beskriva teknisk installation.\nExempel Förklaring A-Låsschema Hus A, låsschema C-D10-Swedoor-Craft 03 E130 Hus C, produktblad dörrtyp 10, Swedoor Craft 03 E130"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/e-el/del-1",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "E – EL"
+   ],
+   "part": 1,
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx. Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\E-El Xlsx\n☐ Apparatförteckning Docx. A4 b-Apparatförteckning 2B Förteckning\\E-El Xlsx\n☐ Armaturförteckning Docx. A4 b-Armaturförteckning 2B Förteckning\\E-El Xlsx\n☐ Kabellista Docx. A4 b-Kabellista 2B Förteckning\\E-El Xlsx\n☐ Ledningslista Docx. A4 b-Ledningslista 2B Förteckning\\E-El Xlsx Dimensionering och säkring av ledningar\n☐ Skyltlista Docx. A4 b-Skyltlista 2B Förteckning\\E-El Xlsx\n☐ Parameterlista***** Docx. A4 b-Parameterlista 2B Förteckning\\E-El Xlsx\n☐ Parttabell Docx. A4 b-Parttabell 2B Förteckning\\E-El Xlsx\n☐ Gruppförteckning*** Docx. A4 b-Gruppförteckning 2B Förteckning\\E-El Xlsx\n☐ Panelkort fastighetsnät Docx. A4 b-E641-id-panelkort 2B Förteckning\\E-El Xlsx\n☐ Teleregistrering Docx A4 b-E641-id-typ 2B Förteckning\\E-El Xlsx − ritningsförteckning Pdf/A-1 − ställförteckning − apparatlista − kabellista − plintkort\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ- 2C Kvalitet\\E-El ååmmdd\n☐ Teknisk beskrivning Docx A4 b-Teknisk beskrivning 2D Beskrivning\\E-El över utförda funktioner\n☐ Förbindningsschema Pdf/A-1 A4 Pdf/A-1 b-E641-C-id-typ 2E Ritning\\E-El tele\n☐ Nätschema tele/ Pdf/A-1 A4 Pdf/A-1 b-E641-C-id-typ 2E Ritning\\E-El fastighetsnät\n☐ Nätschema brandlarm Pdf/A-1 A3 b-E643-C 2E Ritning\\E-El Alla i en Pdf/A-1\n☐ Schema elcentral, Pdf/A-1 A3 b-E632-C-id-typ 2E Ritning\\E-El apparatskåp, ställverk, Alla i en Pdf/A-1 transformator\n☐ Huvudledningsschema Pdf/A-1 A3 Pdf/A-1 b-E630-C 2E Ritning\\E-El\n☐ Enlinjeschema ställverk Pdf/A-1 A3 Pdf/A-1 b-E634-C-id-typ 2E Ritning\\E-El\n☐ Förbindningsschema Pdf/A-1 A3 Pdf/A-1 b-E60-C-id-typ 2E Ritning\\E-El yttre och inre förbindningar\n☐ Ritning belysning Pdf/A-1 A1** b-E631-Pnn 2E Ritning\\E-El\n☐ Ritning nödbelysning Pdf/A-1 A1** b-E636-Pnn 2E Ritning\\E-El\nX Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Ritning brandlarm Pdf/A-1 A1** b-E643-Pnn 2E Ritning\\E-El\n☐ Ritning kanalisation Pdf/A-1 A1** b-E61-Pnn 2E Ritning\\E-El\n☐ Ritning kraft Pdf/A-1 A1** b-E632-Pnn 2E Ritning\\E-El\n☐ Ritning Pdf/A-1 A1** b-E66-Pnn 2E Ritning\\E-El spänningsutjämning\n☐ Ritning åskskydd**** Pdf/A-1 A1** b-E635-Pnn 2E Ritning\\E-El\n☐ Ritning situationsplan Pdf/A-1 A1* 0-E01-P 2E Ritning\\E-El\n☐ Ritning tele/ Pdf/A-1 A1** b-E641-Pnn 2E Ritning\\E-El fastighetsnät\n☐ Montering- och Pdf/A-1 A4 b-E641-Montering-id-typ 2E Ritning\\E-El uppställningsritning tele − stativ"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/e-el/del-2",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "E – EL"
+   ],
+   "part": 2,
+   "text": "☐ Montering- och Pdf/A-1 A3 b-E60-Montering-id-typ 2E Ritning\\E-El uppställningsritning − transformator − ställverk − centraler − apparatskåp\n☐ Frontlayout ställverk Pdf/A-1 A3 b-Layout ställverk 2E Ritning\\E-El\n☐ Program och backup för Exe b-id-Program-typ 2G Komplement\\E-El levererade produkter\n☐ Modell scheman Dwg Ritningslayouter: nnnnb-E643-C 2H Modell\\E brandlarm − scheman A3\n☐ Modell scheman Dwg Ritningslayouter: nnnnb-E632-C-id-typ 2H Modell\\E elcentral, apparatskåp, − scheman A3 ställverk, transformator\n☐ Modell byggnad Rvt Sheets per plan: A1 nnnnb-E60-V 2H Modell\\E − situationsplan − kanalisation − kraft − belysning − nödljus − tele/fastighetsnät − brandlarm − spänningsutjämn − åskskydd\n☐ Modell situationsplan Dwg Layouter: A1 nnnnb-E01-P 2H Modell\\E − situationsplan\n☐ Modeller våningsplan Dwg Layouter: A1 nnnnb-E60-Pnn 2H Modell\\E − kanalisation nnnnb-E61-Pnn − kraft nnnnb-E632-Pnn − belysning nnnnb-E631-Pnn − nödbelysning nnnnb-E636-Pnn − tele/fastighetsnät nnnnb-E641-Pnn − brandlarm nnnnb-E643-Pnn − spänningsutjämn nnnnb-E66-Pnn nnnnb-E635-Pnn − åskskydd\n☐ Riskanalys inslagsskydd Docx, A4 b-Riskanalys 2J Mätning och beräkning\\ E- Xlsx, Pdf inslagsskydd El\n☐ Teknisk beräkning Docx. A4 b-Typ-ååmmdd 2J Mätning och beräkning\\ E- Xlsx El\n☐ Ledningsberäkning Docx. A4 b-Ledningsberäkn- 2J Mätning och beräkning\\ E- Xlsx Pdf ååmmdd El\nX Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Provningsprotokoll och Pdf/A-1 A4 b-Provningsprotokoll- 2K Besiktning\\E-El mätprotokoll Se omfattning i typ-ååmmdd tabell nedan\n☐ Funktionsbeskrivning Pdf, Docx A4 b-id- 2L Drift och underhåll\\E-El Funktionsbeskrivning\n☐ Drift- och Pdf, Docx A4 b-id-Fabrikat-Typ- 2L Drift och underhåll\\E-El skötselinstruktion Skötselinstruktion\n☐ Produktblad Pdf Standarddokument b-id-Fabrikat-Typ 4E Produktinformation\\E-El från fabrikant eller leverantör\n☐ Byggvarudeklaration Pdf Standarddokument b-id-Fabrikat-Typ-BVD 4E Produktinformation\\E-El från fabrikant eller leverantör\n*) A1 i skala som visar hela tomten, normalt skala 1:500.\n**) A1 i skala som visar hela plan, normalt skala 1:200 eller 1:100.\n***) Gruppförteckning ska innehålla uppgifter om: säkringsstorlek, anslutet objekt, ledningsarea, jordfelsbrytares skyddsområde, jordfelsbrytares sektionering."
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/e-el/del-3",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "E – EL"
+   ],
+   "part": 3,
+   "text": "****) Ritning åskskydd ska innehålla information om: takledarsystem, särskilda nedledarsystem, jordelektrodssystem, skyddsavstånd som ska upprätthållas, förteckning över byggnadsdelar och installationsdelar som nyttjas som nedledare.\n*****) Parameterlista ska innehålla uppgifter på inställda värden för: effektbrytare, tidrelä/astrour, motorskydd, frekvensomformare mm.\nExempel Förklaring 1141A-E631-P01 Stadshuset modellfil hus A, belysning, plan 1 B-E61-P034 Ritning hus B, kanalisation, plan 3, del 4 C-E643-P Ritning hus C, brandlarm, alla plan\nProvningsprotokoll och mätprotokoll som ska överlämnas:\nSamtliga protokoll ska vara daterade och signerade ☐ Utförd egenkontroll. ☐ Kontroll före drifttagning. ☐ Isolationsmätningar. Isolationsmätning av samtliga huvudledningar och gruppledningar i elkraftsystem och matarledningar i telesystem. Isolationsresistansen ska även mätas mellan neutralledare och skyddsjord. ☐ Kontroll av samtliga skyddsjordningar. ☐ Kontroll av fasföljd och faslikhet. ☐ Utförda funktionsprov. ☐ Kontroll av utlösningsvillkor på utgående kablar i anläggningen. ☐ Utlösningsprov av effektbrytare med aktuella parametrar. Utlösningsprov av effektbrytarnas elektroniska L-, S-, I-skydd, varje funktion ska funktionsprovas med provapparat.\n☐ Funktionsprov av jordfelsbrytare (med externt provdon). ☐ Uppmätning av jordtag. ☐ Uppmätning av fastighetsnät. ☐ Termografering av anslutningar i ställverk, elcentraler, apparatskåp, transformatorer mm. (utförs 2 veckor efter driftsatt anläggning samt ytterligare en gång ca 1 månad före garantitidens utgång, diplomerad eller certifierad person utför mätningen.) Anm: Kalibreringsintyg för mätinstrument som använts vid mätningar, ska uppvisas vid behov."
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/e-el/batterilagring/del-1",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "E – EL",
+    "BATTERILAGRING"
+   ],
+   "part": 1,
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx. Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\ Xlsx Ep-Elproduktion\n☐ Komponentförteckning Docx. A4 b-Apparatförteckning 2B Förteckning\\ Xlsx Ep-Elproduktion\n☐ Gruppförteckning** Docx. A4 b-Gruppförteckning 2B Förteckning\\ Xlsx Ep-Elproduktion\n☐ Skyltlista Docx. A4 b-Skyltlista 2B Förteckning\\ Xlsx Ep-Elproduktion\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ- 2C Kvalitet\\ ååmmdd Ep-Elproduktion\n☐ Funktionsbeskrivning* Docx A4 b-Funktionsbeskrivning 2D Beskrivning\\ Xlsx Ep-Elproduktion\n☐ Föranmälan Pdf A4 b-Föranmälan-ååmmdd 2D Beskrivning\\ Ep-Elproduktion\n☐ Färdiganmälan Pdf A4 b-Färdiganmälan- 2D Beskrivning\\ ååmmdd Ep-Elproduktion\n☐ Anläggningsbeskrivning Docx A4 b- 2D Beskrivning\\ Xlsx Anläggningsbeskrivning Ep-Elproduktion\n☐ Ritning kanalisation Pdf/A-1 A3 b-Ep61-Pnn 2E Ritning\\ Ep-Elproduktion\n☐ Schema solcellsanläggning Pdf/A-1 A3 b-Ep632-C-id-typ 2E Ritning\\ Ep-Elproduktion\n☐ Strängritning Pdf/A-1 A3 b-Ep632-Pnn-sträng 2E Ritning\\ Ep-Elproduktion\n☐ Ritning kraft Pdf/A-1 A3 b-Ep632-Pnn 2E Ritning\\ Ep-Elproduktion\n☐ Ritning spänningsutjämning Pdf/A-1 A3 b-Ep66-Pnn 2E Ritning\\ Ep-Elproduktion\n☐ Insatsplan Pdf/A-1 A3 b-Ep60-Insatsplan 2E Ritning\\ Alla plan i en Ep-Elproduktion Pdf/A-1\nX Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Insatskort Pdf/A-1 A3 b-Ep60-Insatskort 2E Ritning\\ Alla plan i en Ep-Elproduktion Pdf/A-1\n☐ Program och backup för Exe b-id-Program-typ 2G Komplement\\ levererade produkter Ep-Elproduktion\n☐ Modell schema Dwg Ritningslayouter: nnnnb-Ep632-C-id-typ 2H Modell\\Ep − scheman A3\n☐ Modell för insatsplan Dwg Layouter: nnnnb-Ep60-P- 2H Modell\\Ep − insatsplan A3 Insatsplan\n☐ Modell för insatskort Dwg Layouter: nnnnb-Ep60-P-Insatskort 2H Modell\\Ep − insatskort A3\n☐ Teknisk beräkning Docx. A4 b-Typ-ååmmdd 2J Mätning och Xlsx beräkning\\ Ep-Elproduktion\n☐ Taklastberäkning Docx. A4 b-Taklastberäkning- 2J Mätning och Xlsx Pdf ååmmdd beräkning\\ Ep-Elproduktion\n☐ Vindlastberäkning Docx. A4 b-Vindlastberäkning- 2J Mätning och Xlsx Pdf ååmmdd beräkning\\ Ep-Elproduktion\n☐ Ledningsberäkning Docx. A4 b-Ledningsberäkn- 2J Mätning och Xlsx Pdf ååmmdd beräkning\\ Ep-Elproduktion\n☐ Provningsprotokoll och Pdf/A-1 A4 b-Provningsprotokoll-typ- 2K Besiktning\\ mätprotokoll Se omfattning i ååmmdd Ep-Elproduktion tabell EL"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/e-el/batterilagring/del-2",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "E – EL",
+    "BATTERILAGRING"
+   ],
+   "part": 2,
+   "text": "☐ Drift- och skötselinstruktion Pdf, A4 b-id-Fabrikat-Typ- 2L Drift och underhåll\\ Docx Skötselinstruktion Ep-Elproduktion\n☐ Produktblad Pdf Standarddokument b-id-Fabrikat-Typ 4E Produktinformation\\ från fabrikant eller Ep-Elproduktion leverantör\n*) I förkommande fall för att förtydliga och beskriva funktion.\n**) Gruppförteckning ska innehålla uppgifter om: säkringsstorlek, anslutet objekt, ledningsarea, jordfelsbrytares skyddsområde, jordfelsbrytares sektionering."
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/es-el-sakerhetsklassat",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "ES – EL SÄKERHETSKLASSAT"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx. Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\ Xlsx Es-El säkerhetsklassat\n☐ Apparatförteckning Docx. A4 b-Apparatförteckning 2B Förteckning\\ Xlsx Es-El säkerhetsklassat\n☐ Dörrförteckning Docx. A4 b-Dörrförteckning-Passer 2B Förteckning\\ passersystem Xlsx Es-El säkerhetsklassat\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ-ååmmdd 2C Kvalitet\\ Es-El säkerhetsklassat\nX Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Funktionsbeskrivning Pdf/A-1 A4 b-Funktion-Inbrottslarm 2D Beskrivning\\ inbrottslarm Es-El säkerhetsklassat\n☐ Funktionsbeskrivning Pdf/A-1 A4 b-Funktion-Passer 2D Beskrivning\\ passersystem Es-El säkerhetsklassat\n☐ Anläggarintyg inbrott Pdf/A-1 A4 Anläggarintyg-Inbrott- 2D Beskrivning\\Es-El ååmmdd\n☐ OR inbrottslarm Pdf/A-1 A3 b-OR-Inbrottslarm 2E Ritning\\ Es-El säkerhetsklassat\n☐ OR passersystem Pdf/A-1 A3 b-OR-Passer 2E Ritning\\ Es-El säkerhetsklassat\n☐ Ritning inbrottslarm Pdf/A-1 A1** b-Es642-Pnn 2E Ritning\\ Es-El säkerhetsklassat\n☐ Ritning passersystem Pdf/A-1 A1** b-Es644-Pnn 2E Ritning\\ Es-El säkerhetsklassat\n☐ Modell OR inbrott Dwg Layouter: nnnnb-Es932-Pnn 2H Modell\\Es − inbrott A3\n☐ Modell OR passage Dwg Layouter: nnnnb-Es934-Pnn 2H Modell\\Es − passage A3\n☐ Modell inbrott Dwg Layouter: nnnnb-Es642-Pnn 2H Modell\\Es − inbrott A1**\n☐ Modell passage Dwg Layouter: nnnnb-Es644-Pnn 2H Modell\\Es − passage A1**\n☐ Provningsprotokoll Pdf/A-1 A4 b-Provning-Inbrott- 2K Besiktning\\ inbrottslarm ååmmdd Es-El säkerhetsklassat\n☐ Provningsprotokoll Pdf/A-1 A4 b-Provning-Passer- 2K Besiktning\\ passersystem ååmmdd Es-El säkerhetsklassat\n☐ Manual Pdf A4 b-id-Fabrikat-Typ-Manual 2L Drift och underhåll\\ Es-El säkerhetsklassat\n☐ Drift- och Pdf, Docx A4 b-id-Fabrikat-Typ- 2L Drift och underhåll\\ skötselinstruktion Skötselinstruktion Es-El säkerhetsklassat\n☐ Produktblad Pdf Standard- b-id-Fabrikat-Typ 4E Produktinformation\\ dokument från Es-El säkerhetsklassat fabrikant eller leverantör\n☐ Byggvarudeklaration Pdf Standard- b-id-Fabrikat-Typ-BVD 4E Produktinformation\\ dokument från Es-El säkerhetsklassat fabrikant eller leverantör\n**) A1 i skala som visar hela plan, normalt skala 1:200 eller 1:100.\nExempel Förklaring 1157A-Es642-P02 Herrhagsskolan, hus A, inbrottslarm, plan 2"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/g-geoteknik",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "G – GEOTEKNIK"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Geologisk undersökning Pdf/A-1 A4 nnnn-Geound-ååmmdd 2J Mätning och beräkning\n☐ Radonundersökning Pdf/A-1 A4 nnnn-Radonund-ååmmdd 2J Mätning och beräkning\n☐ Mark- och miljöteknisk Pdf/A-1 A4 nnnn-Mark- och miljöund- 2J Mätning och beräkning undersökning ååmmdd\nExempel Förklaring 1420-Radonund-131122 Objekt 1420, radonundersökning, daterad 22 november 2013"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/h-hiss-och-maskin",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "H – HISS OCH MASKIN"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ-ååmmdd 2C Kvalitet\\H-Hiss\n☐ Apparatskåpsplan Pdf/A-1 A4 b-H63-C-id-ASnn 2E Ritning\\H-Hiss\n☐ Elschema Pdf/A-1 A4 b-H63-C-id 2E Ritning\\H-Hiss\n☐ Ritning plan och sektion Pdf/A-1 A3 b-H71-PS-id 2E Ritning\\H-Hiss\n☐ Hissbesiktningsprotokoll Pdf/A-1 A4 b-id-Besiktning-ååmmdd 2K Besiktning\\H-Hiss\n☐ Driftkort Pdf/A-1 A4 b-id-Driftkort 2L Drift och underhåll\\H-Hiss\n☐ Drift- och Pdf, Docx A4 b-id-Fabrikat-Typ- 2L Drift och underhåll\\H-Hiss skötselinstruktion Skötselinstruktion\n☐ Produktblad Pdf Standard- b-id-Fabrikat-Typ 4E Produktinformation\\H-Hiss dokument från fabrikant eller leverantör\n☐ Byggvarudeklaration Pdf Standard- b-id-Fabrikat-Typ-BVD 4E Produktinformation\\H-Hiss dokument från fabrikant eller leverantör\nExempel Förklaring A-H71-PS-HISS2 Hus A, hissritningar (plan och sektion) för hiss 2 A-H63-C-HISS3 Hus A, elschema för hiss 3 B-H63-C-HISS2-AS1 Hus B, apparatskåpsplan för apparatskåp AS1 tillhörande hiss 2 C-HISS1-Skötselinstruktion Hus C, skötselinstruktion för hiss 1 A-HISS1-Besiktning-251114 Hus A, besiktningsprotokoll för hiss 1, daterad 14 november 2025"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/k-konstruktion",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "K – KONSTRUKTION"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx. Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\K-Konstruktion Xlsx\n☐ Allmänna föreskrifter Pdf/A-1 A1 b-Allmänna föreskrifter 2D Beskrivning\\K-Konstruktion\n☐ Ritning grundläggning Pdf/A-1 A1** b-K15-P-typ* 2E Ritning\\K-Konstruktion\n☐ Ritning grundplan Pdf/A-1 A1** b-K15-P-typ* 2E Ritning\\K-Konstruktion\n☐ Ritning golvplan(er) Pdf/A-1 A1** b-K27-Pnn-typ* 2E Ritning\\K-Konstruktion\n☐ Ritning stomplan Pdf/A-1 A1** b-K27-Pnn-typ* 2E Ritning\\K-Konstruktion\n☐ Ritning takplan Pdf/A-1 A1** b-K27-P-typ* 2E Ritning\\K-Konstruktion\n☐ Ritning huvudsektion Pdf/A-1 A1** b-K27-S-typ* 2E Ritning\\K-Konstruktion\n☐ Ritning sektioner Pdf/A-1 A1** b-K27-S-typ* 2E Ritning\\K-Konstruktion\n☐ Ritning stomelevationer Pdf/A-1 A1** b-K27-S-typ* 2E Ritning\\K-Konstruktion\n☐ Ritning stomdetaljer Pdf/A-1 A1 b-K27-D-typ* 2E Ritning\\K-Konstruktion\n☐ Ritning övriga detaljer Pdf/A-1 A1 b-K27-D-typ* 2E Ritning\\K-Konstruktion\n☐ Modell byggnad Rvt Sheets: nnnnb-K20-V 2H Modell\\K − plan A1** − sektion A1** − detalj A1\n☐ Modell Dwg Layouter: nnnnb-K20-V 2H Modell\\K − plan A1** − sektion A1** − detalj A1\n*) Med nn menas våningsplan, med typ menas ex: golv, grund, stomme, tak.\n**) A1 i skala som visar hela plan eller sektion, normalt skala 1:200 eller 1:100.\nExempel Förklaring A-K15-P-grund Hus A, grundplan A-K27-P02-stomme Hus A, stomplan, plan 2 A-K27-D-stomme Hus A, detalj stomme"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/ky-kyla",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "KY – KYLA"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx Xlsx Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\Ky-Kyla\n☐ Komponentförteckning Docx Xlsx A4 b-Komponentförteckning 2B Förteckning\\Ky-Kyla\n☐ CE-dokumentation Pdf A4 b-id-CE-dokumentation 2C Kvalitet\\Ky-Kyla\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ-ååmmdd 2C Kvalitet\\Ky-Kyla\n☐ Funktionsbeskrivning* Docx Xlsx A4 b-Funktionsbeskrivning 2D Beskrivning\\Ky-Kyla\n☐ Ritning kylsystem Pdf/A-1 A1** b-W55-Pnn 2E Ritning\\Ky-Kyla\n☐ Totalflödesschema Pdf/A-1 A1 b-W55-C 2E Ritning\\Ky-Kyla\n☐ Ritning ledningar/borrhål Pdf/A-1 A1** b-W55-P-Kyla 2E Ritning\\Ky-Kyla\n☐ Modell kylsystem Dwg Layouter: nnnnb-W55-Pnn 2H Modell\\Ky − planer A1** − sektioner\n☐ Besiktningsprotokoll Pdf/A-1 A4 b-Tryckkärlsbesiktning- 2K Besiktning\\Ky-Kyla tryckkärl ååmmdd\n☐ Injusteringsprotokoll Pdf/A-1 A4 b-id-Injusteringsprotokoll- 2K Besiktning\\Ky-Kyla ååmmdd\n☐ Kontrollrapport enl Pdf/A-1 A4 b-Köldmedieförordningen- 2K Besiktning\\Ky-Kyla Köldmedieförordningen ååmmdd\n☐ Provningsprotokoll Pdf/A-1 A4 b-Provningsprotokoll-typ- 2K Besiktning\\Ky-Kyla ååmmdd\n☐ Driftkort Pdf/A-1 A4 b-id-Driftkort 2L Drift- och underhåll\\Ky-Kyla\n☐ Drift- och Pdf Docx A4 b-id-Fabrikat-Typ- 2L Drift- och underhåll\\Ky-Kyla skötselinstruktion Skötselinstruktion\n☐ Produktblad Pdf Standard- b-id-Fabrikat-Typ 4E Produktinformation\\Ky-Kyla dokument från fabrikant eller leverantör\n☐ Säkerhetsdatablad Pdf Standard- b-id-Fabrikat-Typ- 4E Produktinformation\\Ky-Kyla dokument från Säkerhetsdatablad fabrikant eller leverantör\n☐ Byggvarudeklaration Pdf Standard- b-id-Fabrikat-Typ-BVD 4E Produktinformation\\Ky-Kyla dokument från fabrikant eller leverantör\n*) I förkommande fall för att förtydliga och beskriva funktion.\n**) A1 i skala som visar hela plan, normalt skala 1:200 eller 1:100."
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/m-mark",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "M – MARK"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx. Enl. SS 32222 0-Ritningsförteckning 2B Förteckning\\M-Mark Xlsx\n☐ Utrustningsförteckning Docx. Enligt mall 0-Utrustningsförteckning 2B Förteckning\\M-Mark Xlsx\n☐ Växtförteckning Docx. Enligt mall 0-Växtförteckning 2B Förteckning\\M-Mark Xlsx\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ-ååmmdd 2C Kvalitet\\M-Mark\n☐ Ritning situationsplan Pdf/A-1 A1* 0-M01-P-Situationsplan 2E Ritning\\ M-Mark\n☐ Ritning Pdf/A-1 A1* 0-M01-P-Höjder 2E Ritning\\M-Mark höjdsättningsplan\n☐ Ritning Pdf/A-1 A1* 0-M01-P-Markplanering 2E Ritning\\M-Mark markplaneringsplan\n☐ Ritning utrustningsplan Pdf/A-1 A1* 0-M01-P-Utrustning 2E Ritning\\M-Mark\n☐ Ritning ledningsplan Pdf/A-1 A1* 0-M01-P-Ledningsplan 2E Ritning\\M-Mark\n☐ Ritning växtplan Pdf/A-1 A1* 0-M01-P-Växter 2E Ritning\\M-Mark\n☐ Modell situationsplan Dwg Layouter: nnnn0-M01-P-Situation 2H Modell\\M − planer A1*\n☐ Modell Dwg Layouter: nnnn0-M01-P-Höjder 2H Modell\\M höjdsättningsplan − planer A1*\n☐ Modell Dwg Layouter: nnnn0-M01-P- 2H Modell\\M markplaneringsplan − planer A1* Markplanering\n☐ Modell utrustningsplan Dwg Layouter: nnnn0-M01-P-Utrustning 2H Modell\\M − planer A1*\n☐ Modell ledningsplan Dwg Layouter: nnnn0-M01-P- 2H Modell\\M − planer A1* Ledningsplan\n☐ Modell växtplan Dwg Layouter: nnnn0-M01-P-Växter 2H Modell\\M − planer A1*\n☐ Besiktning av lekplats Pdf/A-1 Enl SS-EN 0-Lekplatsbesiktning- 2K Besiktning\\M-Mark 1176:2008 och ååmmdd"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/m-mark/ss-en-177-2008",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "M – MARK",
+    "SS-EN 177:2008"
+   ],
+   "text": "☐ Drift- och Pdf, Docx A4 0-id-Fabrikat-Typ- 2L Drift och underhåll\\M-Mark skötselinstruktion Skötselinstruktion\n☐ Skötselplan Pdf, Docx A4 0-Skötselplan-ååmmdd 2L Drift och underhåll\\M-Mark\n☐ Snöröjningsplan Pdf, Docx A4 0-Snöröjningsplan- 2L Drift och underhåll\\M-Mark ååmmdd\n☐ Trädvårdsplan Pdf, Docx A3 0-Trädvårdsplan-ååmmdd 2L Drift och underhåll\\M-Mark\n☐ Produktblad Pdf Standarddokument 0-id-Fabrikat-Typ 4E Produktinformation\\M-Mark från leverantör\n☐ Byggvarudeklaration Pdf Standarddokument 0-id-Fabrikat-Typ-BVD 4E Produktinformation\\M-Mark från leverantör\n*) I skala som visar hela tomten, ex. 1:200, 1:500.\nOBS! För att minska antalet ritningar och modeller är det möjligt att kombinera flera delar på samma ritning och modell. Exempelvis utrustning-växter och höjder-markplanering. Hänsyn tas till ritningens läsbarhet. Viktigt att det framgår i namngivningen 0-M01-P-xxxxxxx.\nExempel Förklaring 13240-M01-P-Utrustning Objekt 13240, Situationsplan mark, utrustning 0-Lekplatsbesiktning-130813 Hela objektet lekplatsbesiktning, daterad 13 augusti 2013"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/s-styr",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "S – STYR"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx. Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\S-Styr Xlsx\n☐ Komponentförteckning Docx. Komponenter b-Komponentförteckning 2B Förteckning\\S-Styr Xlsx i och utanför apparatskåp\n☐ Brandspjällsförteckning** Docx, A4 b-Brandspjällsförteckning 2B Förteckning\\S-Styr Xlsx\n☐ Skyltförteckning Docx. A4 b-Skyltförteckning 2B Förteckning\\S-Styr Xlsx\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ- 2C Kvalitet\\S-Styr ååmmdd\n☐ Ritning plan Pdf/A-1 A1* b-S81-Pnn 2E Ritning\\S-Styr\n☐ Scheman Pdf/A-1 A4 b-S81-C-ASnn 2E Ritning\\S-Styr − kretsscheman Alla scheman för − yttre ett apparatskåp i förbscheman en Pdf/A-1-fil − översiktsschema − blockschema − nätschema\n☐ Program för DUC/PLC och Såväl källkod som b-Program-DUCn 2G Komplement\\S-Styr displayer kompilerad kod ska levereras digitalt\n☐ Modell plan Dwg Layouter: nnnnb-S81-Pnn 2H Modell\\S − plan A1*\n☐ Modell scheman Dwg Layouter (A4): nnnnb-S81-C-ASnn 2H Modell\\S − kretsschema − yttre förb.schema − översiktsschema − blockschema − nätschema − driftkort\n☐ Provningsprotokoll Docx. A4 b-Provningsprotokoll- 2K Besiktning\\S-Styr Citect/Desigo CC Xlsx Citect/Desigo-ååmmdd\n☐ Provningsprotokoll Docx. A4 b-Provningsprotokoll- 2K Besiktning\\S-Styr förbrukningsmätare Xlsx mätare-ååmmdd\n☐ Injusteringsprotokoll Docx. A4 b-Injusteringsprotokoll- 2K Besiktning\\S-Styr Xlsx ååmmdd\n☐ Driftkort Pdf/A-1 A4 b-id-Driftkort 2L Drift och underhåll\\S-Styr\nX Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Drift- och Pdf, A4 b-id-Fabrikat-Typ- 2L Drift och underhåll\\S-Styr skötselinstruktion Docx Skötselinstruktion\n☐ Produktblad Pdf Standarddokument b-id-Fabrikat-Typ 4E Produktinformation\\S-Styr från fabrikant eller leverantör\n☐ Byggvarudeklaration Pdf Standarddokument b-id-Fabrikat-Typ-BVD 4E Produktinformation\\S-Styr från fabrikant eller leverantör\n*) A1 i skala som visar hela plan, normalt skala 1:200 eller 1:100.\n**) Information om namn, systembeteckning, placering, betjäningsområde samt hänvisning till ritningsnummer."
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/sk-storkok",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "SK – STORKÖK"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx. Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\Sk-Storkök Xlsx\n☐ Utrustningsförteckning Docx. A4 b-Utrustningsförteckning 2B Förteckning\\Sk-Storkök Xlsx\n☐ Försäkran om Pdf A4 b-id-Försäkran om 2C Kvalitet\\Sk-Storkök överensstämmelse överensstämmelse\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ-ååmmdd 2C Kvalitet\\Sk-Storkök\n☐ Underlag för anmälan Docx. A4 b-Anmälan-Nyinstallation 2D Beskrivning\\Sk-Storkök nyinstallation Xlsx\n☐ Ritning plan Pdf/A-1 A1* b-Sk91-Pnn 2E Ritning\\Sk-Storkök\n☐ Modell plan Dwg Layouter: nnnnb-Sk91-Pnn 2H Modell\\Sk − planer A1* − sektioner\n☐ Första kontroll Pdf/A-1 A4 b-Första kontroll-ååmmdd 2K Besiktning\\Sk-Storkök\n☐ Kontrollrapport enl Pdf/A-1 A4 b-Köldmedieförordningen- 2K Besiktning\\Sk-Storkök Köldmedieförordningen ååmmdd\n☐ Igångkörningsprotokoll Pdf/A-1 A4 b-Igångkörningsprotokoll- 2K Besiktning\\Sk-Storkök med driftvärden ååmmdd\n☐ Manual Pdf A4 b-id-Fabrikat-Typ-Manual 2L Drift och underhåll\\ Sk-Storkök\n☐ Drift- och Pdf, Docx A4 b-id-Fabrikat-Typ- 2L Drift och underhåll\\ skötselinstruktion Skötselinstruktion Sk-Storkök\n☐ Produktblad Pdf Standard- b-id-Fabrikat-Typ 4E Produktinformation\\ dokument från Sk-Storkök fabrikant eller leverantör\n☐ Säkerhetsdatablad Pdf Standard- b-id-Fabrikat-Typ- 4E Produktinformation\\ dokument från Säkerhetsdatablad Sk-Storkök fabrikant eller leverantör\n☐ Byggvarudeklaration Pdf Standard- b-id-Fabrikat-Typ-BVD 4E Produktinformation\\ dokument från Sk-Storkök fabrikant eller leverantör\n*) A1 i skala som visar hela plan, normalt skala 1:200 eller 1:100."
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/sp-sprinkler",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "SP – SPRINKLER"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx Xlsx Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\Sp-Sprinkler\n☐ Komponentförteckning Docx Xlsx A4 b-Komponentförteckning 2B Förteckning\\Sp-Sprinkler\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ-ååmmdd 2C Kvalitet\\Sp-Sprinkler\n☐ Funktionsbeskrivning* Docx Xlsx A4 b-Funktionsbeskrivning 2D Beskrivning\\Sp-Sprinkler\n☐ Anläggningsbeskrivning Docx Xlsx A4 b-Anläggningsbeskrivning 2D Beskrivning\\Sp-Sprinkler\n☐ Anläggarintyg Pdf/A-1 A4 b-Anläggarintyg-ååmmdd 2D Beskrivning\\Sp-Sprinkler\n☐ Ritning plan Pdf/A-1 A1** b-Sp54-Pnn 2E Ritning\\Sp-Sprinkler\n☐ Ritning sektion Pdf/A-1 A1 b-Sp54-S 2E Ritning\\Sp-Sprinkler\n☐ Serviceritning Pdf/A-1 A3 b-SR-Sprinkler 2E Ritning\\Sp-Sprinkler\n☐ Orienteringsritning Pdf/A-1 A3 b-OR-Sprinkler 2E Ritning\\Sp-Sprinkler\n☐ Flödesschema Pdf/A-1 A1 b-Sp54-C 2E Ritning\\Sp-Sprinkler\n☐ Modell plan Dwg Layouter: nnnnb-Sp54-Pnn 2H Modell\\Sp − planer A1* − sektioner*\n☐ Modell OR Dwg Layouter: nnnnb-Sp54-OR-Pnn 2H Modell\\Sp"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/sp-sprinkler/or-a3",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "SP – SPRINKLER",
+    "− OR A3"
+   ],
+   "text": "☐ Modell SR Dwg Layouter: nnnnb-Sp54-SR-Pnn 2H Modell\\Sp"
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/sp-sprinkler/sr-a3",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "SP – SPRINKLER",
+    "− SR A3"
+   ],
+   "text": "☐ Beräkning Pdf/A-1 A4 b-Beräkning-ååmmdd 2J Mätning och beräkning\\ Sp-Sprinkler\n☐ Kapacitetsprov Pdf/A-1 A4 b-Kapacitetsprov-ååmmdd 2K Besiktning\\Sp-Sprinkler\n☐ Injusteringsprotokoll Pdf/A-1 A4 b-Injusteringsprotokoll- 2K Besiktning\\Sp-Sprinkler ååmmdd\n☐ Provningsprotokoll Pdf/A-1 A4 b-Provningsprotokoll-typ- 2K Besiktning\\Sp-Sprinkler ååmmdd\n☐ Drift- och Pdf, Docx A4 b-id-Fabrikat-Typ- 2L Drift och underhåll\\ skötselinstruktion Skötselinstruktion Sp-Sprinkler\n☐ Produktblad Pdf Standard- b-id-Fabrikat-Typ 4E Produktinformation\\ dokument från Sp-Sprinkler fabrikant eller leverantör\n☐ Säkerhetsdatablad Pdf Standard- b-id-Fabrikat-Typ- 4E Produktinformation\\ dokument från Säkerhetsdatablad Sp-Sprinkler fabrikant eller leverantör\n☐ Byggvarudeklaration Pdf Standard- b-id-Fabrikat-Typ-BVD 4E Produktinformation\\ dokument från Sp-Sprinkler fabrikant eller leverantör\n*) I förkommande fall för att förtydliga och beskriva funktion.\n**) A1 i skala som visar hela plan, normalt skala 1:200 eller 1:100."
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/v-ventilation",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "V – VENTILATION"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx. Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\V-Ventilation Xlsx\n☐ Komponentförteckning Docx. A4 b-Komponentförteckning 2B Förteckning\\V-Ventilation Xlsx\n☐ Brandspjällsförteckning*** Docx. A4 b- Brandspjällsförteckning 2B Förteckning\\V-Ventilation Xlsx\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ-ååmmdd 2C Kvalitet\\V-Ventilation\n☐ Ritning plan Pdf/A-1 A1** b-V57-Pnn 2E Ritning\\V-Ventilation\n☐ Ritning sektion Pdf/A-1 A1 b-V57-S 2E Ritning\\V-Ventilation\n☐ Modell byggnad Rvt Sheets: nnnnb-V57-V 2H Modell\\V − planer A1** − sektioner\n☐ Modell plan Dwg Layouter: nnnnb-V57-Pnn 2H Modell\\V − planer A1** − sektioner\n☐ OVK-protokoll Pdf/A-1 A4 b-OVK-ååmmdd 2K Besiktning\\V-Ventilation\n☐ Injusteringsprotokoll Pdf/A-1 A4 b-id-Injusteringsprotokoll- 2K Besiktning\\V-Ventilation ååmmdd\n☐ Aggregatprotokoll**** Pdf/A-1 A4 b-id-Aggregatprotokoll- 2K Besiktning\\V-Ventilation ååmmdd\n☐ Driftkort Pdf/A-1 Från Citect b-id-Driftkort 2L Drift och underhåll\\ V-Ventilation\n☐ Drift- och Pdf, Docx A4 b-id-Fabrikat-Typ- 2L Drift och underhåll\\ skötselinstruktion Skötselinstruktion V-Ventilation\n☐ Produktblad Pdf Standard- b-id-Fabrikat-Typ 4E Produktinformation\\ dokument från V-Ventilation fabrikant eller leverantör\n☐ Byggvarudeklaration Pdf Standard- b-id-Fabrikat-Typ-BVD 4E Produktinformation\\ dokument från V-Ventilation fabrikant eller leverantör\n*) I förkommande fall för att förtydliga och beskriva funktion.\n**) A1 i skala som visar hela plan, normalt skala 1:200 eller 1:100.\n***) Information om namn, systembeteckning, placering, betjäningsområde samt hänvisning till ritningsnummer.\n****) Fullständig aggregatinformation efter fullgjord luftinjustering så som installerade effekter, flöden, tryck och driftseffekt samt SFP-värden."
+  },
+  {
+   "id": "specifikation-handlingar/leveransspecifikation/w-varme-och-sanitet",
+   "path": [
+    "LEVERANSSPECIFIKATION",
+    "W – VÄRME OCH SANITET"
+   ],
+   "text": "X Informationsmängd Format Struktur/mall Filnamn Leveransmapp\n☐ Inte aktuellt ☐ Ritningsförteckning Docx. Enl. SS 32222 b-Ritningsförteckning 2B Förteckning\\W- Värme och Xlsx sanitet\n☐ Komponentförteckning Docx. A4 b-Komponentförteckning 2B Förteckning\\W- Värme och Xlsx sanitet\n☐ Ventilförteckning Docx. A4 b-Ventilförteckning 2B Förteckning\\W-Värme och Xlsx sanitet\n☐ Egenkontroll Pdf/A-1 A4 Egenkontroll-typ-ååmmdd 2C Kvalitet\\W-Värme och sanitet\n☐ Funktionsbeskrivning* Docx. A4 b-Funktionsbeskrivning 2D Beskrivning\\W- Värme och Xlsx sanitet\n☐ Parameterlista Docx. A4 b-Parameterlista 2B Förteckning\\W-Värme och Xlsx sanitet\n☐ Ritning VA-installationer Pdf/A-1 A1** b-W50-Pnn 2E Ritning\\W-Värme och sanitet\n☐ Ritning värmesystem Pdf/A-1 A1** b-W56-Pnn 2E Ritning\\W-Värme och sanitet\n☐ Ritning bergvärme Pdf/A-1 A1** 0-W56-P-Bergvärme 2E Ritning\\W-Värme och ledningar/borrhål sanitet\n☐ Totalflödesschema Pdf/A-1 A1 b-W50-C 2E Ritning\\W-Värme och sanitet\n☐ Ledningsplan Pdf/A-1 A1*** 0-W01-P-Ledningsplan 2E Ritning\\W-Värme och sanitet\n☐ Modell byggnad Rvt Sheets: nnnnb-W50-V 2H Modell\\W − planer A1** − sektioner\n☐ Modell plan Dwg Layouter: nnnnb-W50-Pnn 2H Modell\\W − planer A1** − sektioner\n☐ Modell ledningsplan Dwg Layouter: nnnnb-W01-P 2H Modell\\W − sit.plan A1***\n☐ Besiktningsprotokoll Pdf/A-1 A4 b-Tryckkärlsbesiktning- 2K Besiktning\\W-Värme och tryckkärl ååmmdd sanitet\n☐ Injusteringsprotokoll Pdf/A-1 A4 b-id-Injusteringsprotokoll- 2K Besiktning\\W-Värme och ååmmdd sanitet\n☐ Provningsprotokoll Pdf/A-1 A4 b-Provningsprotokoll-typ- 2K Besiktning\\ W-Värme och ååmmdd sanitet\n☐ Driftkort Pdf/A-1 A4 b-id-Driftkort 2L Drift och underhåll\\ W-Värme och sanitet\n☐ Drift- och Pdf, Docx A4 b-id-Fabrikat-Typ- 2L Drift och underhåll\\ skötselinstruktion Skötselinstruktion W-Värme och sanitet\n☐ Produktblad Pdf Standard- b-id-Fabrikat-Typ 4E Produktinformation\\ dokument från W-Värme och sanitet fabrikant eller leverantör\n☐ Säkerhetsdatablad Pdf Standard- b-id-Fabrikat-Typ- 4E Produktinformation\\ dokument från Säkerhetsdatablad W-Värme och sanitet fabrikant eller leverantör\n☐ Byggvarudeklaration Pdf Standard- b-id-Fabrikat-Typ-BVD 4E Produktinformation\\ dokument från W-Värme och sanitet fabrikant eller leverantör\n*) I förkommande fall för att förtydliga och beskriva funktion.\n**) A1 i skala som visar hela plan, normalt skala 1:200 eller 1:100. ***) A1 i skala som visar hela tomten, normalt skala 1:500"
+  },
+  {
+   "id": "specifikation-handlingar/bilagor/bilaga-a-teknikomrade-disciplin",
+   "path": [
+    "BILAGOR",
+    "BILAGA A - TEKNIKOMRÅDE – DISCIPLIN"
+   ],
+   "text": "Beteckning Teknikområde Förklaring A Arkitekt Enligt SIS Bygghandlingar By Bygg Låssystem, dörrar, fönster, storkök Br Brandskydd Utrymningsplaner, brandskyddsritningar E El Enligt SIS Bygghandlingar Ep El - elproduktion Exempelvis solceller och batterilagring Es El - säkerhetsklassat Exempelvis passage, inbrott, med begränsad åtkomst G Geoteknik Enligt SIS Bygghandlingar H Hiss och maskin K Byggnadskonstruktion Enligt SIS Bygghandlingar Ky Kyla M Mark Enligt SIS Bygghandlingar P Projekt- och entreprenadgemensamt Enligt SIS Bygghandlingar R VA (yttre ledningar - utomhus) Enligt SIS Bygghandlingar S Styr Enligt SIS Bygghandlingar Sk Storkök Sp Sprinkler T Trafik och väg V Ventilation/VVS där V och VS inte är åtskilda Enligt SIS Bygghandlingar W Värme och sanitet Enligt SIS Bygghandlingar Y Process- och maskininstallation Enligt SIS Bygghandlingar"
+  },
+  {
+   "id": "specifikation-handlingar/bilagor/bilaga-b-redovisningssatt",
+   "path": [
+    "BILAGOR",
+    "BILAGA B - REDOVISNINGSSÄTT"
+   ],
+   "text": "Kod Redovisningssätt Förklaring P Planer Enligt SIS Bygghandlingar S Sektioner Enligt SIS Bygghandlingar F Fasader Enligt SIS Bygghandlingar U Uppställning, elevationer Enligt SIS Bygghandlingar C Schema Enligt SIS Bygghandlingar V Volymer (3D-modell) Enligt SIS Bygghandlingar X Icke-grafisk modell Enligt SIS Bygghandlingar\nKod Redovisningssätt Förklaring T Förteckningar* Enligt SIS Bygghandlingar D Detaljer* Enligt SIS Bygghandlingar\n*) Gäller modellorienterade förteckningar och detaljer."
+  },
+  {
+   "id": "specifikation-handlingar/bilagor/bilaga-c-bsab-96-byggdelar-byggdelstyper-total",
+   "path": [
+    "BILAGOR",
+    "BILAGA C - BSAB 96 – BYGGDELAR BYGGDELSTYPER TOTAL"
+   ],
+   "text": "Kod* Förklaring"
+  },
+  {
+   "id": "specifikation-handlingar/bilagor/bilaga-c-bsab-96-byggdelar-byggdelstyper-total/0-sammansatta-byggdelar-och-installationssystem",
+   "path": [
+    "BILAGOR",
+    "BILAGA C - BSAB 96 – BYGGDELAR BYGGDELSTYPER TOTAL",
+    "0      SAMMANSATTA BYGGDELAR OCH INSTALLATIONSSYSTEM"
+   ],
+   "text": "01 Sammansatta byggdelar (SITUATIONSPLAN, samordningsritningar)"
+  },
+  {
+   "id": "specifikation-handlingar/bilagor/bilaga-c-bsab-96-byggdelar-byggdelstyper-total/1-undergrund-underbyggnad-skyddande-lager-i-mark-grundkonstruktioner",
+   "path": [
+    "BILAGOR",
+    "BILAGA C - BSAB 96 – BYGGDELAR BYGGDELSTYPER TOTAL",
+    "1      UNDERGRUND, UNDERBYGGNAD, SKYDDANDE LAGER I MARK, GRUNDKONSTRUKTIONER"
+   ],
+   "text": "10 Sammansatta markbyggdelar 13 Lager i mark för skydd av byggnadsverk 15 Grundkonstruktioner"
+  },
+  {
+   "id": "specifikation-handlingar/bilagor/bilaga-c-bsab-96-byggdelar-byggdelstyper-total/2-barverk",
+   "path": [
+    "BILAGOR",
+    "BILAGA C - BSAB 96 – BYGGDELAR BYGGDELSTYPER TOTAL",
+    "2      BÄRVERK"
+   ],
+   "text": "20 Sammansatta bärverk 27 Bärverk i husstomme"
+  },
+  {
+   "id": "specifikation-handlingar/bilagor/bilaga-c-bsab-96-byggdelar-byggdelstyper-total/rumskompletteringar",
+   "path": [
+    "BILAGOR",
+    "BILAGA C - BSAB 96 – BYGGDELAR BYGGDELSTYPER TOTAL",
+    "RUMSKOMPLETTERINGAR"
+   ],
+   "text": "40 Sammansatta rumsbildande byggdelar, huskompletteringar, ytskikt och rumskompletteringar 43 Inre rumsbildande byggdelar 44 Invändiga ytskikt 49 Övriga rumsbildande byggdelar, huskompletteringar, ytskikt och rumskompletteringar"
+  },
+  {
+   "id": "specifikation-handlingar/bilagor/bilaga-c-bsab-96-byggdelar-byggdelstyper-total/5-va-vvs-kyl-och-processmediesystem",
+   "path": [
+    "BILAGOR",
+    "BILAGA C - BSAB 96 – BYGGDELAR BYGGDELSTYPER TOTAL",
+    "5      VA-, VVS-, KYL- OCH PROCESSMEDIESYSTEM"
+   ],
+   "text": "50 Sammansatta Va-, vvs-, kyl- och processmediesystem 52 Försörjningssystem för flytande eller gasformigt medium 53 Avloppsvattensystem och pneumatiska avfallstransportsystem 54 Brandsläckningssystem 55 Kylsystem 56 Värmesystem 57 Luftbehandlingssystem"
+  },
+  {
+   "id": "specifikation-handlingar/bilagor/bilaga-c-bsab-96-byggdelar-byggdelstyper-total/6-el-och-telesystem",
+   "path": [
+    "BILAGOR",
+    "BILAGA C - BSAB 96 – BYGGDELAR BYGGDELSTYPER TOTAL",
+    "6      EL- OCH TELESYSTEM"
+   ],
+   "text": "60 El- och telesystem sammansatt 61 El- och telekanalisationssystem 63 Elkraftsystem 630 Huvudledningsschema 631 Belysning 632 Kraft 633 UPS-Kraft 634 Ställverk 635 Åskskydd 636 Nödbelysning 64 Telesystem 641 Telefoni / data / fastighetsnät 642 Inbrottslarm 643 Brandlarm 644 Passagesystem\nKod* Förklaring 66 Potentialutjämning"
+  },
+  {
+   "id": "specifikation-handlingar/bilagor/bilaga-c-bsab-96-byggdelar-byggdelstyper-total/7-transportsystem-mm",
+   "path": [
+    "BILAGOR",
+    "BILAGA C - BSAB 96 – BYGGDELAR BYGGDELSTYPER TOTAL",
+    "7                TRANSPORTSYSTEM MM"
+   ],
+   "text": "71 Hissystem 73 Rulltrappssystem och rullrampssystem 76 System med maskindriven port, grind, dörr mm"
+  },
+  {
+   "id": "specifikation-handlingar/bilagor/bilaga-c-bsab-96-byggdelar-byggdelstyper-total/8-styr-och-overvakningssystem",
+   "path": [
+    "BILAGOR",
+    "BILAGA C - BSAB 96 – BYGGDELAR BYGGDELSTYPER TOTAL",
+    "8                STYR- OCH ÖVERVAKNINGSSYSTEM"
+   ],
+   "text": "81 Styr- och övervakningssystem för fastighetsdrift 82 Styr- och övervakningssystem för processinstallationer 9 ÖVRIGA BYGGDELAR OCH INSTALLATIONSSYSTEM (TF:s egen indelning) 91 Storkök 931 Brandcellsindelning och utrymningsvägar 932 Orienteringsplaner inbrott 933 Orienterings- och serviceplaner brand 934 Orienteringsplaner passage 939 Utrymningsplaner\n*) Använd en förfinad indelning enligt BSAB 96 om så krävs. Fler koder finns på byggtjanst.se.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

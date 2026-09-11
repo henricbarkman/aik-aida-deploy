@@ -1,0 +1,336 @@
+{
+ "doc": "el",
+ "title": "Riktlinje El",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-El-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "el/att-tanka-pa",
+   "path": [
+    "ATT TÄNKA PÅ"
+   ],
+   "text": "• Vid elarbeten som utförs i anläggningar som Karlstads Kommun Mer information finns äger och förvaltar ska ”Riktlinjer för ansvar och skyldigheter på karlstad.se avseende elsäkerheten i Karlstads kommun” beaktas.\n• Elentreprenören ska upprätta föranmälan och färdiganmälan enligt nätägarens anvisningar (Elabonnemang och fordonsladdare) och även skicka kopia på gjorda anmälningar till projektledaren via mejl.\n• Solcellsentreprenören ska upprätta föranmälan och färdiganmälan enligt nätägarens anvisningar (Solcellsproduktion) och även skicka kopia på gjorda anmälningar till projektledaren via mejl.\n• Vid nybyggnation eller större förändringar i befintliga anläggningar ska nätägaren meddelas i god tid.\n• Vid behov av byggström ansvarar huvudentreprenören och nätägaren ska meddelas i god tid."
+  },
+  {
+   "id": "el/manualer-och-foreskrifter",
+   "path": [
+    "MANUALER OCH FÖRESKRIFTER"
+   ],
+   "text": "Följande handlingar gäller:\n• Gällande ellagstiftning och starkströmsföreskrifter.\n• Svensk standard.\n• Kontroller ska utföras enligt del 6 i Elinstallationsreglerna och överlämnas efter anmodan vid avslutat arbete."
+  },
+  {
+   "id": "el/allmanna-krav/heta-arbeten",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "HETA ARBETEN"
+   ],
+   "text": "• Installationsarbete ska utföras enligt regler för Heta arbeten."
+  },
+  {
+   "id": "el/allmanna-krav/fabrikatval",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "FABRIKATVAL"
+   ],
+   "text": "• Om inte annat anges ska don och apparater vara av fabrikat vanligt förekommande i Sverige med lättillgängliga reservdelar och med service- och försäljningsorganisation i Sverige.\n• Om det i handling föreskrivs fabrikatsangivna produkter, får de bytas mot likvärdiga. Karlstads kommuns projektansvariga avgör likvärdigheten efter samråd med teknik- och fastighetsförvaltningens sakkunniga inom respektive teknikområde."
+  },
+  {
+   "id": "el/miljobetingelser",
+   "path": [
+    "MILJÖBETINGELSER"
+   ],
+   "text": "• I miljöer med risk för skadegörelse installeras vandalsäkert materiel."
+  },
+  {
+   "id": "el/elmiljo/elmateriel",
+   "path": [
+    "ELMILJÖ",
+    "ELMATERIEL"
+   ],
+   "text": "• Elmateriel i byggnad ska vara i halogenfritt utförande."
+  },
+  {
+   "id": "el/elmiljo/elektromagnetiska-falt",
+   "path": [
+    "ELMILJÖ",
+    "ELEKTROMAGNETISKA FÄLT"
+   ],
+   "text": "• Den fasta installationen ska utföras så att följande värden inte överskrids, där människor stadigvarande vistas:\n− Lågfrekventa magnetfält 0,2 µT uppmätt 1 meter över golvet i nybyggnad.\n− Lågfrekventa magnetfält 0,4 µT i äldre bebyggelse vid driftsatt anläggning.\n− Elektriska fält 10 V/m."
+  },
+  {
+   "id": "el/el-och-telekablar",
+   "path": [
+    "EL-OCH TELEKABLAR"
+   ],
+   "text": "• Vid korrosiv miljö används fästmaterial av för miljön lämpligt material.\n• Utomhus används fästmaterial av galvat, elförzinkad, rostfritt material.\n• Infällda kablar ska förläggas i rör och vara utbytbar även när slang används.\n• Utanpåliggande rör och slangar för kablar ska fästas upp på lämpligt sätt och avstånd. (Max 75 cm mellan infästningspunkterna.)\n• Huvudledningar och utanpåliggande gruppledningsinstallationer utförs med metallmantlade (Skärm) kablar.\n• Kabelns metallmantel ansluts i matande ända."
+  },
+  {
+   "id": "el/kanalisationssystem/kabelstegar-kabelrannor-och-ledningskanaler",
+   "path": [
+    "KANALISATIONSSYSTEM",
+    "KABELSTEGAR, KABELRÄNNOR OCH LEDNINGSKANALER"
+   ],
+   "text": "• Kraft-, tele-, data- och styrkablar förläggs åtskilda på lämpligt sätt för att undvika störningar med skiljeplåt eller ränna.\n• Likströmskablar (Solceller) ska ha eget kanalisationssystem skilt från övriga kablar.\n• Reservutrymme ska vara minst 25% vid färdig anläggning både vid nyproduktion och renoveringar.\n• Fönsterbänkskanaler ska vara plåt eller aluminium."
+  },
+  {
+   "id": "el/elkraftssystem/systemutformning",
+   "path": [
+    "ELKRAFTSSYSTEM",
+    "SYSTEMUTFORMNING"
+   ],
+   "text": "• TN-S system ska användas.\n• Vid ombyggnad där 4-ledarsystem (TN-C) förekommer ska förberedelser för att enkelt gå över till 5-ledarsystem (TN-S) göras."
+  },
+  {
+   "id": "el/relaer-och-skydd/relaer",
+   "path": [
+    "RELÄER OCH SKYDD",
+    "RELÄER"
+   ],
+   "text": "• Reläer ska vara av instickstyp med sockel för skruvanslutning."
+  },
+  {
+   "id": "el/relaer-och-skydd/overspanningsskydd-spd",
+   "path": [
+    "RELÄER OCH SKYDD",
+    "ÖVERSPÄNNINGSSKYDD (SPD)"
+   ],
+   "text": "• Överspänningsskydd av typ kombinerat grovskydd/mellanskydd ska monteras i inkommande ställverk och inkommande elcentraler.\n• Överspänningsskydd av typ mellanskydd ska monteras i första elcentral i respektive fristående byggnad som matas från ställverk och elcentraler försedda med kombinerat grovskydd/mellanskydd.\n• Behovet av överspänningsskydd typ mellanskydd även i underliggande elcentral samordnas i projektet.\n• I underliggande elcentral som matar utrustning utomhus ska överspänningsskydd typ mellanskydd monteras.\n• Överspänningsskydd ska vara jackbara, med möjlighet att kunna bytas för respektive fas.\n• Överspänningsskydd ska ha optisk indikering som visar om skyddet är förbrukat.\n• Överspänningsskydd ska vara försedda med larmkontakt.\n• Larm från överspänningsskydd kopplas upp mot överordnat system."
+  },
+  {
+   "id": "el/relaer-och-skydd/askskydd",
+   "path": [
+    "RELÄER OCH SKYDD",
+    "ÅSKSKYDD"
+   ],
+   "text": "• Riskanalys för inslagsskydd utförs av TE.\n• För att bestämma omfattningen av inslagsskydd med uppfångare och nedledare samt ringledare och jordtag i en byggnad utförs riskanalys, där bland annat följande projektspecifika parametrar kan vara ett underlag för beslut:\n− Konsekvenserna av ett nedslag.\n− Vem eller vilka som vistas i anläggningen (till exempel känslig verksamhet, barn, äldre och sjuka).\n− Hur många som vistas i anläggningen.\n− Människors rädsla/oro.\n− Kulturhistoriska värden.\n− Typ av byggnadsmateriel.\n− Nybyggnad eller utbyggnad.\n− Byggnadens höjd.\n− Byggnadens storlek.\n− Byggnadens höjdläge.\n− Höga föremål i omgivningen."
+  },
+  {
+   "id": "el/relaer-och-skydd/askskydd/minibrytare-mcb",
+   "path": [
+    "RELÄER OCH SKYDD",
+    "ÅSKSKYDD",
+    "MINIBRYTARE (MCB)"
+   ],
+   "text": "• Minibrytare ska ha en kortslutningshållfasthet på minst 10 kA.\n• Minibrytare ska vara godkända för säker frånskiljning (synligt brytställe).\n• Minibrytare ska ha energibegränsningsklass 3.\n• Minibrytare ska vara beröringsskyddade IP 20 vid monterad fasskena."
+  },
+  {
+   "id": "el/relaer-och-skydd/stromkannande-jordfelsbrytare-rccb",
+   "path": [
+    "RELÄER OCH SKYDD",
+    "STRÖMKÄNNANDE JORDFELSBRYTARE (RCCB)"
+   ],
+   "text": "• Jordfelsbrytare/personskyddsbrytare ska vara försedda med automatisk återstart (självåterställning) efter tillfälligt fel samt avbrottsfri motionering (självtestfunktion).\n• Jordfelsbrytare ska vara försedda med signalkontakt för felindikering.\n• Larm från jordfelsbrytare kopplas upp mot överordnat system (kopplas i serie per central och som B-larm).\n• Jordfelsbrytare ska vara stötströmssäkra och av typ A.\n• Jordfelsbrytare som kopplas i serie ska vara selektiva.\n• Vägguttag som matar apparater ingående i säkerhetsanläggningar ska ej föregås av jordfelsbrytare.\n• Vägguttag och CEE-uttag som ej matas via jordfelsbrytare (speciella undantag) ska märkas upp med texten ”Ej kopplat via jordfelsbrytare” och dokumenterad riskanalys ska utföras.\n• Kyl respektive frys ska föregås av egna jordfelsbrytare i produktionskök och mottagningskök i övrigt samordnas det med projektet och berörd verksamhet\n• Lämplig sektionering ska alltid beaktas för att undvika ofrivillig frånkoppling.\n• I vissa utrymmen (till exempel produktionskök och mottagningskök) kan det vara aktuellt att förutom uttag även skydda fast anslutna apparater via jordfelsbrytare. Samordnas med projektet, berörd verksamhet och tillverkarens rekommendationer."
+  },
+  {
+   "id": "el/relaer-och-skydd/kopplingsutrustningar",
+   "path": [
+    "RELÄER OCH SKYDD",
+    "KOPPLINGSUTRUSTNINGAR"
+   ],
+   "text": "• Vid avsäkring > 63A ska effektbrytare av pluggintyp användas. Undantag för till exempel överspänningsskydd och markskåp utomhus.\n• Effektbrytare ska vara försedda med elektroniskt reläskydd (LSI).\n• Effektbrytare ska vara försedda med utdragbar låsanordning på vredet/vippa.\n• Effektbrytare ska förses med skylt med Kabeltyp, area, längd, inställt värde och matande objekt.\n• Varje elcentral ska ha en huvudbrytare.\n• Varje grupp med diazedsäkringar typ GIII ska föregås av brytare.\n• Grupper inklusive N och PE ska anslutas till radplint med skruvanslutning och skärm ansluts till jordskena med skruvanslutning.\n• Reservutrymme ska vara minst 25% vid färdig anläggning både vid nybyggnad och utbyte av utrustning.\n• Elcentraler ska vara i plåtkapslat utförande. Kabelfläns ska ha minst 25% reservutrymme.\n• För utgående grupper ska det finnas minst 20% reservsäkringar i kopplingsutrustning, dock minst tre säkringar av varje levererad storlek.\n• Elcentraler förses med proppskåp för reservsäkringar (Diazed), dock minst tre av varje levererad storlek.\n• Kabelfack ska ha bredden minst 600 mm.\n• Ställverk ska vara försedda med ljusbågsvakter. Ljusbågsvakt ska kunna ställas av manuellt med omkopplare.\n• Driftrum med anslutning 400 A. och större ska förses med ljusbågsvakt om riskanalysen kräver det. Ljusbågsvakten ska kunna ställas av manuellt med omkopplare.\n• Ställverk ska vara försedda med förreglade jordningskopplare.\n• I ställverksrum ska det finnas nödbrytare monterad vid utgångarna.\n• I ställverksrum ska larm kopplas upp från apparater i ställverk (effektbrytare, ljusbågsvakter, nödbrytning, hjälpkraft, överspänningsskydd, avställd ljusbågsvakt med mera) till larmtablå. Från larmtablå ska A- och B-larm kopplas upp till överordnat system.\n• Apparater i ställverk och larmtablå ska matas med hjälpkraft. Hjälpkraft ska fungera i minst åtta timmar vid strömavbrott. Batterier ska ha minst tio års livslängd.\n• Ställverk ska vara försedda med multiinstrument (TRMS) för indikering av ström, spänning, frekvens, effekt för respektive fas och nolla.\n• Märkström på N-skena i ställverk ska vara 100% av fasskenorna.\n• Vid utlöst inkommande effektbrytare (huvudbrytare) i ställverk på grund av fel i anläggningen ska överliggande effektbrytare i matande ställverk lösa.\n• Reläskydd i effektbrytare ska ha egen hjälpspänning (får ej strömförsörjas via egen strömtransformator)."
+  },
+  {
+   "id": "el/relaer-och-skydd/sakerhetsbrytare-for-hogst-1-kv",
+   "path": [
+    "RELÄER OCH SKYDD",
+    "SÄKERHETSBRYTARE FÖR HÖGST 1 KV"
+   ],
+   "text": "• Säkerhetsbrytare ska vara försedd med hjälpkontakt där behov av larm finns.\n• Säkerhetsbrytare monterad utomhus ska förses med kabelförskruvning och vid behov väderskydd."
+  },
+  {
+   "id": "el/relaer-och-skydd/kabelmarkskap",
+   "path": [
+    "RELÄER OCH SKYDD",
+    "KABELMARKSKÅP"
+   ],
+   "text": "• Elservis/central utförande som markmonterat kabelskåp med tillhörande mätfack. Kabelskåp förses med säkringslastfrånskiljare.\n• Reservutrymme ska vara minst 30% vid färdig anläggning.\n• Kabelskåp ska vara utfört med cylindriskt lås typ SDC-LSE/LTC."
+  },
+  {
+   "id": "el/reservkraft/generellt",
+   "path": [
+    "RESERVKRAFT",
+    "GENERELLT"
+   ],
+   "text": "• Behov av stationär reservkraft samordnas med projektet och kommunens mål.\n• Behov av intag för mobilt reservelverk samordnas med projektet och kommunens mål.\n• Externt jordtag efter nätägarens instruktioner."
+  },
+  {
+   "id": "el/elproduktion/solcellsanlaggningar",
+   "path": [
+    "ELPRODUKTION",
+    "SOLCELLSANLÄGGNINGAR"
+   ],
+   "text": "• Behov av solcellsanläggningar samordnas med projektet och kommunens mål.\n• DC-brytning ska ske i växelriktaren mjukvara.\n• Nödstoppsknapp för växelriktaren monteras vid fastighetens brandlarmscentral.\n• Kabelvägar på tak ska vara kabelstege/trådstege i metall av korrosionssäkert material samt förses med lock.\n• Likströmskablar inomhus ska förläggas i slang på egen kabelstege/trådstege.\n• Likstömskablarnas plus och minus ska ligga i separata rör/slang.\n• Likströmskablar får ej skarvas utomhus eller i utrymmen inomhus.\n• Kablarna under panelerna får ej hänga ner mot taket.\n• Optimerare ska ej installeras.\n• Skuggning ska beaktas i projektet så att anläggningen blir så effektiv som möjligt.\n• Skyltning/Varselmärkning/Dokumentation enligt SEK HB 457 och nätägarens instruktioner.\n• Växelriktaren monteras så nära panelerna som är möjligt.\n• Anslutningskablar från växelriktare ansluts i första hand i fastighetens huvudcentral.\n• Växelriktare ska ha larmutgång och kopplas upp mot överordnat system.\n• Växelriktare ska ha separat elmätare uppkopplat mot energiövervakningssystemet (M- Bus).\n• Växelriktarens värmebelastning ska beaktas vid placering i rum.\n• Solcellsanläggningen ska förses med erforderliga åskskyddskomponenter så som överspänningsskydd med mera, både på DC- respektive AC-sida, samt på nätverksuppkoppling av växelriktare."
+  },
+  {
+   "id": "el/apparater-for-manovrering/kok-och-pentry",
+   "path": [
+    "APPARATER FÖR MANÖVRERING",
+    "KÖK OCH PENTRY"
+   ],
+   "text": "• I Pentry/kök ska det finnas minst ett uttag 230 V/16 A. som är matat via timer. Behov av fler uttag samordnas i projektet utifrån verksamhetens behov.\n• Spisvakt/Värmevakt monteras för uttag till spis/häll.\n• Spisvakt/värmevakt ska vara fastanslutna (ej innehålla batterier)."
+  },
+  {
+   "id": "el/apparater-for-manovrering/storkok",
+   "path": [
+    "APPARATER FÖR MANÖVRERING",
+    "STORKÖK"
+   ],
+   "text": "• Kraftutrustning för anläggningar som betjänar köksutrustning ska styras centralt via manöverbrytare med signalindikering. Anläggningar ska utföras med nollspänningsutlösning (manuell återstart efter strömbortfall).\n• För utrustning inom storkök ska styrning uppdelas i flera steg, till exempel grytor, stekbord, ugnar, diskmaskiner med mera.\n• Behov av styrning från kökssläcksystem ska samordnas (SBF 508:1)."
+  },
+  {
+   "id": "el/apparater-for-manovrering/slojd",
+   "path": [
+    "APPARATER FÖR MANÖVRERING",
+    "SLÖJD"
+   ],
+   "text": "• Slöjdsal textil, symaskiner och strykjärn inom respektive enhet och styrs av lokal nyckelmanövrerad brytare.\n• Slöjdsal trä, metall; teknikcentral för maskinutrustning och dylikt utförs inom respektive enhet och styrs av lokal nyckelmanövrerad brytare samt nödstoppanläggning i kombination med nollspänningsutlösning."
+  },
+  {
+   "id": "el/eluttag/generellt",
+   "path": [
+    "ELUTTAG",
+    "GENERELLT"
+   ],
+   "text": "• I teknikrum (fläktrum, elrum, elnisch, undercentraler, ställverk och liknande utrymmen) ska minst ett tvåvägsuttag 230V/16A och ett trefasuttag 400V/16A installeras.\n• I eller bredvid nya elcentraler ska serviceuttag 230V/16A installeras.\n• Bredvid automatikskåp för ventilation ska serviceuttag 230V installeras.\n• Städuttag 230V/16A ska installeras på egen grupp (max sex per grupp).\n• Städuttag ska installeras med max 15 meters mellanrum där behovet finns i övrigt samordnas det med verksamheten och i projektet.\n• I skolor och idrottsanläggningar ska slimmade vägguttag användas. Uttag med påbyggnadsramar ska undvikas.\n• Uttag för diskmaskiner dimensioneras för framtida behov av snabbdiskmaskiner. Samordnas i projektet utifrån verksamhetens behov."
+  },
+  {
+   "id": "el/laddplatser/elbilsladdning",
+   "path": [
+    "LADDPLATSER",
+    "ELBILSLADDNING"
+   ],
+   "text": "• Omfattning av laddplatser för elbilar samordnas med verksamheten, projektet, BBR och kommunens mål.\n• Billaddare ska ha gemensam elmätare uppkopplat mot energiövervakningssystemet (M- Bus).\n• Elbilsladdarna kopplas som ett stjärnnät med gemensamt apparatskåp/markskåp.\n• Laddplats för verksamhetsbilar skyltas tydligt för sitt ändamål.\n• Elbilsladdare ska ha RFID läsare."
+  },
+  {
+   "id": "el/laddplatser/laddplatser-ovrigt",
+   "path": [
+    "LADDPLATSER",
+    "LADDPLATSER ÖVRIGT"
+   ],
+   "text": "• Omfattning av laddplatser för mobiltelefoner, datorer och surfplattor samordnas med verksamheten och i projektet.\n• Laddplatser för laddvagnar matas med 230V/16A. Uttag och märks tydligt för sitt ändamål.\n• Omfattning av laddplatser/laddrum för elcyklar/elfordon samordnas med verksamheten, projektet och kommunens mål.\n• Omfattning av laddplatser för städmaskiner samordnas med verksamheten. Uttag märks tydligt för sitt ändamål."
+  },
+  {
+   "id": "el/belysning/generellt",
+   "path": [
+    "BELYSNING",
+    "GENERELLT"
+   ],
+   "text": "• Belysningsanläggningar ska projekteras och utformas enligt Ljus och Rum samt"
+  },
+  {
+   "id": "el/belysning/generellt/ss-en-12464-1",
+   "path": [
+    "BELYSNING",
+    "GENERELLT",
+    "SS-EN 12464-1."
+   ],
+   "text": "• Armaturer ska vara bestyckade med LED-ljuskällor.\n• LED-armaturer ska ha en livslängd L80 på minst 70 000 timmar\n• LED-armaturer ska ha en färgåtergivning Ra på minst 80.\n• I första hand ska armaturer med utbytbara LED -ljuskällor och drivdon användas.\n• Belysningsarmaturer ska lätt kunna bytas ut vid fel."
+  },
+  {
+   "id": "el/belysning/belysningsstyrning",
+   "path": [
+    "BELYSNING",
+    "BELYSNINGSSTYRNING"
+   ],
+   "text": "• Styrningar ska i huvudsak utföras med aktiv tändning och närvarostyrt samt vara enkla och användarvänliga både för användare och underhållspersonal.\n• Rum med sektionerade belysningsfunktioner ska kunna styras separat (Till exempel tavla, allmänbelysning)\n• I vissa utrymmen kan ljudstyrning vara aktuellt. Samordnas med projektet och kommunens energisparmål.\n• Adresserade armaturer ska undvikas för att underlätta underhåll och utbyte (undantag om en viss funktion efterfrågas som ej går att lösa på annat sätt).\n• Belysning i teknikrum (elrum, ställverk, undercentraler och fläktrum) ska styras med strömställare.\n• Belysningen ska kunna sektioneras och olika belysningsstyrkor väljas om det anses kunna spara energi. Till exempel städljus eller låg nattbelysning för nattpersonal på boenden. Dagsljuskompensering kräver noggrann injustering och projektering."
+  },
+  {
+   "id": "el/belysning/utomhusbelysning",
+   "path": [
+    "BELYSNING",
+    "UTOMHUSBELYSNING"
+   ],
+   "text": "• Utomhusbelysning ska sektioneras som fasadbelysning, parkbelysning, skyltbelysning och lekplatsbelysning för att kunna ljusregleras eller släckas ner var för sig.\n• Utomhusbelysning ska styras via ljusreläsignal och tidkanal via DUC. Omkopplare H-0-A placeras på samma plats."
+  },
+  {
+   "id": "el/belysning/utomhusbelysning/nodbelysning",
+   "path": [
+    "BELYSNING",
+    "UTOMHUSBELYSNING",
+    "NÖDBELYSNING"
+   ],
+   "text": "• Installeras med omfattning enligt brandskyddsbeskrivning.\n• Armaturer ska vara bestyckade med LED-ljuskälla.\n• Centralmatat system ska användas.\n• Växelriktare/centralapparat ska vara försedd med larmutgång som kopplas upp mot överordnat system.\n• Adresserade armaturer ska undvikas.\n• Batterier och kondensatorer i armaturerna ska undvikas i större anläggningar med fler än tio skyltar.\n• Armaturer av plast som utsätts för direkt sol och regn ska ha väderskydd.\n• Samtliga armaturer ID-märks och kontrolljournal, OR-ritning och identitetslista monteras vid det centralmatande aggregatet."
+  },
+  {
+   "id": "el/kontroll-och-injustering/provning",
+   "path": [
+    "KONTROLL OCH INJUSTERING",
+    "PROVNING"
+   ],
+   "text": "• Samtliga system ska provas och dokumenteras i daterade och signerade provningsprotokoll som överlämnas till beställaren.\n• Samordnad provning ska utföras.\n• Kalibreringsintyg för mätinstrument som använts vid mätningar ska uppvisas vid anmodan.\n• Mätning med värmekamera kräver diplomerad eller certifierad personal."
+  },
+  {
+   "id": "el/kontroll-och-injustering/injustering",
+   "path": [
+    "KONTROLL OCH INJUSTERING",
+    "INJUSTERING"
+   ],
+   "text": "• Metod och omfattning av injustering avgörs vid projektering och anges i förfrågningsunderlag och bygghandling.\n• Injusteringsvärden ska anges i protokoll och på ritning."
+  },
+  {
+   "id": "el/ovrigt/ledningsberakningar",
+   "path": [
+    "ÖVRIGT",
+    "LEDNINGSBERÄKNINGAR"
+   ],
+   "text": "• Ledningsberäkningar ska uppfylla i standard angivna värden beträffande spänningsfall, utlösningsvillkor och kortslutningsströmmar. Erforderliga beräkningar och mätningar ska utföras. Beräkningsresultat och mätprotokoll ska redovisas. Selektivitet ska utföras i hela anläggningen (det vill säga att överström- och överlastskydd närmast felkällan löser först). Beräkningsresultat ska redovisas till beställaren innan installation påbörjas."
+  },
+  {
+   "id": "el/ovrigt/driftrum",
+   "path": [
+    "ÖVRIGT",
+    "DRIFTRUM"
+   ],
+   "text": "• Vissa utrymmen i en byggnad klassas som driftrum (vem som helst ska inte ha tillträde till rummet). Exempel på driftrum kan vara ställverksrum, reservelverksrum, transformatorrum och batterirum.\n• Tele-, PA- och datautrustning placeras inte i driftrum.\n• Driftrum ska ha egen dörr ut i det fria (för att underlätta tillträde för driftpersonal).\n• För att kunna ansluta huvudledningar (som förläggs i golv/mark) till/från ställverk så ska det finnas ett installationsgolv, som även är åtkomligt i framtiden för tillkommande ledningar.\n• Installationsgolvet reglar ska vara av obrännbart material och golvplattor ska va lätt demonterbara för enkel tillgång till kablarna.\n• Central större än 600A för inkommande huvudledning byggs som fördelningscentral\n• Avstånd framför utrusning i driftrum ska vara 2 meter."
+  },
+  {
+   "id": "el/ovrigt/elrum-elcentraler",
+   "path": [
+    "ÖVRIGT",
+    "ELRUM / ELCENTRALER"
+   ],
+   "text": "• Avstånd framför väggmontrar elcentral ska vara minst 1,2 meter.\n• Avstånd framför centraler av typen golvskåp ska vara minst 2 meter.\n• Vid montering av utrustning på motstående vägg ska avståndet mellan utrustningarna vara minst 2,0 meter.\n• Vid större centraler över 600A kan även installationsgolv krävas i Elrum"
+  },
+  {
+   "id": "el/ovrigt/elnisch",
+   "path": [
+    "ÖVRIGT",
+    "ELNISCH"
+   ],
+   "text": "• Dörr till elnischer ska vara större än centralens bredd och höjd.\n• Utrymme i överkant mellan Dörrkarm/Vägg insida och centralens framkant ska vara minst 50 cm för åtkomst vid kabeldragning både under montage och framtida utökning."
+  },
+  {
+   "id": "el/ovrigt/pa-anlaggning",
+   "path": [
+    "ÖVRIGT",
+    "PA-ANLÄGGNING"
+   ],
+   "text": "• PA-anläggningar placeras i egen nisch.\n• PA-anläggningars värmebelastning ska beaktas."
+  },
+  {
+   "id": "el/ovrigt/kortslutningsuppgifter",
+   "path": [
+    "ÖVRIGT",
+    "KORTSLUTNINGSUPPGIFTER"
+   ],
+   "text": "• Skylt med uppgifter om kortslutningsström och impedans ska sitta på huvudcentralen (nätägarens överlämningspunkt)."
+  },
+  {
+   "id": "el/ovrigt/ex-miljo",
+   "path": [
+    "ÖVRIGT",
+    "EX-MILJÖ"
+   ],
+   "text": "• Se SEK Handbok 427 och de europeiska standarder som ligger som grund.\n• Klassningsplan ska upprättas."
+  },
+  {
+   "id": "el/ovrigt/service-under-garantitid",
+   "path": [
+    "ÖVRIGT",
+    "SERVICE UNDER GARANTITID"
+   ],
+   "text": "• Service och underhåll av apparater under garantitid ska utföras enligt fabrikantens anvisningar. Dokument över serviceintervall för berörda apparater inhämtas av entreprenören från fabrikanten och överlämnas till beställaren vid slutbesiktning. Vem som ska utföra service och underhåll bestäms i projektet.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

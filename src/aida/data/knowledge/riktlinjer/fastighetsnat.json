@@ -1,0 +1,144 @@
+{
+ "doc": "fastighetsnat",
+ "title": "Riktlinje Fastighetsnät",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-Fastighetsnät-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "fastighetsnat/att-tanka-pa",
+   "path": [
+    "ATT TÄNKA PÅ"
+   ],
+   "text": "• Fastighetsnätet ska uppfylla senaste utgåvan av standarden SS-EN 50173.\n• Det kan finnas fall där det är nödvändigt att ta hänsyn till befintliga anläggningar vid kompletteringar, detta beslutas i samråd med beställaren."
+  },
+  {
+   "id": "fastighetsnat/principer",
+   "path": [
+    "PRINCIPER"
+   ],
+   "text": "• Fastighetsnät ska minst uppfylla länkklass EA.\n• Installatör/företag ska vara certifierad av tillverkaren för produkterna samt ha genomgått utbildning för installation av de ingående komponenterna som nyttjas vid installationen."
+  },
+  {
+   "id": "fastighetsnat/utformning",
+   "path": [
+    "UTFORMNING"
+   ],
+   "text": "• Omfattning av fastighetsnätets avseende, antalet uttag och dess placering utreds i samband med projektering i varje specifikt fall. De redovisas i förfrågningsunderlag och/eller rumsbeskrivning."
+  },
+  {
+   "id": "fastighetsnat/kopparnat",
+   "path": [
+    "KOPPARNÄT"
+   ],
+   "text": "• Nätet ska vara skärmat och minst uppfylla prestandakrav för länklass EA. Kabel för spridningsnät ska vara av typ minst F/UTP.\n• Samtliga anslutningskablar ska vara skärmade och av typ minst kategori 6A."
+  },
+  {
+   "id": "fastighetsnat/kopparnat/korskopplingspanel",
+   "path": [
+    "KOPPARNÄT",
+    "KORSKOPPLINGSPANEL"
+   ],
+   "text": "• Korskopplingspaneler för kopparbaserad ledning ska vara i 19” utförande för 8-poliga RJ45 modularuttag."
+  },
+  {
+   "id": "fastighetsnat/kopparnat/modularuttag",
+   "path": [
+    "KOPPARNÄT",
+    "MODULARUTTAG"
+   ],
+   "text": "• Modularuttag för kopparbaserad kabel ska vara minst typ 8-poliga RJ45.\n• 8-poliga RJ45 modularuttag ska uppfylla kraven för kategori 6A i SS-EN 50173.\n• Samtliga modularuttag ska vara kontakterade enligt standarden TIA568-B."
+  },
+  {
+   "id": "fastighetsnat/fibernat",
+   "path": [
+    "FIBERNÄT"
+   ],
+   "text": "• Installation av optisk fiber ska vara utförd och ha prestanda vara enligt den senaste utgåvan av SS-EN 50173.\n• Endast Singelmodekabel ska användas.\n• SC/UPC och mellanstycken ska vara av dubbel typ.\n• Antalet fiberpar mellan överlämningsplats och fastighetens korskoppling beslutas i varje anläggning i samråd med beställaren.\n• Om flera korskopplingar finns inom fastigheten ska antalet fiber mellan de olika korskopplingarna utredas samt beslutas i samråd med beställaren.\n• Antalet kontakterade fiberpar utreds samt beslutas i samråd med beställaren."
+  },
+  {
+   "id": "fastighetsnat/fibernat/kontaktering-och-skarvning",
+   "path": [
+    "FIBERNÄT",
+    "KONTAKTERING OCH SKARVNING"
+   ],
+   "text": "• All kontaktering och skarvning av fiber ska utföras med fiberoptisk svets."
+  },
+  {
+   "id": "fastighetsnat/fibernat/dragavlastning",
+   "path": [
+    "FIBERNÄT",
+    "DRAGAVLASTNING"
+   ],
+   "text": "• Den fiberoptiska kabeln dragavlastas vid ingång av panel/box."
+  },
+  {
+   "id": "fastighetsnat/fibernat/blindpluggar",
+   "path": [
+    "FIBERNÄT",
+    "BLINDPLUGGAR"
+   ],
+   "text": "• Outnyttjade hål i fiberbox/fiberpanel skall förses med blindplugg."
+  },
+  {
+   "id": "fastighetsnat/fibernat/dammskydd",
+   "path": [
+    "FIBERNÄT",
+    "DAMMSKYDD"
+   ],
+   "text": "• Alla mellanstycken ska vara försedda med dammskydd när de inte är i bruk."
+  },
+  {
+   "id": "fastighetsnat/skap-och-stativ",
+   "path": [
+    "SKÅP OCH STATIV"
+   ],
+   "text": "• I olåsta eller allmänt tillgängliga korskopplingsutrymmen ska låsbara skåp användas, låssystemet tillhandahålls av beställaren.\n• I låsta utrymmen så som teknikrum, elnisch, telerum ska det installeras stativ.\n• Stativ och skåp ska funktionjordas till närmaste el-central.\n• I stativ och skåp ska enbart kardborreband användas för koppar samt fibernät.\n• Vid nyinstallation ska stativ ha en bredd av 482 mm samt ett djup av minst 350 mm. Skåp ska ha en bredd av 600 mm samt ett djup av minst 400 mm."
+  },
+  {
+   "id": "fastighetsnat/skap-och-stativ/askskydd",
+   "path": [
+    "SKÅP OCH STATIV",
+    "ÅSKSKYDD"
+   ],
+   "text": "• Överspänningsskydd av typ finskydd ska installeras vid varje skåp och/eller stativ."
+  },
+  {
+   "id": "fastighetsnat/skap-och-stativ/val-av-skap-stativ",
+   "path": [
+    "SKÅP OCH STATIV",
+    "VAL AV SKÅP/STATIV"
+   ],
+   "text": "• Skåp och stativ ska vara anpassade för 19” utrustning.\n• Om antalet kopparförbindelser understiger 49 kan ett litet väggskåp väljas (minst 9u).\n• Om antalet kopparförbindelser överstiger 48 ska ett golvskåp väljas.\n• Stativ ska monteras med mittenmonterat stödben.\n• Val av skåp, så som golvmonterat eller väggmonterat görs i samråd med beställaren."
+  },
+  {
+   "id": "fastighetsnat/skap-och-stativ/stativuppbyggnad",
+   "path": [
+    "SKÅP OCH STATIV",
+    "STATIVUPPBYGGNAD"
+   ],
+   "text": "• Fiberpanel placeras högst upp i stativen. TP-panel placeras under fiberpanel. Lämpligt antal platser ska finnas för aktiv utrustning.\nExempel på stativ Exempel på skåp"
+  },
+  {
+   "id": "fastighetsnat/provning",
+   "path": [
+    "PROVNING"
+   ],
+   "text": "• Entreprenören ska utföra prov och mätningar som verifieras med protokoll. I protokoll ska det anges typ av instrument och aktuell mjukvara som använts samt när instrumentet senast var kalibrerat."
+  },
+  {
+   "id": "fastighetsnat/kopparnat-2",
+   "path": [
+    "KOPPARNÄT"
+   ],
+   "text": "• För spridningsnät ska mätning utföras med Level IIIe instrument. Samtliga länkar ska mätas med godkänt resultat.\n• Samtliga mätvärden ska uppfylla kraven för permanent länkklass EA enligt senaste utgåvan av SS-EN 50173."
+  },
+  {
+   "id": "fastighetsnat/fibernat-2",
+   "path": [
+    "FIBERNÄT"
+   ],
+   "text": "• På samtliga installerade fiberkanaler ska dämpningsmätning utföras, 1310/1550 i båda riktningar.\n• När kabellängd överstiger 500 meter ska OTDR mätning utföras.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

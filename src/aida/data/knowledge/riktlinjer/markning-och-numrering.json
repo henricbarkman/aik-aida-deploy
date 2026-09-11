@@ -1,0 +1,540 @@
+{
+ "doc": "markning-och-numrering",
+ "title": "Riktlinje Märkning och numrering",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-Märkning-och-numrering-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "markning-och-numrering/att-tanka-pa",
+   "path": [
+    "ATT TÄNKA PÅ"
+   ],
+   "text": "• Vid ombyggnader kan hänsyn behöva tas till befintliga system. Mer information finns\n• Löpnummer för system är normalt alltid tvåsiffriga. på karlstad.se\n• Vid angivelse av byggnadsnummer ska alltid huvudsystemets placering vara styrande.\n• Samma beteckningar ska användas vid märkning ute i byggnader som vid kommunikation mellan datorundercentral och datorhuvudcentral.\n• Denna riktlinje innefattar främst märkning och skyltning avseende Karlstads kommuns teknik. Information om skyltar, orienteringstavlor, informationstavlor Grafiska handbok och liknande presenteras i Karlstads kommun Grafisk handbok, finns tillgänglig på senaste version. karlstad.se"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/principer",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "PRINCIPER"
+   ],
+   "text": "Märkning av system, komponenter med mera är uppbyggt utifrån följande grundprincip:\nObjektnummer Byggnad (A–Ö) - System Löpnummer (01–99) - Komponent Löpnummer/beskrivning\nExempel: 1601A-LA01-GT4 Märkning utförs för identifiering, 1601 Frödingskolan därför krävs en A Byggnad A ändamålsenlig, samordnad och LA01 Luftbehandlingsaggregat LA01 enhetlig märkning. GT4 Temperaturgivare\nOm en komponent, utrustning eller liknande inte tillhör ett system utesluts systembeteckning enligt nedanstående exempel:\nExempel: 1601A-DS1\n1601 Frödingskolan A Byggnad A DS1 Dragskåp 1"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/objekt",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "OBJEKT"
+   ],
+   "text": "Objekten betecknas med ett fyrsiffrigt objektsnummer.\n• Information om vilket objektsnummer respektive fastighet har, fås av teknik- och fastighetsförvaltningens informationsförvaltare."
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/byggnad",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "BYGGNAD"
+   ],
+   "text": "Varje byggnad betecknas med en bokstav. Huvudbyggnaden betecknas A, därefter B, C, och så vidare, medsols. Mark och information som är gemensam för objektet betecknas 0 (noll) där det krävs, till exempel i filnamn. Byggnadsdelar numreras 1, 2, 3, och så vidare inom en byggnad.\nÄldre byggnadsindelning får inte ändras vid ombyggnation.\nExempel på numrering:"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/plan",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "PLAN"
+   ],
+   "text": "Vid nybyggnation numreras våningsplan enligt ISO 4157-1. Våningsplan 1 är första användbara våning. Takplan används då det finns installationer på taket. I befintliga byggnader ändras inte våningsplanens numrering.\nPlannamn utgörs av Plan och numret på planet, som till exempel ”Plan 01” och ”Plan 02”."
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/utrymme",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "UTRYMME"
+   ],
+   "text": "Nybyggnation\nVid nybyggnation numreras utrymme (rum/lägenhet) medurs med början vid huvudentrén med tre siffror där första siffran motsvarar våningsplan enligt ISO 4157-2.\nRum n00 reserveras för exteriören på planet. Trappor, hissar, schakt och andra utrymmen som är vertikalt genomgående i byggnaden tilldelas samma nummer (som 199, 299, 399.) på varje plan. Företrädesvis används serie n99, n98, n97, och så vidare för att underlätta numreringen på övriga plan. Rumsnummer får utelämnas för framtida bruk eller där det är logiskt.\nLägenheter\nLägenheter numreras med prefix L och enligt formen Ln01 (där n är våningsplan).\nStörre byggnader\nVid större byggnader kan rums- och lägenhetsnummer utökas med ett tecken, som n001 och n002. Byggnadsdelar får inte användas i vid numrering av utrymmen, men kan förekomma i befintliga byggnader. I befintliga byggnader ändras normalt inte numrering av utrymmen.\nNamnsättning av utrymme\nFör information om vilka rumsnamn teknik- och fastighetsförvaltningen använder för respektive utrymme, se förteckning längst bak i denna riktlinje.\nExempel på numrering och namnsättning:\nNummer Namn Förklaring 302 Korridor Stagnellska, Stjärnhuset, korridor, plan 3 399 Hiss Stagnellska, Stjärnhuset, hiss, plan 3 L302 Lägenhet Stagnellska, Stjärnhuset, lägenhet 2, plan 3\nVid om- och tillbyggnader ska numrering av utrymmen och lägenheter alltid ske i samråd med Karlstads kommun. Generellt gäller att tillkommande rum, exempelvis vid tillbyggnad, ges första lediga nummer efter det sista i serien. Vid delning av rum tilldelas normalt det nya rummet samma rumsnummer som det ursprungliga rummet följt av en bokstav som tilläggsbeteckning (A, B, och så vidare). Nummerserien bör inte brytas eftersom allmänheten ofta besöker våra lokaler."
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/utrymme/komponenter-och-utrustning",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "UTRYMME",
+    "KOMPONENTER OCH UTRUSTNING"
+   ],
+   "text": "System, komponenter och utrustning ska märkas upp och betecknas enligt denna riktlinje. Detta avsnitt redogör för de respektive beteckningar som ska användas vid uppmärkning."
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/brand",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "BRAND"
+   ],
+   "text": "Beteckningar\nSystem Komponent Förklaring Kommentar BS Brandlarmsystem BD Branddörr BFT Brandförsvarstablå CA Centralapparat BL Brandgasevakueringslucka IT Informationstablå LS Larmsändare KFA Kontrollenhet och fördröjningsanordning"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/el-sakerhet",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "EL-SÄKERHET"
+   ],
+   "text": "Beteckningar\nSystem Komponent Förklaring Kommentar ILS Inbrottslarmsystem CA Inbrottslarmcentral LS Larmsändare MAP Manöverpanel PKS Passerkontrollsystem UC Undercentral DC Dörrcentral ÖK Öppnaknapp LS Larmsändare\nEL"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/el-sakerhet/principer",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "EL-SÄKERHET",
+    "Principer"
+   ],
+   "text": "• Mätare namnges enligt principer under rubriken ”MÄTARE”.\n• Märkning självtestande JFB exempelvis: T1SB1B1-SJFB1, T1SB1B1-SJFB2 och så vidare.\nBeteckningar\nSystem Komponent Förklaring Kommentar EKS Elkraftssystem HSS Högspänningsställverk Driftrum HSB Högspänningsbrytare Driftrum T Transformator Driftrum LSS Lågspänningsställverk Driftrum UPS Hjälpkraft UPS HKB Hjälpkraft batterier HKE Hjälpkraft elverk ELC Elcentral El-rum, El-nisch JFB Jordfelsbrytare SJFB Självtestandejordfelsbrytare ÖSP Överspänningsskydd ELVS Elvärmesystem ELV Elvärmebatteri BELS Belysningssystem BA Belysningsarmatur NBEL Nöd- och hänvisningssystem Inbyggt batteri/kondensator CNBEL Centralmatat Centralt batteri och laddare. nödbelysningssystem ANBEL Adresserat nödbelysningssystem NA Nödbelysningsarmatur HA Hänvisningsarmatur HAR Hänvisningsarmatur med rullstol NHA Nöd- och hänvisningsarmatur"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/hiss-och-maskin/principer",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "HISS OCH MASKIN",
+    "Principer"
+   ],
+   "text": "• Hissar, portar, dörrautomatik och roterande dörrar märks som system.\n• Exempel: 1606A-HISS01, 1606A-PORT01.\n• Lingångar, lyftbord med flera märks som del av ett lyftsystem.\n• Exempel: 1606A-LS01-RV1.\nBeteckningar\nSystem Komponent Förklaring Kommentar HISS Hissystem PORT Portsystem DA Dörrautomatiksystem RD Roterande dörrsystem LS Lyftsystem MPL Mobil arbetsplattform RV Ridåvägg RT Rulltrappa LG Lingång LB Lyftbord TLF Telfer TRH Trapphiss TRV Travers SPL Stationär arbetsplattform"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/kok/principer",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "KÖK",
+    "Principer"
+   ],
+   "text": "• Med kök menar vi utrymme med utrustning av storkökskaraktär.\n• Varje kök hanteras som en enhet där köket i sig likställs med ett system.\n• Flera olika kök i samma fastighet ger märkning 1606A-KÖK01, 1606A-KÖK02.\n• Köksutrustning märks 1606A-KÖK01-KG1 vilket ger Kokgryta 1 tillhörande Kök01 som är placerad i Byggnad A på objektet 1606 Frödingskolan.\nBeteckningar\nSystem Komponent Förklaring Kommentar"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/kok",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "KÖK"
+   ],
+   "text": "Storkök BM Blandningsmaskin DM Diskmaskin DMH Huvdiskmaskin DMT Tunneldiskmaskin FR Frysrum FS Frysskåp KB Kylbänk KD Kyldisk KFS Kyl och frysskåp Kombinerat KG Kokgryta KR Kylrum KS Kylskåp NS Nedkylningsskåp SB Stekbord SP Spis SPH Spishäll UGN Ugn"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/mark/principer",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "MARK",
+    "Principer"
+   ],
+   "text": "• Varje lekplats hanteras som en enhet där lekplatsen i sig likställs med ett system.\n• Flera olika lekplatser på samma fastighet ger märkning 16060-LEK01, 16060-LEK02.\n• Lekutrustning märks 16060-LEK01-GB1 vilket ger gungbräda 1 tillhörande lekplats 01 som är placerad på marken på 1606 Frödingskolan.\nBeteckningar\nSystem Komponent Förklaring Kommentar LEK Lekplats BR Balansredskap FG Fjädergunga GB Gungbräda G Gunga HB Hinderbana KA Karusell Redskap som snurrar KL Klätterlek KS Klätterställning LB Lekbord LH Lekhus LB Linbana RL Rollek Bil, båt, isbjörn med mera RB Rutschbana SL Sandlåda"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/styr-och-overvakning",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "STYR OCH ÖVERVAKNING"
+   ],
+   "text": "Beteckningar System Komponent Förklaring Kommentar AS Apparatskåp DHC Datahuvudcentral DUC/DDC Dataundercentral RC Reglercentral"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/ventilation/principer",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "VENTILATION",
+    "Principer"
+   ],
+   "text": "• Givare, ställdon, styrventiler har egen märkning enligt följande exempel:\n− Givare i tilluften i LA01 ska heta A-LA01-GT1.\n− Om en temperaturgivare används i ett rum heter givaren A-LA01-GT4. Om flera temperaturgivare används i ett rum namnges givarna A-LA01-GT4:1, A-LA01-GT4:2 och så vidare.\n− Desamma gäller tryckgivare, flödesgivare, spjällmotorer och liknande.\n• Enhetsaggregat som kopplas upp mot överordnat system ska märkas enligt Karlstads kommuns standard. Aggregat som ej kopplas upp kan använda leverantörens märkning. Stäms av med beställaren.\nBeteckningar\nSystem Komponent Förklaring Kommentar BG Brandgas-/evakueringssystem CS Cirkulationssystem FA Frånluftsaggregat Ej kopplade till system FS Frånluftssystem LA Luftbehandlingssystem LK Luftkylare Ej kopplade till system LV Luftvärmare Ej kopplade till system LR Luftreningsaggregat TS Tilluftssystem TA Tilluftsaggregat Ej kopplade till system ÅV Återvinningssystem ÖA Överluftsaggregat Ej kopplade till system BBGS Brand/Brandgasspjäll BGS Brandgasspjäll BBSS Brandbackströmningsspjäll CA Cirkulationsaggregat CF Cirkulationsfläkt DS Dragskåp EXP Expansionskärl FA Frånluftsaggregat FD Frånluftsdon FF Frånluftsfläkt FLK Fläktluftkylare\nSystem Komponent Förklaring Kommentar FLV Fläktluftvärmare FLK/V Fläktluftkylare/värmare GF_ Flödesgivare 1 Tilluft 2 Frånluft GL_ Läge-, nivågivare 3 Påfrostning GM_ Fuktgivare 4 Rum 5 Avluft GN_ Närvarogivare 6– GP_ Tryckgivare 7 Uteluft 8 Frysvakt GS_ Hastighetsgivare 9 Ute GT_ Temperaturgivare GX_ Koncentrationsgivare KÅPA Kåpa LD Ljuddämpare LF Luftfuktare LK Luftkylare LR Luftreningsaggregat LV Luftvärmare NL Nödlarm PU Punktutsug P Pump RD Rökdetektor SHG Shuntgrupp ST_ Ställdon för spjäll 1 Tilluft 2 Frånluft 3 ByPass 4 Övrigt SV_ Styrventil alternativ ställdon för 1 Värme ventil 2 Kyla SPA Spånsugsaggregat TA Tilluftsaggregat TD Tilluftdon TF Tilluftsfläkt TH Takhuv TM Timer Funktion ska anges på skylt vid komponent, t.ex. ”förlängd drift ventilation”,”forcerad ventilation” TAS Tryckavlastningsspjäll VVX Värmeväxlare YG Ytterväggsgaller ÖD Överluftdon"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/vs-gas-och-kyla/principer",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "VS, GAS OCH KYLA",
+    "Principer"
+   ],
+   "text": "• Pumpar namnges med hjälp av löpnummer: P1, P2, P3 och så vidare.\n• Tvillingpumpar namnges VP01-P1:1, VP-P1:2.\n• Mätare namnges enligt principer under rubriken ”MÄTARE”.\n• Om flera givare används på samma system namnges givarna A-VV01-GT1:1, A-VV01- GT1:2 och så vidare.\n• Värme-/kylsystem, system som inte har några undersystem benämns VS01/KB01.\nSystem med underliggande system så benämns huvudsystemet VP01/KP01 och därefter underliggande shuntade system VS01, VS02/KB01, KB02 osv.\nBeteckningar\nSystem Komponent Förklaring Kommentar BA Bevattningsanläggning D Dagvattensystem DR Dräneringssystem FR Frysrum GA Gas, Gasol KA Kylaggregat Sammansatta KB Köldbärarsystem KM Kylmediesystem KP Kylsystem primär KV Kallvattensystem KY Kylanläggning LT Luft, tryckluftssystem PG Pumpgropssystem S Spillvattensystem SPR Sprinkleranläggning VA Varmluftsaggregat VMP Värmepumpsystem VP Värmesystem primär VR Vattenreningssystem VS Värmesystem sekundär VV Varmvattensystem VVC Varmvattensystem cirkulation AB Avloppsbrunn\nSystem Komponent Förklaring Kommentar AVG Undertrycksavgasare EXP Expansionskärl FA Fettavskiljare FJV Fjärrvärmecentral FJK Fjärrkylecentral GF_ Flödesgivare Givarna löpnummerhanteras enligt nedan: GL_ Läge-, nivågivare GT1, GT2, GT3 och så vidare. GM_ Fuktgivare Givarbeteckningarna ger ingen information om funktion såsom GN_ Närvarogivare kontinuerligt reglerande eller GP_ Tryckgivare liknande.\nGS_ Hastighetsgivare GT_ Temperaturgivare GX_ Koncentrationsgivare KK Kylkompressor KMK Kylmedelskylare LK Luftkompressor P Pump RF Ridåfläktar SHG Shuntgrupp SV_ Styrventil alternativ ställdon för 1 Värme ventil 2 Kyla VKA Vatten/vätskekylaggregat VMP Värmepump Del av system VVÄ Vattenvärmare"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/matare/principer",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "MÄTARE",
+    "Principer"
+   ],
+   "text": "• Samtliga mätare har i början av mätarnamnet sitt förvaltningsobjektsnummer samt byggnadsspecifika bokstav. Bokstaven relaterar till i vilken byggnad som mätaren sitter.\n• Elmätare (ELM) döps efter i vilken elcentral mätaren är placerad samt löpnummer utifrån antalet mätare i aktuell elcentral. Där en elmätare finns till för att mäta specifika delar så som solel, värmepump, elpanna, huskroppar, apparatskåp och så vidare så läggs en förkortning/ett mindre antal tecken till för att efter bästa förmåga beskriva detta. Exempel: Sol, VMP, HusA, ELP, AS01, KÖK och så vidare. Saknas ett tydligt betjäningsområde för installerad mätare kan dessa tecken/förkortningar utlämnas. När mätare inte är placerade i elcentral anges endast betjäningsområde, placering utlämnas. Vid behov kan mer detaljerade namn behöva tas fram. I byggprojekt görs detta lämpligast i samband med att mätplan för fastigheten upprättas. I övriga fall i samråd med beställare. Exempel: 1159B-A1-Kök-ELM1\n• Energi och vatten döps efter vad de mäter (värmeenergi, kylenergi, varmvatten, kallvatten), vad de betjänar samt löpnummer utifrån antalet mätare av samma mättyp per system. Mätartyper: VMM (värmmängdsmätare energi), KMM (Kylmängdsmätare energi), VVM (varmvattenmätare m³), KVM (Kallvattenmätare m³). Exempel: 1159H-VP01-VMM1,"
+  },
+  {
+   "id": "markning-och-numrering/att-tanka-pa/matare/1159b-vv01-vvm1",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "MÄTARE",
+    "1159B-VV01-VVM1"
+   ],
+   "text": "Beteckningar\nSystem Komponent Förklaring Kommentar ELM Elmätare KMM Kylmängdsmätare KVM Kallvattenmätare VMM Värmemängdsmätare VVM Varmvattenmätare"
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/skylt-for-utrymmen",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "SKYLT FÖR UTRYMMEN"
+   ],
+   "text": "Alla utrymmen såsom klassrum, grupprum, arbetsrum där två eller flera Ventilationsentreprenör än två personer har sin arbetsplats samt samlingssalar eller liknande ska har ansvaret för att ta märkas upp av entreprenören. Skylten ska tydligt visa hur många personer fram samt montera skyltar vad gäller antal lokalen är anpassad för, samt i vilket avseende anpassningen gäller. personer i lokal. Exempelvis ventilation, utrymning etcetera. I samlingssalar, matsalar, idrottssalar eller liknande ska även skylt monteras för maximalt antal personer som får vistas där. Skyltarna ska placeras i det utrymme de är avsedda för.\nSe skyltexempel nedan."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/skyltlista",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "SKYLTLISTA"
+   ],
+   "text": "• Skyltlista ska upprättas av entreprenören och levereras till projekt-/uppdragsansvarig för godkännande innan tillverkning påbörjas."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/utformning-av-markskyltar/for-utrymmen",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "UTFORMNING AV MÄRKSKYLTAR",
+    "FÖR UTRYMMEN"
+   ],
+   "text": "• Skyltar ska utformas med svart text på vit botten. Specificera redan\n• Skyltar ska vara av 2-skikts plastlaminat med vitt ytskikt och under programskedet hur många personer svarta graverade bokstäver eller siffror. en lokal ska vara anpassad för.\n• Skyltar ska vara av sådan kvalitet att de inte slår sig.\nExempel på märkskylt:"
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/utformning-av-markskyltar/for-utrymmen/typsnitt",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "UTFORMNING AV MÄRKSKYLTAR",
+    "FÖR UTRYMMEN",
+    "Typsnitt"
+   ],
+   "text": "• Helvetica 26"
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/utformning-av-markskyltar/for-utrymmen/storlek-pa-skylt",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "UTFORMNING AV MÄRKSKYLTAR",
+    "FÖR UTRYMMEN",
+    "Storlek på skylt"
+   ],
+   "text": "• Bredd: 120 millimeter.\n• Höjd: 70 millimeter."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/utformning-av-markskyltar/for-utrymmen/placering",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "UTFORMNING AV MÄRKSKYLTAR",
+    "FÖR UTRYMMEN",
+    "Placering"
+   ],
+   "text": "• Skylt ska skruvas fast och placeras vid sidan av dörr ovanför tryckknapp till belysning.\n• Höjd: 1550 millimeter till ovankant skylt.\n• I det utrymme skylten avser"
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/skylt-for-rumsnumrering",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "SKYLT FÖR RUMSNUMRERING"
+   ],
+   "text": "Exempel på märkskylt för rum:"
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/skylt-for-rumsnumrering/typsnitt",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "SKYLT FÖR RUMSNUMRERING",
+    "Typsnitt"
+   ],
+   "text": "• Helvetica 26"
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/skylt-for-rumsnumrering/storlek-pa-rumsskylt",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "SKYLT FÖR RUMSNUMRERING",
+    "Storlek på rumsskylt"
+   ],
+   "text": "• Bredd: 40 millimeter.\n• Höjd: 15 millimeter."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/skylt-for-rumsnumrering/placering",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "SKYLT FÖR RUMSNUMRERING",
+    "Placering"
+   ],
+   "text": "• Skylt ska placeras på karmöverstycke på ingångssidan.\n• Skylten ska vara läsbar från korridor eller liknande."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/skylt-for-dorr-i-brandcellsgrans",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "SKYLT FÖR DÖRR I BRANDCELLSGRÄNS"
+   ],
+   "text": "Dörr i brandcellsgräns ska märkas med skylt ”Branddörr”\nExempel på märkskylt:\nPlacering\nSkylten placeras på dörrbladet."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/skylt-for-dorr-i-brandcellsgrans/och-komponenter",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "SKYLT FÖR DÖRR I BRANDCELLSGRÄNS",
+    "OCH KOMPONENTER"
+   ],
+   "text": "• Hela installationen ska märkas.\n• Märkning ska lämna all nödvändig information för entydig och säker driftorientering.\n• Märkning och skyltning ska utföras med permanent och varaktigt märk- och skyltsystem avsett för ändamålet.\n• Märkning ska göras så att märkskylt inte kan förväxlas genom bland annat skifte av hölje eller lock.\n• Märkning ska samordnas med övriga installationer så att en enhetlig märkning bevaras."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/utformning-av-markskyltar",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "UTFORMNING AV MÄRKSKYLTAR"
+   ],
+   "text": "• Märkskylt ska vara utförd av plast eller metall.\n• Skyltar ska i de flesta fall utföras med svart text på vit botten.\n• Plastskyltar ska vara av tvåskikts laminat med vitt ytskikt och svarta graverade bokstäver eller siffror.\n• Plastskyltar ska vara av sådan kvalitet att de inte slår sig.\n• Metallskyltar ska ha tryckt, etsad eller maskingraverad text.\n• I apparatskåp och på bärverk till undertak får präglad tejp tillsammans med skylthållare användas som alternativ till graverade märkskyltar.\n• Ventiler kan med fördel märkas med rund märkbricka.\n• Om märkskylt inte kan utföras enligt exempel nedan ska utgångspunkten vara att texten ska vara rak, centrerad och ha en höjd som ger god läsbarhet även från avstånd. Typsnittet Helvetica ska användas.\nExempel på märkskylt:"
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/utformning-av-markskyltar/typsnitt",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "UTFORMNING AV MÄRKSKYLTAR",
+    "Typsnitt"
+   ],
+   "text": "• Huvudkomponent – Helvetica 16 (A-LA01-GT1:2, A-VS01-SV1).\n• Matningsangivelse – Helvetica 12 (FRÅN A-AS01).\n• Komponentbeskrivning – Helvetica 10 (TEMPERATURGIVARE)."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/utformning-av-markskyltar/storlek-pa-rektangular-markskylt",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "UTFORMNING AV MÄRKSKYLTAR",
+    "Storlek på rektangulär märkskylt"
+   ],
+   "text": "• Bredd: 60 millimeter.\n• Höjd: 25 millimeter."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/utformning-av-markskyltar/storlek-pa-rund-markskylt",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "UTFORMNING AV MÄRKSKYLTAR",
+    "Storlek på rund märkskylt"
+   ],
+   "text": "• Bredd: 35 millimeter."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/utformning-av-markskyltar/storlek-pa-smal-rektangular-markskylt",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "UTFORMNING AV MÄRKSKYLTAR",
+    "Storlek på smal rektangulär märkskylt"
+   ],
+   "text": "• Bredd: 60 millimeter (Bredd kan utökas om det bedöms nödvändigt).\n• Höjd: 12 millimeter."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/placering-av-skyltar",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "PLACERING AV SKYLTAR"
+   ],
+   "text": "• Märkskylt ska alltid placeras på väl synlig plats.\n• Märkskylt för synlig komponent i rumsmiljö såsom givare, vägguttag och dylikt placeras centrerat ovanför respektive komponent.\n• Märkskylt för utrustning såsom köksutrustning och lekutrustning placeras på respektive utrustning på en för utrustningen lämplig plats. Ta hänsyn till hur utrustning används för att minimera slitage på skylten."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/fastsattning-av-skyltar",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "FASTSÄTTNING AV SKYLTAR"
+   ],
+   "text": "• Märkskylt ska i normalfallet sättas fast med skruvfastsättning.\n• Rostfria skruvar ska användas där så krävs."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-brandlarm",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV BRANDLARM"
+   ],
+   "text": "• Enligt SBF 110:8 och denna riktlinje.\n• Adresserade produkter såsom detektorer, larmdon, adressenheter med mera märks med larmadressen. Tejp från till exempel Dymoapparat eller liknande accepteras.\n• Övriga produkter märks med beteckningar enligt denna riktlinje."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-nod-och-hanvisningsskyltar",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV NÖD- OCH HÄNVISNINGSSKYLTAR"
+   ],
+   "text": "• Adresserade produkter såsom hänvisningsarmaturer och nödljus märks med larmadressen. Tejp från till exempel Dymoapparat eller liknande accepteras.\n• Centralmatade system (ej adresserade) märks med ID-nummer så som centralapparat, slinga, rumsnummer och löp-nr.\n• Batteri-/kondensatordrivna enheter märks med ID-nummer så som central, rumsnummer, löp-nr och datum.\n• Märkes med beteckningar enligt denna riktlinje."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-data-och-teleinstallationer",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV DATA- OCH TELEINSTALLATIONER"
+   ],
+   "text": "• Märkning av uttag för data och tele samt paneler och övriga komponenter i fastighetsnätet ska utföras enligt SS 455 12 01 utgåva 5 eller i överenskommelse med Karlstads kommuns IT-enhet."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-data-och-teleinstallationer/mellanstycken-fiber",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV DATA- OCH TELEINSTALLATIONER",
+    "Mellanstycken – fiber"
+   ],
+   "text": "• Färg och märkning på mellanstycken enligt följande: SMF UPC = Blå\n• Varje mellanstycke ska märkas med ett löpnummer."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-data-och-teleinstallationer/markning-av-fiber-panel",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV DATA- OCH TELEINSTALLATIONER",
+    "Märkning av fiber-panel"
+   ],
+   "text": "• Panelen ska märkas med etikett ”Singlemode”."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-elinstallationer",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV ELINSTALLATIONER"
+   ],
+   "text": "• Enligt gällande regelverk och denna riktlinje."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-elinstallationer/elcentraler-och-stallverk",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV ELINSTALLATIONER",
+    "Elcentraler och ställverk"
+   ],
+   "text": "• Elcentral förses med skylt med uppgifterna namn, ledningstyp och maxsäkring.\n• Elcentral förses med gruppförteckning med uppgift om matat objekt, objektets placering (rumsnummer), ledningstyp, ledningsarea, säkringsstorlek, maxsäkring samt datum.\n• För utgående grupper i ställverk, driftrum och elrum större än 63A, monteras märkskylt med uppgifter om matande objekt, ledningstyp, ledningsarea, ledningslängd, säkringsstorlek och maxsäkring alternativt inställt värde på effektbrytaren.\n• Huvudcentral förses med skylt med uppgifter om kortslutningsström ik3 och förimpedans zför.\n• Dörrar till elcentraler märks med ”ELCENTRAL” (minst 60 x 200 mm.) och centralens beteckning."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-elinstallationer/huvudledning",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV ELINSTALLATIONER",
+    "Huvudledning"
+   ],
+   "text": "• Huvudledning märks i båda ändar med kabelnummer."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-elinstallationer/gruppledning",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV ELINSTALLATIONER",
+    "Gruppledning"
+   ],
+   "text": "• Gruppledning märks vid central och vid första dosan, med centralbeteckning och gruppnummer (eventuellt kabelnummer)."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-elinstallationer/eluttag",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV ELINSTALLATIONER",
+    "Eluttag"
+   ],
+   "text": "• Eluttag skyltas med centralbeteckning och gruppnummer."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-elinstallationer/kopplingsdosor",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV ELINSTALLATIONER",
+    "Kopplingsdosor"
+   ],
+   "text": "• Utanpåliggande kopplingsdosor i undertak skyltas med centralbeteckning och gruppnummer."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-elinstallationer/platsutrustning-och-belastningsobjekt",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV ELINSTALLATIONER",
+    "Platsutrustning och belastningsobjekt"
+   ],
+   "text": "• Platsutrustning och belastningsobjekt skyltas med centralbeteckning och gruppnummer. Gäller inte belysningsarmaturer inomhus och till exempel strömställare."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-elinstallationer/huvudledningsschema",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV ELINSTALLATIONER",
+    "Huvudledningsschema"
+   ],
+   "text": "• På huvudledningsschema redovisas alla i anläggningen ingående kopplingsutrustningar (elcentraler, apparatskåp, växelriktare för sol-el, med mera), samt var de är placerade (byggnad, rumsnummer).\n• Huvudledningsschema ska innehålla uppgift om beteckningar på elcentraler och apparatskåp, ledningstyp, ledningsarea, ledningslängd samt datum.\n• Vid huvud- och fördelningscentraler monteras huvudledningsschema.\n• Centralmärkning utförs enligt Svensk standard, Handbok 419 är lika med Svensk standard och bygger på SS-EN 81346-1, SS-EN 81346-2 och SS-EN 61082-1, som ska användas vid nyproduktion inom Karlstads kommun. Vid renovering och mindre ombyggnader ska det gamla systemet i fastigheten följas, som till exempel IBL77 och IBL96. I samtliga fall ska ledningstyp, ledningsarea och säkring finnas med.\nMärkskyltar ska ha följande färger:\n• För ordinarie kraft Vit med svart text\n• För reservkraft Grön med vit text\n• För avbrottsfri kraft Brun med vit text\n• För nödkraft Röd med vit text\n• För FYL-kraft Blå med vit text"
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-inbrottslarm-och-passersystem",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV INBROTTSLARM OCH PASSERSYSTEM"
+   ],
+   "text": "• Inbrottslarm – märks enligt SSF130 och denna riktlinje.\n• Inbrottslarm – all utrustning som kan ställa ut någon typ av larm/sabotage ska märkas med sektion eller motsvarande. Tejp från till exempel Dymoapparat eller liknande accepteras.\n• Inbrottslarm – övrig utrustning märks med beteckningar enligt denna riktlinje.\n• Passersystem – kortläsare och dörrkontrollenhet märks med ansluten undercentral samt kortläsarnummer, exempelvis: UC01:01, UC01:02 och så vidare.\n• Passersystem – övrig utrustning märks med beteckningar enligt denna riktlinje.\n• Enheter som är dolt placerade märks synligt i anslutning till placeringen."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-kylinstallationer",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV KYLINSTALLATIONER"
+   ],
+   "text": "• Enligt AMA och denna riktlinje."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-koksutrustning",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV KÖKSUTRUSTNING"
+   ],
+   "text": "• Köksutrustning märks med skylt enligt denna riktlinje."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-lekutrustning",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV LEKUTRUSTNING"
+   ],
+   "text": "• Lekutrustning märks med skylt enligt denna riktlinje."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-luftbehandlingsinstallationer",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV LUFTBEHANDLINGSINSTALLATIONER"
+   ],
+   "text": "• Enligt AMA och denna riktlinje.\n• I anläggningar där ozon förekommer, ska skyltar med information om detta finnas. Exempelvis på kökskåpor, aggregat, rens- och inspektionsluckor placerade utanför teknik och fläktrum. Märkning sker med gul skylt med svart text ”OZON”."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-vs-installationer",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV VS-INSTALLATIONER"
+   ],
+   "text": "• Enligt AMA och denna riktlinje."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-styr-och-overvakningsinstallationer",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV STYR- OCH ÖVERVAKNINGSINSTALLATIONER"
+   ],
+   "text": "• Enligt AMA och denna riktlinje.\n• Skylt vid apparat ska ange apparatbeteckning, apparatskåpsnummer samt funktion och om möjligt monteras så att den inte följer med enheten vid byte av komponent."
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/markning-av-styr-och-overvakningsinstallationer/markning-av-ingaende-kablage-i-apparatskap",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "MÄRKNING AV STYR- OCH ÖVERVAKNINGSINSTALLATIONER",
+    "Märkning av ingående kablage i apparatskåp"
+   ],
+   "text": "• Ledningar mellan apparater inom kopplingsutrustningar ska förses med löpande nollnummer.\n• Högsta nollnummer anges i den tekniska dokumentationen.\n• Samtliga nollnummer ska anges på schema eller i tabell.\n• Överblivna nollnummer upp till närmsta jämt 100-tal, medlevereras apparatskåp i återförslutningsbar plastförpackning.\nManöver och hjälpströmskretsar inom kopplingsutrustning\nBenämning Beteckning Färg Betydelse Styrspänning Svart 230 VAC Neutralledare N Ljusblå 230 VAC Extern spänning Orange 230 VAC Styrspänning Vit 24/48 VAC Neutralledare Brun 24/48 VAC Extern spänning Orange 24/48 VAC Styrspänning L+ Röd DC pluspol Neutralledare L- Mörk/Blå DC minuspol\nMät- och reglerkretsar inom kopplingsutrustning Benämning Beteckning Färg Betydelse Analogsignal Grå Analog mätspänning/ström Analogsignal Grå Analog styrspänning/ström\nBenämning Beteckning Färg Betydelse Digitalasignaler Violett Klenspänning Mätnolla Blå/Röd (Exempel ±15 VDC) SK Transp Skärm E Transp Jord TE Transp Störningsfri jord"
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/bsab-96-utrymmen",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "BSAB 96 – UTRYMMEN"
+   ],
+   "text": "Kod* Förklaring Rumsnamn**"
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/bsab-96-utrymmen/1-utrymmen-for-utomhusaktiviteter",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "BSAB 96 – UTRYMMEN",
+    "1         UTRYMMEN FÖR UTOMHUSAKTIVITETER"
+   ],
+   "text": "11 Utrymmen för trafik 13 Utrymmen för undervisning, lek, idrott, rekreation, kultur, religiösa aktiviteter och liknande"
+  },
+  {
+   "id": "markning-och-numrering/markning-av-utrymmen/bsab-96-utrymmen/2-utrymmen-for-inomhusaktiviteter",
+   "path": [
+    "MÄRKNING AV UTRYMMEN",
+    "BSAB 96 – UTRYMMEN",
+    "2         UTRYMMEN FÖR INOMHUSAKTIVITETER"
+   ],
+   "text": "21 Utrymmen för boende Lägenhet 211 Utrymmen för personlig hygien, omklädning eller textilvård WC/Dusch 213 Utrymmen för sömn eller vila Rum 214 Utrymmen för måltider, matlagning, förvaring av livsmedel Kök/Kokvrå och liknande 217 Utrymmen för gemensamma boendeaktiviteter Allrum 222.BB Kontorsrum Kontor 222.BE Konferensrum Konferensrum 222.G Utrymmen för matberedning, servering och liknande Kök/Kokvrå 224.BB Utrymmen för barnomsorg Förskola 224.BCB Hemklassrum Klassrum 224.BCC Grupprum Grupprum 224.BCD Datasalar Datasal 224.BCE Teknikrum Teknik 224.BCF Träslöjdsalar Träslöjd 224.BCG Textilslöjdsalar Textilslöjd 224.BCH Musiksalar Musik 224.BCJ Bildsalar Bild 224.CB Lekutrymmen Lek 224.CC Idrottshallar Idrottshall 224.CD Ishallar Ishall 224.CE Simhallar Simhall 224.CF Träningslokaler, gymlokaler Träning/Gym 225.BC Väntrum och uppehållsrum Väntrum 225.BD Undersökningsutrymmen Undersökning 228.BB Duschutrymmen Dusch 228.BD Omklädningsutrymmen Omklädning 228.BE Toalettutrymmen WC 228.BEB Handikapptoalett RWC 228.BF Bastuutrymmen Bastu 228.C Utrymmen för vila Vila\nKod* Förklaring Rumsnamn** 231.D Entréer Entré 231.E Korridorer och passager Korridor/Passage 231.F Trappor Trappa 231.G Hissutrymmen Hiss 233.B Garage för vägfordon Garage 234.B Lagerutrymmen Lager 234.C Förrådsutrymmen Förråd 234.D Arkivutrymmen Arkiv 234.E Kylutrymmen och frysutrymmen Kylrum/Frysrum 234.F Soputrymmen Källsorteringsrum 261.B Undercentraler Undercentral/UC 261.C Elcentraler Elcentral/ELC 261.D Ventilationsaggregatutrymmen Fläktrum 261.E Hissmaskinutrymmen Hissmaskin\n*) Använd en förfinad indelning enligt BSAB 96 om så krävs. Fler koder finns på byggtjanst.se.\n**) Teknik- och fastighetsförvaltningens rumsnamn.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

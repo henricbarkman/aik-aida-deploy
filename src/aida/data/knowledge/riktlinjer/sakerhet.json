@@ -1,0 +1,333 @@
+{
+ "doc": "sakerhet",
+ "title": "Riktlinje Säkerhet",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-Säkerhet-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "sakerhet/att-tanka-pa",
+   "path": [
+    "ATT TÄNKA PÅ"
+   ],
+   "text": "• Försäkringsbranschens krav är underlag i denna riktlinje."
+  },
+  {
+   "id": "sakerhet/forsakringskrav/skyddsklass-1",
+   "path": [
+    "FÖRSÄKRINGSKRAV",
+    "SKYDDSKLASS 1"
+   ],
+   "text": "• Försäkringsbolaget räknar med att alla byggnader (ej lekförråd eller liknande byggnader) är uppförda i lägst skyddsklass 1."
+  },
+  {
+   "id": "sakerhet/forsakringskrav/godkand-lasenhet",
+   "path": [
+    "FÖRSÄKRINGSKRAV",
+    "GODKÄND LÅSENHET"
+   ],
+   "text": "• Låsklass 3 och uppåt ska ingå i vad som betecknas som godkänd låsenhet."
+  },
+  {
+   "id": "sakerhet/forsakringskrav/handikapp-wc",
+   "path": [
+    "FÖRSÄKRINGSKRAV",
+    "HANDIKAPP WC"
+   ],
+   "text": "• Krav är enligt Säkert vatten. Kommunen följer branschstandard och sätter inga trösklar på handikapp wc."
+  },
+  {
+   "id": "sakerhet/forsakringskrav/forrad-for-datorer",
+   "path": [
+    "FÖRSÄKRINGSKRAV",
+    "FÖRRÅD FÖR DATORER"
+   ],
+   "text": "• Lokal där persondatorer med tillhörande utrustning till ett sammanlagt värde av 5 basbelopp eller mer förvaras, ska uppfylla Skyddsklass 2, om inte datorerna är låsta med datorlås. Övriga delar av försäkrad byggnad som innehåller sådan lokal ska uppfylla Skyddsklass 1."
+  },
+  {
+   "id": "sakerhet/forsakringskrav/forrad-for-datorer/containrar-och-annat-brannbart-material",
+   "path": [
+    "FÖRSÄKRINGSKRAV",
+    "FÖRRÅD FÖR DATORER",
+    "CONTAINRAR OCH ANNAT BRÄNNBART MATERIAL"
+   ],
+   "text": "• Inga papperskorgar eller postlådor får var monterade på fasader oavsett byggmaterial.\n• Alla papperskorgar/postlådor ska vara fastmonterade och minst 3 meter från fasad/skärmtak.\n• Rullkärl ska vara minst 6 meter från fasader och låsta tex med kedja under icke skoltid eller inlåsta i egen byggnad (soprum).\n• Avfallsbehållare ska vara fastmonterade/fastlåst, och uppfylla minimumsavstånd till brännbara byggningsdelar, fönster eller öppningar på minst 6 meter. Vid solida låsanordningar kan metallbehållare placeras närmare byggnad om detta inte medför påtändningsfara, självtändningsrisk eller brandspridningsfara.\n• Sopcontainrar ska vara minst 6 meter från fasad och låsta under icke skoltid.\n• Öppen container som används till tömning av avfall ska placeras så att brand inte kan spridas till byggnad och alltid minst 6 meter från brännbar yttervägg och aldrig under tak/takutsprång, i ett skjul, på övertäckt lastningsramp eller vid fönsteröppning.\n• Brännbara material, som tomma emballage och träpallar som lagras utomhus, ska lagras minst 10 meter från byggnad."
+  },
+  {
+   "id": "sakerhet/forsakringskrav/utstallningslokal-museum-lokal-for-visning-av-konst",
+   "path": [
+    "FÖRSÄKRINGSKRAV",
+    "UTSTÄLLNINGSLOKAL (MUSEUM, LOKAL FÖR VISNING AV KONST)"
+   ],
+   "text": "• Se utställningsförsäkring PS842. Kontakta fastighetsavdelningens säkerhetssamordnare."
+  },
+  {
+   "id": "sakerhet/fasad/fonster",
+   "path": [
+    "FASAD",
+    "FÖNSTER"
+   ],
+   "text": "• Okrossbara fönster installeras på bottenplanet på byggnader i oroliga områden. Tas i samråd med beställare. Skyddsglas ska vara av typ A eller B klass P1A-P5A eller P6B-P8B. Detta bör även gälla dörrar med glaspartier. Kan också vara skyddsfilm.\n• Fönster i källarplan, galler eller okrossbara fönster: Beslutas i samråd med beställare."
+  },
+  {
+   "id": "sakerhet/fasad/vaggar",
+   "path": [
+    "FASAD",
+    "VÄGGAR"
+   ],
+   "text": "• Väggar, fönster, golv och tak bör ha samma skalskyddskrav som till exempel dörrar."
+  },
+  {
+   "id": "sakerhet/fasad/utvandig-utrymningstrapp",
+   "path": [
+    "FASAD",
+    "UTVÄNDIG UTRYMNINGSTRAPP"
+   ],
+   "text": "• För att förhindra att obehöriga personer tar sig upp på tak så ska utvändiga trappor/utrymningstrapp ha galler upp till 3 meter. Tas i samråd med beställare."
+  },
+  {
+   "id": "sakerhet/fasad/lastkajer-och-varuleveransplatser",
+   "path": [
+    "FASAD",
+    "LASTKAJER OCH VARULEVERANSPLATSER"
+   ],
+   "text": "• För att få bra insyn och överblickbarhet. Ska man kunna stänga av med stängsel eller områdesskydd. Tas i samråd med beställare."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/personantal-i-byggnader",
+   "path": [
+    "SKYDD MOT BRAND",
+    "PERSONANTAL I BYGGNADER"
+   ],
+   "text": "• En beräkning ska genomföras av en brandskyddskonsult\n• Hur många personer får det vara i publika lokaler och samlingslokaler.\n• Hur många personer får vara i respektive brandcell?\n• Hur många personer får det vara maximalt i byggnaden?\n• Detta ska skyltas i respektive lokal en blå skylt med vit text."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/slackutrustning",
+   "path": [
+    "SKYDD MOT BRAND",
+    "SLÄCKUTRUSTNING"
+   ],
+   "text": "• Brandsläckare ska vara flourtensidfria (PFAS) och miljöklassificerade.\n• Släckutrustning i ställverk, elrum, och andra driftutrymmen (dit tillträde är begränsat) placering av släckare tas i samråd med beställare.\n• Det ska finnas minst en pulverbrandsläckare (vid brandlarmscentral) på vård- och gruppboenden, elevhem samt förskolor."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/utrymningsplaner",
+   "path": [
+    "SKYDD MOT BRAND",
+    "UTRYMNINGSPLANER"
+   ],
+   "text": "• Utrymningsplaner ska utformas enligt AFS 2020:1.\n• På arbetsplatser ska det, i den omfattning som behövs och på platser som är väl synliga och lätta att upptäcka finnas utrymningsplaner.\n• Små lokaler där samtliga utrymningsvägar är synliga från hela lokalen är exempel på när utrymningsplanen kan sakna betydelse för arbetstagarnas säkerhet.\n• Utrymningsplanen ska\n- visa alla utrymningsvägar, inklusive tillfälliga utrymningsplatser,\n- visa plats för återsamling,\n- ange hur räddningstjänst och annan nödvändig hjälpinsats larmas, och\n- visa placering av handbrandsläckare, manuella larmutlösningsdon och larmtelefon,\n- adress och våningsplan.\n• Utrymningsplanen ska inte innehålla namn på verksamheten som till exempel en förskolas avdelningar. Namn på förskolan är ok.\n• Om alla utrymningsvägar inte är tillgängliga för personer med nedsatt rörelse eller orienteringsförmåga ska det framgå av utrymningsplanen vilka utrymningsvägar de kan använda. Utrymningsplanen får också innehålla annan information, om det inte försvårar läsningen.\n• Texten ska vara på svenska och engelska."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/verksamhetsgranser",
+   "path": [
+    "SKYDD MOT BRAND",
+    "VERKSAMHETSGRÄNSER"
+   ],
+   "text": "• Olika verksamheter i en byggnad ska ha egna brandceller."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/laddrum/laddrum-ska-vara-utformade-enligt-nedan",
+   "path": [
+    "SKYDD MOT BRAND",
+    "LADDRUM",
+    "Laddrum ska vara utformade enligt nedan"
+   ],
+   "text": "• Egen brandcell EI60\n• Brand detekterat\n• Ventilerat\n• En utredning av eventuell kyla ska genomföras i samråd med beställaren."
+  },
+  {
+   "id": "sakerhet/skyddsrum",
+   "path": [
+    "SKYDDSRUM"
+   ],
+   "text": "• Om ett befintligt skyddsrum berörs vid en ombyggnation eller på annat sätt, ska en skyddsrumssakkunnig kontaktas. Beslutas i samråd med beställare"
+  },
+  {
+   "id": "sakerhet/att-tanka-pa-2",
+   "path": [
+    "ATT TÄNKA PÅ"
+   ],
+   "text": "• Brandskyddsdokumentationen är grunden för fastighetsägarens och verksamhetens tillsyn och underhåll.\n• Brandskyddsdokumentation används även för planering av inbrottslarm, passersystem, beslagning och ventilation.\n• Finskydd/åskskydd kan behöva monteras på byggnader inom vissa områden. Beslut tas av beställare."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/allmanna-krav-for-brandlarm",
+   "path": [
+    "SKYDD MOT BRAND",
+    "ALLMÄNNA KRAV FÖR BRANDLARM"
+   ],
+   "text": "• Brandlarm ska vara adresserbara. Detektorer och larmknappar ska vara tydligt märkta med adress lika som i brandlarmcentralen.\n• När brandlarmet är återställt, ska ventilationsstyrning återgå automatiskt.\n• Brandskyddsbeskrivning och utförandespecifikation ska göras tillsammans med kravställare och byggherre. Ska vara utfört innan förfrågan skickas ut.\n• Omfattning av takfotslarm ska diskuteras vid varje brandlarmsinstallation mellan fastighetsägare och projektledare. Vid installation av takfotslarm ska det integreras med brandlarm.\n• Brandlarm ska projekteras av behörig ingenjör enligt Svenska Brandskyddsföreningen (SBF) standard, SBF 1007 eller anläggarfirma enligt SBF 1008.\n• Utförandespecifikation ska upprättas för brandlarm och utrymningslarm enligt SBF 110.\n• Innan byggnaden eller anläggningen tas i drift ska man kontrollera att den projekterade lösningen fungerar som helhet.\n• När färdigställandekontroll av brandlarmanläggningen är klar ska leveransen besiktigas. En leveransbesiktning är en opartisk tredjepartskontroll som ska omfattas av minst anvisningarna i SBF 141."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/allmanna-krav-for-brandlarm/larmoverforing",
+   "path": [
+    "SKYDD MOT BRAND",
+    "ALLMÄNNA KRAV FÖR BRANDLARM",
+    "Larmöverföring"
+   ],
+   "text": "• Larmsändare för vidaresändning av larm ska överenskommas med beställare. Den ska vara godkänd av SOS Alarm AB. Typ avgörs av respektive anläggnings behov av karaktärer och antal utgående larm. Larmsändare ska ha två av varandra oberoende vägar från objekt till larmmottagare för överföring av larm. Det ska gå via det kommunala IT-nätet och telefonförbindelse genom mobila nätet. Larmöverföring ska ske dygnet runt.\n• Larmsändaren ska vara gemensam med andra larmanläggningar och ska även vidaresända andra typer av larm. Det ska gå att skicka de olika larmen till olika mottagare.\n• Krav enligt Svensk Standard SS-EN 54–21.\n• Larmmottagare ska vara SOS Alarm AB eller annan upphandlad larmcentral som får kalla ut Räddningstjänst."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/allmanna-krav-for-brandlarm/detektorer",
+   "path": [
+    "SKYDD MOT BRAND",
+    "ALLMÄNNA KRAV FÖR BRANDLARM",
+    "Detektorer"
+   ],
+   "text": "• Detektorer och knappar i idrottshallar ska vara skyddade med bollskydd.\nDetektorer ska finnas:\n• Där personer sover, vilrum, även för tillfällig övernattning.\n• Där personer med mindre god lokalkännedom uppehåller sig.\n• Driftrum/teknikrum.\n• Med särskilda brandrisker till exempel tvättstuga, rum för laddning av apparater med batteri och el, skärmtak och soprum.\n• I alla utrymningsvägar och övriga kommunikationsytor.\n• I lokaler som kan tänkas hyras ut, idrottshall, matsal, kök, slöjdsalar, hemkunskapssalar, aula.\n• Rökdetektor i ventilationssystemet ingår inte i brandlarmet.\nFunktionskrav på detektorer:\n• Utförande med aspirerande system ska beroende på miljö utföras med självrengöring för att uppnå en hög driftsäkerhet. Omfattning ska diskuteras med beställare."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/allmanna-krav-for-brandlarm/larmknapp",
+   "path": [
+    "SKYDD MOT BRAND",
+    "ALLMÄNNA KRAV FÖR BRANDLARM",
+    "Larmknapp"
+   ],
+   "text": "• Omfattning ska göras i samråd med beställare."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/allmanna-krav-for-brandlarm/brandlarmsignal",
+   "path": [
+    "SKYDD MOT BRAND",
+    "ALLMÄNNA KRAV FÖR BRANDLARM",
+    "Brandlarmsignal"
+   ],
+   "text": "• Brandlarmanordningarna ska avge signaler som uppfattas i alla lokaler där personer kan befinna sig. Andra förekommande signaler ska ha sådan ljud- och ljusbild att de inte kan förväxlas med larmdon (blixtljus, sirén eller larmklocka) för brandlarm.\n• Larmsignalen ska kunna utlösas manuellt, utförandespecifikation SBF 110.\n• I utrymmen med högre ljudklass ska det vara god hörbarhet.\nStyrningar\nStyrningar enligt SBF 110:\n• Anläggningen ska gå i brandsäkert läge (aktiverat läge) vid en kortslutning eller ett avbrott som orsakas av brandpåverkan. Om anläggning inte går i aktiverat läge ska förläggning ske (brandsäkert förlagd).\n• Med kabel som upprätthåller funktionssäkerheten i minst 30 minuter vid brandpåverkan, eller i ringmatad ledning där en kabelskada ger felsignal men styrfunktion i övrigt fungerar normalt.\n• För att funktionen ska vara säkerställd i minst 30 minuter vid brandpåverkan krävs en brandresistent ledning eller att ledningen är skyddad bakom gips, betong eller liknande (brandsäkert förlagd).\nFörutom rena brandlarmfunktioner ska anläggningen kunna styra:\n• Utrymningslarm\n• Branddörrstyrning\n• Brandfunktioner i ventilationssystem\n• Hissar\n• Rökluckor\n• Nödljusupptändning\n• Allmänbelysning som tänds automatiskt\n• Ljud för musikanläggning stängs av\n• Rökmaskin (disco) stängs av\n• Funktion för nödstopp samt avstängning av elkraft\n• Dörrar i brandcellsgräns, branddörrar, ska kunna stå öppna även vid en frånställning/frånkoppling av den sektion/larmadress som styr dörrstängningsfunktionen.\n• De brandstyrningar som installeras ska fungera under hela byggnadens livstid"
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/brandlarm",
+   "path": [
+    "SKYDD MOT BRAND",
+    "BRANDLARM"
+   ],
+   "text": "Karlstads kommun har en egen ambition vad gäller automatiskt brandlarm och utrymningslarm, det ska finnas på de flesta objekt med undantag av:\n• Förskolor med max två avdelningar i ett plan.\n• Övriga lokaler: beror på verksamhet och hur lokalerna ser ut och om personalen har en god lokalkännedom. Beslut tas av beställare i samråd med brandkonsult."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/utrymningslarm",
+   "path": [
+    "SKYDD MOT BRAND",
+    "UTRYMNINGSLARM"
+   ],
+   "text": "• Utrymningslarmet ska utföras enligt senaste utgåvan av SBF:s rekommendationer utrymningslarm.\n• Aktivering av utrymningslarm ska ske via det automatiska brandlarmet och kombinerat med manuell aktivering.\n• Optiska larmdon i fläktrum."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/slackanlaggning/koksslacksystem",
+   "path": [
+    "SKYDD MOT BRAND",
+    "SLÄCKANLÄGGNING",
+    "Kökssläcksystem"
+   ],
+   "text": "• Automatiskt släcksystem avsett för fett-brand ska utredas i samråd med beställare om det ska installeras ovan stekbord/fritös i storkök. Om installation genomförs ska SBF 508, ”Regler för kökssläcksystem” följas och en utförandespecifikation tas fram."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/slackanlaggning/sprinkler",
+   "path": [
+    "SKYDD MOT BRAND",
+    "SLÄCKANLÄGGNING",
+    "Sprinkler"
+   ],
+   "text": "• Behov av sprinkleranläggning ska utredas i samråd med beställare i samband med brandskyddsbeskrivningen eller risk- och sårbarhetsanalysen. Anläggningen ska utformas enligt SBF 120."
+  },
+  {
+   "id": "sakerhet/skydd-mot-brand/slackanlaggning/mobilsprinkler",
+   "path": [
+    "SKYDD MOT BRAND",
+    "SLÄCKANLÄGGNING",
+    "Mobilsprinkler"
+   ],
+   "text": "• Behov av mobil sprinkleranläggning ska utredas i samråd med beställare i samband med brandskyddsbeskrivningen eller risk- och sårbarhetsanalysen."
+  },
+  {
+   "id": "sakerhet/inbrottslarmsystem/allmanna-krav-for-inbrottslarm",
+   "path": [
+    "INBROTTSLARMSYSTEM",
+    "ALLMÄNNA KRAV FÖR INBROTTSLARM"
+   ],
+   "text": "• På de objekt som Karlstads kommun väljer att sätta in inbrottslarm ska omfattningen beslutas i samråd med beställare.\n• Inbrottslarmanläggning ska installeras enligt SSF 130 och med materiel enligt SSF 1014.\n• Inbrottslarm och passersystem ska integreras i minst sådan utsträckning att passersystemet styr till- och frånkoppling av inbrottslarmet.\n• Anläggarfirma ska vara certifierad för minst larmklass 2 eller 3 beroende på anläggningens säkerhetsnivå enligt SSF 1015.\n• Inbrottslarmssystemet ska vara öppet och programmeringsverktyg samt anslutningskabel ska ges till Karlstads kommun efter installation.\n• Förvarningssignal kan ges i både ljus och ljud och ska ges i berört område vid tillkoppling av inbrottslarm.\n• Inbrottslarmet ska kunna styra avstängning av inkommande vatten samt belysning.\n• Entré där manöverpanel installeras ska övervakas med magnetkontakt.\n• I idrottshallar ska detektorer förses med bollskydd.\n• Sektionering ska ske efter typ av lokal och verksamhetens behov, så att olika byggnader eller delar av byggnader inom objektet kan vara tillkopplade oberoende av varandra såväl under ordinarie verksamhetstid som under kvällstid.\n• Larmöverföring enligt SSF 114. Finns det en befintlig larmsändare ska den användas.\n• Kombidetektorer ska användas av typ IR/MW.\n• Antimask (övertäckningsskydd) på detektorer ska diskuteras med beställaren."
+  },
+  {
+   "id": "sakerhet/inbrottslarmsystem/kombilarm",
+   "path": [
+    "INBROTTSLARMSYSTEM",
+    "KOMBILARM"
+   ],
+   "text": "Inbrottslarm kombinerat med andra typer av larm, exempel brandindikering och driftlarm ska se som skadebegränsande åtgärd för egendomsskydd och personskydd.\nKombilarm (med inbrottslarm och brandindikering) installeras på:\n• Förskolor med max två avdelningar i ett plan.\n• Övriga lokaler: beror på verksamhet och hur lokalerna ser ut och om personalen har en god lokalkännedom. Beslut tas av beställare i samråd med brandkonsult.\n• Larmet följer rekommendationer från SBF i tillämpliga delar, men behöver dock inte besiktas enligt dessa.\n• Larmöverföring enligt SSF 114, Regler för övervakad larmöverföring. Finns det en befintlig larmsändare ska den användas."
+  },
+  {
+   "id": "sakerhet/passersystem",
+   "path": [
+    "PASSERSYSTEM"
+   ],
+   "text": "• Passersystem ska installeras i skalskyddet, undantag kan göras på dörrar som används för enbart utrymning. Övrig omfattning ska diskuteras med verksamhet och beställare.\n• Elektroniskt manövrerade, lås, låshus och slutbleck används där dörren styrs av ett passersystem enligt SSF 3522.\n• Systemet ska vara flexibelt, möjligt att utöka, förändra och uppdatera i takt med ändrade kravbilder och behov.\n• Driftrum, elrum, teknikrum ska ha digitalt passermedia (exempelvis tagg, kort etcetera)."
+  },
+  {
+   "id": "sakerhet/passersystem/allmanna-krav-for-passersystem",
+   "path": [
+    "PASSERSYSTEM",
+    "ALLMÄNNA KRAV FÖR PASSERSYSTEM"
+   ],
+   "text": "• Systemet ska ha ett öppet gränssnitt för möjlighet till integration med andra delsystem eller överordnat system.\n• Passersystem ska kunna administreras via nätverk där databasen finns i teknik- och fastighetsförvaltningens befintliga servrar.\n• Systemet kan ha onlineläsare (läsare med direkt kommunikation till systemet) eller en kombination av online och offlineläsare (läsare där information bärs med tagg). Onlineläsare ska installeras i ytterskal.\n• Kodavläsare ska vara beröringsfria. Passermedia ska vara av typen mifare/desfire.\n• Systemet ska vara integrerat med inbrottslarmanläggning, om sådan finns, för att styra till exempel till- och frånkoppling av larmet.\n• Funktionsmässigt ska det utföras så att det inte går att öppna en dörr där inbrottslarmet är påkopplat, eller ofrivilligt passera in till ett larmat område i syfte att förebygga onödiga larm.\n• Systemets indelning i behörighetszoner, tidzoner, behörighetskategorier och definiering av användare ska ske i samråd med beställare.\n• System inom en och samma fastighet eller verksamhet ska företrädesvis byggas upp som ett system för administration från en och samma plattform med samma mjukvara.\n• Där systemet täcker flera fristående avdelningar eller verksamheter ska administrationen byggas upp verksamhetsvis med ansvarig administratör med åtkomst till sina respektive dörrmiljöer och användare (vars uppgift är att programmera avdelningsanvändare med behörighet i databas).\n• Dörrmiljöer med skyddsvärde ska installeras med delat montage (separat kortläsare på vägg). Exempel på sådana dörrmiljöer skulle kunna vara dörr i skal, dörr in till larmområde, läkemedelsrum, värdeförvaringsrum, rum med stöldbegärlig egendom med mera.\n• Vandalsäkert väderskydd kan behöva monteras där kortläsare monteras i skalskyddet. Beslut ska tas i samråd med beställare.\n• Samtliga läsare ska installeras via fast nätmatad spänningskälla med batteribackup.\n• Batteribackup ska kunna ge ut larmer så som nätspänningsbortfall samt batterifel. Vid installation av enbart passersystem ska dessa larm vara lokala. Vid integrerat inbrottslarm och passersystem ska dessa larm läggas på sektion som tekniskt fel inbrottslarm. Batteribackup ska inte vara mjukvaruintegrerad i systemet."
+  },
+  {
+   "id": "sakerhet/mekaniskt-skydd/dorrlas",
+   "path": [
+    "MEKANISKT SKYDD",
+    "DÖRRLÅS"
+   ],
+   "text": "• Nattlås i form av motorlås kopplas genom inbrottslarm, godkänd larmmanöver låser upp samtliga motorlås. Om något motorlås skulle låsa upp efter godkänd larmmanöver ska larm skickas till larmcentral. Motorlåset ska vara kopplad till väsentlig funktion till exempel belysningsstyrning.\n• Enbart elektrisk öppning vid brandlarm rekommenderas inte eftersom utrymningssäkerheten är beroende av att det elektriska fungerar. Dessutom kan situationer uppstå då en snabb utrymning krävs utan att brandlarmet aktiverats.\n• Elektriska lås styrda via brandlarm ska kompletteras med mekaniska utrymningsbeslag."
+  },
+  {
+   "id": "sakerhet/mekaniskt-skydd/nodoppningsknapp",
+   "path": [
+    "MEKANISKT SKYDD",
+    "NÖDÖPPNINGSKNAPP"
+   ],
+   "text": "• Nödöppningsknapp ska sättas in i överenskommelse mellan verksamhet och beställare.\n• Nödöppningsknapp skall ha plastglas som ej förstörs vid aktivering.\n• Den ska vara väl synlig och placerad i nära anslutning till dörren. Vid intryckt knapp ska strömmen brytas till låset, det innebär att utrymningsvägen låses upp även vid strömavbrott. För att säkerställa att dörren hålls låst vid ofrivilligt strömbortfall ska batteribackup anslutas till låsfunktionen.\n• För verksamhet där panikutrymningsbeslag rekommenderas ska nödöppningsknapp inte installeras.\n• SS-EN 1125 panikutrymningsbeslag, är lämpliga i lokaler och byggnader där ett större antal personer utan god lokalkännedom kan vistas samtidigt, t.ex. stora samlingslokaler. Beslut tas av beställare i samråd med brandskyddskonsult.\n• SS-EN 179 nödutrymningsbeslag, är lämpliga i lokaler och byggnader där ett mindre antal personer kan vistas och där inte alla kan förväntas ha god lokalkännedom. Beslut tas av beställare i samråd med brandskyddskonsult."
+  },
+  {
+   "id": "sakerhet/mekaniskt-skydd/godkand-avvikelse-fran-bbr",
+   "path": [
+    "MEKANISKT SKYDD",
+    "GODKÄND AVVIKELSE FRÅN BBR"
+   ],
+   "text": "• Vid utrymningsdörrar på vård- och omsorgsboenden måste det sitta nödöppningsknappar och det ska gå larm från utrymningsdörr till trygghetslarmet så personalen ser direkt om en sådan dörr öppnas."
+  },
+  {
+   "id": "sakerhet/mekaniskt-skydd/nycklar-och-lasschema",
+   "path": [
+    "MEKANISKT SKYDD",
+    "NYCKLAR OCH LÅSSCHEMA"
+   ],
+   "text": "Karlstads kommun, fastighetsförvaltning har ett internt dokument för hur ett låsschema ska byggas."
+  },
+  {
+   "id": "sakerhet/kamerabevakning",
+   "path": [
+    "KAMERABEVAKNING"
+   ],
+   "text": "• En risk- och sårbarhetsanalys ska göras gemensamt av verksamhet och förvaltare/ägare för att se om och var eventuella kameror behöver sättas upp.\n• Förberedelse för eventuell kamerabevakning ska utredas i samråd mellan verksamhet och beställare."
+  },
+  {
+   "id": "sakerhet/personlarm/overfallslarm",
+   "path": [
+    "PERSONLARM",
+    "ÖVERFALLSLARM"
+   ],
+   "text": "• Överfallslarm ska installeras där det enligt en riskbedömning är lämpligt. Verksamhet, projektledare och larmgruppen har diskussion om lämplig lösning."
+  },
+  {
+   "id": "sakerhet/personlarm/trygghetslarm",
+   "path": [
+    "PERSONLARM",
+    "TRYGGHETSLARM"
+   ],
+   "text": "• Trygghetslarm är en samlingsbenämning för larmsystem avsedda att användas av äldre, funktionshindrade eller andra personer där speciella behov finns och snabba insatser kan behövas. Trygghetslarm är alltid kopplad till en larmcentral som för åtgärden vidare till hemtjänst eller vårdpersonal."
+  },
+  {
+   "id": "sakerhet/kontroll-och-injustering/provning",
+   "path": [
+    "KONTROLL OCH INJUSTERING",
+    "PROVNING"
+   ],
+   "text": "• Samtliga system ska provas och dokumenteras i provningsprotokoll.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

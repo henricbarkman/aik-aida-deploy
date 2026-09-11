@@ -1,0 +1,449 @@
+{
+ "doc": "hiss",
+ "title": "Riktlinje Hiss",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-Hiss-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "hiss/att-tanka-pa",
+   "path": [
+    "ATT TÄNKA PÅ"
+   ],
+   "text": "• Krav vad gäller märkning av utrustning med mera beskrivs Mer information finns i Hissdirektivet 2014/33/eu och maskindirektivet 2006/42/eg på karlstad.se med därtill harmoniserade standarder.\n• Ytterligare krav vad gäller märkning finner ni i denna riktlinje samt i ”Riktlinje märkning och numrering”.\n• Krav vad gäller dokumentation beskrivs i ”Riktlinje BIM, CAD och dokumentation” samt i ”Specifikation handlingar”.\n• För åtgärder som inte kräver bygglov, krävs det en anmälan hos Byggnadsnämnden, vid en installation eller väsentlig ändring av en hiss. Fastighetsägaren har ansvaret för ansökan om startbesked till Byggnadsnämnden och arbetet får inte påbörjas innan startbesked är utfärdat av Byggnadsnämnden. Med större ändring av hissen eller utbyte av väsentlig del i hissen menas ändring eller byte av hissens styrsystem, apparatställ eller maskineri samt byte av hisskorgens inredning eller av hela hisskorgen."
+  },
+  {
+   "id": "hiss/hissystem/utforande-och-funktionskrav",
+   "path": [
+    "HISSYSTEM",
+    "UTFÖRANDE OCH FUNKTIONSKRAV"
+   ],
+   "text": "• Vid nybyggnation ska hiss med hisskorg installeras om inget annat beslutas i samråd med beställaren.\n• Hiss med hisskorg, märkhastighet högre än 0,15 m/s, ska utföras enligt harmoniserade standarder till Hissdirektivet 2014/33/EU.\n• Hiss med märkhastighet högst 0,15 m/s, ska utföras enligt harmoniserade standarder till Maskindirektivet 2006/42/EG.\n• Beakta säkerhetsregler, enligt SS-EN 81-70, gällande tillträde till hissar för personer inklusive personer med funktionsnedsättningar.\n• Hissar ska vara tillgängliga för personer med nedsatt rörelse och orienteringsförmåga.\n• Nyinstallation av hiss ska genomgå första besiktning, konstruktions- och installationskontroll, enligt Boverkets grundförfattning BFS 2025:11 BFS 2025:12"
+  },
+  {
+   "id": "hiss/hissystem/utforande-och-funktionskrav/bfs-2025-13",
+   "path": [
+    "HISSYSTEM",
+    "UTFÖRANDE OCH FUNKTIONSKRAV",
+    "BFS 2025:13"
+   ],
+   "text": "• Ändring och modernisering av befintlig hiss ska genomgå revisionsbesiktning, konstruktions- och installationskontroll, enligt Boverkets grundförfattning BFS 2025:11"
+  },
+  {
+   "id": "hiss/hissystem/utforande-och-funktionskrav/bfs-2025-12-bfs-2025-13/sakerhetsfunktioner",
+   "path": [
+    "HISSYSTEM",
+    "UTFÖRANDE OCH FUNKTIONSKRAV",
+    "BFS 2025:12 BFS 2025:13",
+    "Säkerhetsfunktioner"
+   ],
+   "text": "• Beakta grundläggande hälso- och säkerhetskrav, enl. BFS 2025:11 BFS 2025:12"
+  },
+  {
+   "id": "hiss/hissystem/utforande-och-funktionskrav/bfs-2025-13-2",
+   "path": [
+    "HISSYSTEM",
+    "UTFÖRANDE OCH FUNKTIONSKRAV",
+    "BFS 2025:13."
+   ],
+   "text": "• Risker för personer som befinner sig utanför hisskorgen enligt bilaga 5:1, punkt 2 beträffande åtkomlighet till hisschakt, räddningsutrymmen i hisschakt och tillträdesöppningar till hisskorg.\n• Risker för personer som befinner sig i hisskorgen enligt bilaga 5:1, punkt 3 beträffande hisskorgens inhägnad, hindrande av fritt fall eller okontrollerad rörelse av hisskorg.\n• Övriga risker enligt bilaga 5:1, punkt 4 beträffande schakt- och korgdörrar, nödevakuering, nödtelefon, temperaturövervakning, luftväxling i hisskorg, belysning, nödbelysning, funktion vid strömbortfall och brandfunktion.\n• Märkning och skyltar i hisskorg enligt bilaga 5:1, punkt 5 beträffande märklast, uttryckt i kg och tillåtet antal personer i hisskorg, instruktioner för självevakuering ur hisskorg.\n• Bruksanvisningar enligt bilaga 5:1, punkt 6 beträffande säkerhetskomponenter, bruksanvisningarnas innehåll och servicejournalens innehåll.\n• Vid ändring eller modernisering av hiss, ska särskilt beaktas grundläggande krav enligt kapitel 2."
+  },
+  {
+   "id": "hiss/hissystem/brandfunktion",
+   "path": [
+    "HISSYSTEM",
+    "BRANDFUNKTION"
+   ],
+   "text": "• Då hiss ska utföras som räddningshiss, gäller SS-EN 81-72. Samråd med brandkonsult.\n• Då hiss ska utföras som utrymningshiss, gäller krav baserade på analytisk dimensionering av byggnaders brandskydd enligt BFS 2011:27 BBRAD1 (senaste ändringsförfattning BFS 2013:12 BBRAD3) avsnitt 3.5.1. Samråd med brandkonsult.\n• Vid ny hiss eller ändring eller modernisering av befintlig hiss ska hissen alltid utföras med driftsatt brandlarmfunktion enligt SS-EN 81-73. Brandlarmfunktion innebär funktion för att ta hissen ur drift vid händelse av brand. Ändring och modernisering omfattar till exempel byte av apparatställ (hissens styrsystem)."
+  },
+  {
+   "id": "hiss/hissystem/manover-och-signalorgan",
+   "path": [
+    "HISSYSTEM",
+    "MANÖVER- OCH SIGNALORGAN"
+   ],
+   "text": "• Manöver- och signalorgan ska utformas enligt SS-EN 81-70, 5.4, tabell 2 och 4. Då hiss är placerad i miljö där personer med funktionsnedsättningar använder hiss ska manöver- och signalorgan enligt bilaga B, Extra stora manöveranordningar (Normativ) användas.\n• Ljuskontrast mellan intilliggande ytor med minsta skillnad i ljusreflektionsvärde (LRV) enligt SS-EN 81-70, 5.1.2 och tabell 2, beträffande ljusförhållanden och reflektioner från tak, väggar och golv vid stannplan och i hisskorg. Till exempel ska tablålock för anropstablåer på våningsplan och tablålock för destinationsknappar i hisskorg, utföras med rostfri stålplåt med borstad yta som inte ger reflexer och bländning från belysning och ger tydlig kontrastverkan mot knapparna.\n• Manöverpanel ska vara horisontell med snedställd front samt knappar med relief. Entrévåningen ska vara särskild markerad.\n• Nyckelstyrd hiss ska styras med tagg/kort.\n• Vid ändring eller modernisering av hiss, ska särskilt beaktas grundläggande krav enl. Boverkets grundförfattning BFS 2025:11 BFS 2025:12 BFS 2025:13. BÄRRAM FÖR"
+  },
+  {
+   "id": "hiss/hissystem/hisskorg",
+   "path": [
+    "HISSYSTEM",
+    "HISSKORG"
+   ],
+   "text": "• Hiss ska vara konstruerad med hisskorg placerad på fristående bärram. Bärramen får inte vara integrerad med hisskorgen."
+  },
+  {
+   "id": "hiss/hissystem/hisskorg-2",
+   "path": [
+    "HISSYSTEM",
+    "HISSKORG"
+   ],
+   "text": "Mer information vad gäller tillgänglighet finns\n• Vid nybyggnation ska hissens invändiga korgmått minst vara i Svensk Byggtjänst bok 1,1 x 2,1 m (B x D). Bygg IKapp\n• Vid ombyggnation, om en hiss med måtten 1,1 x 2,1 m (B x D) inte får plats får måtten anpassas till 1,1 x 1,4 m (B x D) i samråd med beställaren.\n• Utförande, storlek, ytskikt och övriga utrustningar ska anpassas till lokala förhållanden och avsedd verksamhet.\n• Utformning ska anpassas till Bygg Ikapp - kapitel, Hiss och annan lyftanordning.\n• Vid ändring eller modernisering av hiss, ska särskilt beaktas grundläggande krav enl. Boverkets grundförfattning BFS 2025:11 BFS 2025:12 BFS 2025:13\n• Hisskorgens ytskikt som beklädnader på väggar, golv, tak samt fast inredning ska utformas med ytskikt lika den brandcell den är placerad i, beakta aktuell brandskyddsdokumentation. Samråd ska ske med brandskyddkonsult om projektspecifikt ytskiktskrav.\n• Ledstång med kontrasterande kulör ska monteras 900 mm över golv på båda långsidorna om plats finns. Fri passage mellan ledstängerna ska vara 900 mm."
+  },
+  {
+   "id": "hiss/hissystem/dorrar",
+   "path": [
+    "HISSYSTEM",
+    "DÖRRAR"
+   ],
+   "text": "• Antal driftcykler (öppning-stängning) per år, för schakt- och korgdörrar, anpassade för lokala förhållanden och avsedd verksamhet.\n• Normalt antal driftcykler per år, över en tid på 15 till 20 år, för schakt- och korgdörrar är:\n− Skolor 300 000 driftcykler,\n− Vårdhem 500 000 driftcykler,\n− Industri Högtrafik 800 000 driftcykler.\n• Schaktdörrar ska vara av modellen skjutdörrar om inte schaktet är för trångt.\n• Schaktdörrar inklusive front/karm ska alltid, oavsett brandskyddskrav, utföras isolerade. Kravet avser lägsta kvalitetsnivå för ljud- och brandskyddskrav. I de fall brandskyddskrav föreligger, beakta aktuell brandskydds dokumentation.\n• Automatiska sidoskjutdörrar, öppningstid ca:15sek.\n• kontaktdon/tryckplatta för dörröppningsautomatik och påkallande ska ha avvikande färg och får inte placeras för nära dörren.\n• Fritt öppningsmått ska vara minst 900 mm.\n• Väggen utanför hissen ska ha kontrasterande kulör mot hissen.\n• Vid ändring eller modernisering av hiss, ska särskilt beaktas grundläggande krav enl. Boverkets grundförfattning BFS 2025:11 BFS 2025:12 BFS 2025:13"
+  },
+  {
+   "id": "hiss/hissystem/ytskikt",
+   "path": [
+    "HISSYSTEM",
+    "YTSKIKT"
+   ],
+   "text": "• Ytskikt på utrustningar som sockellister, tablålock för displayer, paneler, tablåer med mera ska vara i rostfritt stål med struktur typ mattborstad (slipning korn 240).\n• Ytskikt på större ytor som korgdörrar, täcklister, korgöppningar och dylikt ska utföra med beklädnad av strukturerad rostfri stålplåt typ enl. samråd med beställaren.\n• Ytskikt på större ytor som schaktdörrar, täcklister och dylikt ska vara med beklädnad av strukturerad rostfri stålplåt alternativt i målat utförande. Kulör beslutas i samråd med beställaren. Beakta kontrastverkan mot anslutande vägg (byggnadsdel).\n• Samtliga ytskikt av rostfritt stål ska vara behandlade med medel mot smuts och fettavtryck. Medlet ska vara Würth saBesto Ädelstålsvård RST-HOITO eller likvärdigt. Viktigt att beakta städrutiner vid ytskikt behandlade enligt ovan.\n• Kontrasterande kulörer ska finnas mellan vägg, golv och dörr samt manöverpanel och ledstång mot väggarna i korgen.\n• Väggbeklädnad får inte ge upphov till besvärande reflexer."
+  },
+  {
+   "id": "hiss/hissystem/belysning",
+   "path": [
+    "HISSYSTEM",
+    "BELYSNING"
+   ],
+   "text": "• Allmänbelysning på stannplan, framför hissen intill schaktdörren, ska uppgå till minst 50 lux vid golvnivå, så att användaren kan se framför sig om korgen är där när hen öppnar schaktdörren för att stiga in i hisskorgen, även om korgbelysningen är ur funktion enligt"
+  },
+  {
+   "id": "hiss/hissystem/belysning/ss-en-81-20-5-3-7-1",
+   "path": [
+    "HISSYSTEM",
+    "BELYSNING",
+    "SS-EN 81-20, 5.3.7.1."
+   ],
+   "text": "• LED-belysning i hisskorg, hisschakt och maskinutrymmen.\n• Allmänbelysning i hisskorg ska utföras med belysningsstyrka lägst 100 lux uppmätt 1 m ovan golv och vid korgtablå enligt SS-EN 81-20, 5.4.10.1-3.\n• LED-belysning i hisskorg utförd som närvarostyrd, alternativt tidstyrd från hissens styrsystem, Släcks helt eller sänks till 10 % av normal belysningsstyrka, 5 minuter efter sista rörelse, dock inte vid driftstopp med innestängda passagerare i hisskorg. All funktion för närvarostyrning reglerbar.\n• Nödbelysning i hisskorg, ska utföras med belysningsstyrka lägst 5 lux under minst 1 timme vid nödsignalknapp, i mitten av hisskorgen 1 m ovan golv och i mitten på korgtaket 1 m ovan enligt SS-EN 81-20, 5.4.10.4.\n• Allmänbelysning i hissmaskinrum och maskinutrymme, ska utföras med belysningsstyrka lägst 200 lux uppmätt på golv, överallt där personer behöver arbeta och 50 lux vid golvnivå mellan arbetsområden enligt SS-EN 81-20, 5.2.1.4.2.\n• Allmänbelysning i hisschakt, ska utföras med belysningsstyrka lägst 50 lux 1 m ovan korgtakets vertikalprojektion och hissgrop enligt SS-EN 81-20, 5.2.1.4.1.\n• Vid ändring eller modernisering av hiss, ska särskilt beaktas grundläggande krav enligt Boverkets grundförfattning BFS 2025:11 BFS 2025:12 BFS 2025:13"
+  },
+  {
+   "id": "hiss/hissystem/strom-och-teleforsorjning",
+   "path": [
+    "HISSYSTEM",
+    "STRÖM- OCH TELEFÖRSÖRJNING"
+   ],
+   "text": "• Strömförsörjning ska förses med överspänningsskydd, typ mellan/fin ska vara jackbart, ska ha optisk indikering och försett med larmkontakt.\n• Vid ändring eller modernisering av hiss, ska särskilt beaktas grundläggande krav enligt Boverkets grundförfattning BFS 2025:11 BFS 2025:12 BFS 2025:13"
+  },
+  {
+   "id": "hiss/hissystem/miljoaspekter/allmanna-miljokrav",
+   "path": [
+    "HISSYSTEM",
+    "MILJÖASPEKTER",
+    "Allmänna miljökrav"
+   ],
+   "text": "• Minimera råvaruanvändningen genom att välja material och systemutformningar med god beständighet mot korrosion och förslitning, liksom mot fukt- och vattenskador.\n• Placera installationsdelar så att de är lätt åtkomliga för funktionskontroll, underhåll, reparation och utbyte.\n• Välj material, produkter och komponenter som kan återanvändas.\n• Placera apparatskåp så att kabeldragningar minimeras.\n• Utrustningar inom hissystemet ska tåla temperaturer från +5°C till +40°C.\n• Kablage och kabelkanaler ska vara PVC- och halogenfritt."
+  },
+  {
+   "id": "hiss/hissystem/miljoaspekter/elmiljo",
+   "path": [
+    "HISSYSTEM",
+    "MILJÖASPEKTER",
+    "Elmiljö"
+   ],
+   "text": "• Ta hänsyn till EMC-föreskrifternas krav på att tillfredställande skydd ska finnas för system, utrustning och apparater, vilkas funktion kan försämras av elektromagnetiska störningar som orsakas av elektriska och elektroniska apparater."
+  },
+  {
+   "id": "hiss/hissystem/miljoaspekter/energianvandning",
+   "path": [
+    "HISSYSTEM",
+    "MILJÖASPEKTER",
+    "Energianvändning"
+   ],
+   "text": "• Utforma systemlösningar så att det finns möjlighet att hålla systemets totala energibehov på en låg nivå.\n• Optimera fördelningen mellan värmeenergi och elenergi."
+  },
+  {
+   "id": "hiss/hissystem/miljoaspekter/frekvensomriktare",
+   "path": [
+    "HISSYSTEM",
+    "MILJÖASPEKTER",
+    "Frekvensomriktare"
+   ],
+   "text": "• Elektriska och magnetiska fält ska begränsas genom att använda skärmade kablar mellan frekvensomriktare och motor.\n• Frekvensomriktare ska uppfylla krav enligt SS-EN 12015, SS-EN 12016 och SS-EN 61800-5-1.\n• I miljö med störningskänslig utrustning, ska frekvensomriktare även vara försedd med radiostörnings- och övertonsfilter klass B anpassat för till exempel vårdmiljö.\n• Frekvensomriktaren ska vara dimensionerad minst för tillförd effekt +20% samt driftcykler enligt aktuellt drivsystem.\nEffekt- och energibegränsade installationer\nEffektbehovet och energianvändningen på hissinstallationen ska minimeras genom att utforma systemlösningar så att det finns möjlighet att hålla systemets totala effekt- och energibehov på en låg nivå:\n• Säkerställ automatisk återmatningsfunktion av elenergi vid inbromsning, till hissens eller fastighetens elsystem. (Återmatningsfunktion rekommenderas vid 10 stannplan eller mer, alternativt vid hiss utförd för högtrafik t.ex. minst 180 driftcykler (Start-märkhastighet- stopp) per timme).\n• Frekvensstyrda hissmotorer ska användas, alternativt andra effekt- och energibegränsande hissmotorer.\n• Driv- och styrsystem ska ha stand-by-läge (reducering) för manöver-, signal och indikeringsfunktioner (inte brandindikering) samt för frekvensomriktare.\n• Drivsystemets effektsteg ska vara inställt på viloläge när det inte används.\n• Signaliseringens ljus ska släckas när de inte används.\n• Hisskorg med ventilationsfläkt ska stängas av när hissen inte används, dock inte vid driftstopp med innestängda passagerare i hisskorg.\n• Datoröverföring och utrustning ska vara störningsskyddat såväl mot övertoner, transienter som mot spänningstoppar på nätspänning.\nLjud- och vibrationsisolering\nUtrustningar för hissystem ska vara utförda för låg ljudnivå med ljud- och vibrationsisolering.\nVibrationsdämpare ska finnas:\n• mellan hissmaskinerier och fast byggnadsdel/bärande konstruktion,\n• mellan hisskorg och bärram,\n• mellan fästdon för apparatskåp och fast byggnadsdel.\nVibrationsdämpande isolering ska finnas:\n• på hisskorgs utsida vid korgväggar i stålplåt.\nUtrustning i apparatskåp ska monteras på vibrationsdämpad montageplåt."
+  },
+  {
+   "id": "hiss/drivsystem",
+   "path": [
+    "DRIVSYSTEM"
+   ],
+   "text": "• Stopp av hisskorg vid stannplan samt planinställningsnoggrannhet enligt SS-EN 81–20, 5.12.1.1.4 och 6.3.12.\n• Drivsystem ska, i första hand, utföras med frekvensstyrd motor.\n• Alternativt drivsystem, med annat effekt- och energibegränsande system, beslutas i samråd med beställaren."
+  },
+  {
+   "id": "hiss/drivsystem/elektriska-hissar",
+   "path": [
+    "DRIVSYSTEM",
+    "ELEKTRISKA HISSAR"
+   ],
+   "text": "• Säkerhetsregler enl. SS-EN 81-20.\n• Hissmaskineri för drivskive-, kedje- och trumhissar enl. SS-EN 81–20, avsnitt 5.9.2.\n• Drivsystemet ska vara dimensionerat för minst 180 driftcykler (Start-märkhastighet-stopp) per timme.\n• Hissmaskineri för hissar nyttjas till max 80 %, vid märklast samt driftcykler."
+  },
+  {
+   "id": "hiss/drivsystem/hydrauliska-hissar",
+   "path": [
+    "DRIVSYSTEM",
+    "HYDRAULISKA HISSAR"
+   ],
+   "text": "• Säkerhetsregler enligt. SS-EN 81-20.\n• Hissmaskineri för hydraulhissar enligt SS-EN 81-20, 5.9.3.\n• Drivsystemet ska vara dimensionerat för minst 90 driftcykler (Start-märkhastighet-stopp) per timme.\n• Drivsystem utförs med frekvensstyrd motor vid hiss med högtrafik till exempel minst 60 driftcykler (Start-märkhastighet-stopp) per timme) eller i samråd med beställare."
+  },
+  {
+   "id": "hiss/drivsystem/hydrauliska-hissar/hisskorg",
+   "path": [
+    "DRIVSYSTEM",
+    "HYDRAULISKA HISSAR",
+    "HISSKORG)"
+   ],
+   "text": "• Säkerhetsregler enligt SS-EN 81-40 för trapphissar och plattformshissar som rör sig längs en lutande bana, avsedda för personer med nedsatt rörelseförmåga.\n• Säkerhetsregler enligt SS-EN 81-41 för vertikalgående plattformshissar, avsedda för personer med nedsatt rörelseförmåga.\n• Drivsystemet ska vara dimensionerat för minst 30 driftcykler (Start-märkhastighet-stopp) per timme."
+  },
+  {
+   "id": "hiss/styrsystem",
+   "path": [
+    "STYRSYSTEM"
+   ],
+   "text": "• Styrsystemets manöver- och signalanordningar, ska utföras enligt SS-EN 81-70, avsnitt5.4.\n• Styrsystemet ska kunna underhållas och repareras av företag som anläggningsägaren finner lämpligt. All teknisk dokumentation, specialverktyg, programmeringsutrustning med mera som behövs för service och underhåll ska ingå och förbli brukbara under styrsystemets livslängd.\n• Styrsystemets samtliga programmerbara och omställbara parametrar och funktioner ska vara möjliga att ändra under hela styrsystemets livslängd, utan att några ytterligare omprogrammeringar, tillbehör eller utrustningar behöver införskaffas av anläggningsägaren.\n• Styrsystemet ska vara elektroniskt och mikrodatorbaserat.\n• Dataöverföring till CPU:n och utrustning ska vara störningsskyddad såväl mot övertoner, transienter som mot spänningstoppar på nätspänningen.\n• Fel i anropstablå vid ett stannplan får inte omöjliggöra anrop från övriga stannplan."
+  },
+  {
+   "id": "hiss/styrsystem/elektriska-och-hydrauliska-hissar",
+   "path": [
+    "STYRSYSTEM",
+    "ELEKTRISKA OCH HYDRAULISKA HISSAR"
+   ],
+   "text": "• Direktstyrning med lagrade impulser i fastigheter med få stannplan och låg trafikintensitet.\n• Nedkollektiv i fastigheter med bostäder eller motsvarande.\n• Helkollektiv i fastigheter med många interna transporter mellan våningar, till exempel vårdmiljö, kontor eller motsvarande."
+  },
+  {
+   "id": "hiss/styrsystem/elektriska-och-hydrauliska-hissar/utan-hisskorg/lagfartshiss-utan-hisskorg",
+   "path": [
+    "STYRSYSTEM",
+    "ELEKTRISKA OCH HYDRAULISKA HISSAR",
+    "UTAN HISSKORG)",
+    "Lågfartshiss utan hisskorg"
+   ],
+   "text": "• Styrsystem typ direktstyrning med lagrade impulser, med impuls för anrop (tryckknapp på våningsplan) och hålldon för destination (tryckknapp på plattform)."
+  },
+  {
+   "id": "hiss/styrsystem/elektriska-och-hydrauliska-hissar/utan-hisskorg/lagfarthiss-med-hisskorg",
+   "path": [
+    "STYRSYSTEM",
+    "ELEKTRISKA OCH HYDRAULISKA HISSAR",
+    "UTAN HISSKORG)",
+    "Lågfarthiss med hisskorg"
+   ],
+   "text": "• Styrsystem typ direktstyrning med lagrade impulser, med impuls för anrop (tryckknapp på våningsplan) och destination (tryckknapp i hisskorg)."
+  },
+  {
+   "id": "hiss/styrsystem/elektriska-och-hydrauliska-hissar/funktioner",
+   "path": [
+    "STYRSYSTEM",
+    "ELEKTRISKA OCH HYDRAULISKA HISSAR",
+    "FUNKTIONER"
+   ],
+   "text": "• Transportkörning\n• Akuttransport\n• Körning via entré- och passerkontrollsystem."
+  },
+  {
+   "id": "hiss/brandlarmfunktion",
+   "path": [
+    "BRANDLARMFUNKTION"
+   ],
+   "text": "Hiss i byggnad med automatiskt brandlarmssystem\nHiss ska förses med brandlarmsfunktion enligt SS-EN 81-73 och anslutas till fastighetens automatiska brandlarmsystem för aktivering av brandlarmsfunktionen.\nEvakueringsplan med två alternativ, ska bestämmas av brandlarm som detekterar brandhärdens läge.\nOm hiss är blockerad på grund av tekniskt fel, aktiverat nödstopp eller aktiverad servicekörning ska brandfunktionen inte kunna starta hissen.\nI anslutning till hissen, på samtliga stannplan, ska skylt enligt figur ”Använd inte hissen i händelse av brand” sättas upp. Skyltens storlek ska vara minst 50 mm enligt SS-EN 81-73, 5.1.6.\nHiss i byggnad utan automatiskt brandlarmssystem\nHiss ska förses med brandlarmsfunktion för aktivering av brandlarmsfunktion, enligt"
+  },
+  {
+   "id": "hiss/brandlarmfunktion/ss-en-81-73-5",
+   "path": [
+    "BRANDLARMFUNKTION",
+    "SS-EN 81-73, 5."
+   ],
+   "text": "Aktivering av driftsatt brandlarmsfunktion ska ske automatiskt via detektor placerad i hisschakt eller i direkt anslutning till hisschakt vid översta stannplan.\nOm hiss är blockerad på grund av tekniskt fel, aktiverat nödstopp eller aktiverad servicekörning ska brandfunktionen inte kunna starta hissen.\nI anslutning till hissen, på samtliga stannplan, ska skylt enligt figur ”Använd inte hissen i händelse av brand” sättas upp. Skyltens storlek ska vara minst 50 mm enligt SS-EN 81-73, 5.1.6.\nFigur 1 ”Använd inte hissen i händelse av brand”"
+  },
+  {
+   "id": "hiss/indikeringsfunktioner/multifunktionsdisplay",
+   "path": [
+    "INDIKERINGSFUNKTIONER",
+    "MULTIFUNKTIONSDISPLAY"
+   ],
+   "text": "Indikeringsfunktioner ska utföras med multifunktionsdisplayer typ TFT / LCD innehållande funktioner enligt nedan beskriven text.\nMultifunktionsdisplayer ska kunna indikera samtliga funktioner, även om funktionen inte använd. Omställning av funktioner, siffror och talande meddelanden ska vara möjliga att ändra hela displayens livslängd, utan att några ytterligare tillbehör eller utrustningar behöver införskaffas av anläggningsägaren.\nIndikering i hisskorg enligt följande:\n• Talande information\n• Våningsangivelse\n• Färdriktning\n• Avstängd\n• Överlast\n• Brand."
+  },
+  {
+   "id": "hiss/indikeringsfunktioner/multifunktionsdisplay/indikeringar-vid-vaningsplan",
+   "path": [
+    "INDIKERINGSFUNKTIONER",
+    "MULTIFUNKTIONSDISPLAY",
+    "Indikeringar vid våningsplan"
+   ],
+   "text": "• Våningsangivelse\n• Färdriktning\n• Avstäng.\n• Brand.\nGäller hissar med fler än 2 stannplan."
+  },
+  {
+   "id": "hiss/indikeringsfunktioner/funktion-for-kvitteringsindikering-och-aterkoppling",
+   "path": [
+    "INDIKERINGSFUNKTIONER",
+    "FUNKTION FÖR KVITTERINGSINDIKERING OCH ÅTERKOPPLING"
+   ],
+   "text": "• Kvitteringsindikering vid våningsplan och i hisskorg enligt SS-EN 81-70, avsnitt 5.4.2.\n• Återkoppling vid knapptryckning enligt SS-EN 81-70, tabell 4, f) och g)."
+  },
+  {
+   "id": "hiss/indikeringsfunktioner/funktion-for-ankomstindikering",
+   "path": [
+    "INDIKERINGSFUNKTIONER",
+    "FUNKTION FÖR ANKOMSTINDIKERING"
+   ],
+   "text": "• Ankomstindikering vid våningsplan och i hisskorg enligt. SS-EN 81-70, 5.4.2.4.\n• Vid normalmanövrering (direktstyrning med lagrade impulser) ska en ljudsignal ljuda vid våningsplanet, visande att dörrarna har börjat öppnas. Ljudet från dörrarna är tillräcklig signal om det är 45 dB(A) eller högre.\nVid kollektivmanövrering (kollektiv ned eller helkollektiv) där manöversystemet har bestämt färdriktning ska färdriktningspilar finnas placerade över eller i anslutning till schaktdörr."
+  },
+  {
+   "id": "hiss/indikeringsfunktioner/funktion-for-avstangdindikering",
+   "path": [
+    "INDIKERINGSFUNKTIONER",
+    "FUNKTION FÖR AVSTÄNGDINDIKERING"
+   ],
+   "text": "• Avstängdindikering ska vara integrerad i tablå för ankomst-, stannplan- och färdriktningsindikering på samtliga våningsplan samt i tablå för stannplans- och färdriktningsindikering i hisskorg."
+  },
+  {
+   "id": "hiss/indikeringsfunktioner/funktion-for-stannplansindikering",
+   "path": [
+    "INDIKERINGSFUNKTIONER",
+    "FUNKTION FÖR STANNPLANSINDIKERING"
+   ],
+   "text": "• Hisskorg förses med system med talande våningsinformation på svenska enligt"
+  },
+  {
+   "id": "hiss/indikeringsfunktioner/funktion-for-stannplansindikering/ss-en-81-70-5-4-2-5-2",
+   "path": [
+    "INDIKERINGSFUNKTIONER",
+    "FUNKTION FÖR STANNPLANSINDIKERING",
+    "SS-EN 81-70, 5.4.2.5.2."
+   ],
+   "text": "• System med talande våningsinformation och talande information ska innehålla utrustning för att, på plats, möjliggöra ändring av våningsinformation och information samt ange alternativt spela in ny information.\n• Högtalare ska placeras och justeras för anpassning till lokala förhållanden."
+  },
+  {
+   "id": "hiss/driftovervakningssystem",
+   "path": [
+    "DRIFTÖVERVAKNINGSSYSTEM"
+   ],
+   "text": "• Hiss ska förses med driftövervakningssystem som ska innehålla loggningsfunktion som lagrar de 10 senast inträffade felen samt typ av fel. Funktionen ska hanteras av driftövervakningssystemet och lagrad information får inte raderas vid strömavbrott.\n• Antal driftcykler (start-märkhastighet-stopp) för drivsystem ska kunna verifieras och avläsas i hissens styrsystem.\n• System ska förses med starträknare, drifttidmätare.\n• Larmindikeringar som innebär driftstopp ska kunna avläsas i hissarnas styrsystem.\nInträffade och loggade fel ska lagras med tidpunkt.\n• Lagrade larm ska anges med kod kompletterad på svenska."
+  },
+  {
+   "id": "hiss/summalarmsystem",
+   "path": [
+    "SUMMALARMSYSTEM"
+   ],
+   "text": "• Samtliga fel som innebär driftstopp, inklusive utlösta överspänningsskydd och teleskydd, summalarm från nödsignalaggregat samt fel på strömförsörjningsaggregat för nödtelefon, ska påverka kontaktfunktionen."
+  },
+  {
+   "id": "hiss/nodsignalsystem/siren",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "SIREN"
+   ],
+   "text": "• Siren för nödsignal ska placeras på korgtak.\n• Siren ska vara försedd med ställbart ljudtryck 35-85 dB."
+  },
+  {
+   "id": "hiss/nodsignalsystem/nodbelysning",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "NÖDBELYSNING"
+   ],
+   "text": "• Nödbelysning i hisskorg ska strömförsörjas med strömförsörjningsaggregat i nödsignalsystemet.\n• Nödbelysning typ LED."
+  },
+  {
+   "id": "hiss/nodsignalsystem/driftlarm",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "DRIFTLARM"
+   ],
+   "text": "• Fel på nödsignalaggregat, ska hanteras som driftlarm enl. summalarm samt tas emot av ansluten larmmottagare."
+  },
+  {
+   "id": "hiss/nodsignalsystem/nodsignalsystem-med-hisstelefon",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "NÖDSIGNALSYSTEM MED HISSTELEFON"
+   ],
+   "text": "• Hisstelefon för alarmsystem enligt SS-EN 81-28 och SS-EN 81-70, 5.4.2.5.3.\n• Hisstelefon för alarmsystem, ska vid behov, kompletteras med induktionsslinga i hisskorg som hörselhjälpmedel enligt SS-EN 81-70, 5.4.2.5.4.\n• Hisstelefon utförd för mobilt telefonnät (GSM) för säkerställd förbindelse med ansluten larmmottagare.\n• Telefonabonnemang hanteras och bekostas av beställaren.\n• Telefonnummer som ska programmeras in i telefonen utförs av entreprenören i samråd med beställaren.\n• Centralenhet utförd med larmprotokoll som används vid larmöverföring till ansluten larmmottagare. Entreprenören har samordningsansvaret att larmprotokollet kan tas emot av ansluten larmmottagare.\n• Nödlarm, från innestängd passagerare i hisskorg via hisstelefon, ska tas emot av ansluten larmmottagare enligt SS-EN 81-28, 4.1.1.\n• Larm med talkommunikation som går till larmpersonal-SOS samt akustisk signal utanför hissen.\n• Nödtelefon ska kunna användas av personer med nedsatt funktionsförmåga.\n• Fel på hisstelefon, ska hanteras som driftlarm och tas emot av ansluten larmmottagare enligt SS-EN 81-28, avsnitt 4.2.1.\n• Mobil anslutning (GSM) av nödtelefon ska utföras enligt. SS-EN 81-28, 4 med hänvisning till"
+  },
+  {
+   "id": "hiss/nodsignalsystem/nodsignalsystem-med-hisstelefon/ss-en-81-20-5-12-3-1",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "NÖDSIGNALSYSTEM MED HISSTELEFON",
+    "SS-EN 81-20, 5.12.3.1."
+   ],
+   "text": "• Vid ändring eller modernisering av hiss, ska särskilt beaktas grundläggande krav enligt Boverkets grundförfattning BFS 2025:11 BFS 2025:12 BFS 2025:13\n• Nödkommunikationssystemet ska kunna underhållas och repareras av företag som anläggningsägaren finner lämpligt. All teknisk dokumentation, specialverktyg, programmeringsutrustning med mera som behövs för service och underhåll ska ingå och förbli brukbara under systemets livslängd. Dokumentation på samtliga parametrar och felkoder ska ingå i drift- och underhållsinstruktioner. Inga hårdvarulås, koder eller liknande som hindrar felsökning eller fritt utbyte av komponenter får förekomma. Leverantören ska förbinda sig att leverera teknisk support, reservdelar med mera till vilket hissföretag som helst under systemets livslängd. Det ska vara möjligt att i efterhand komplettera eller utöka systemet med fler funktioner."
+  },
+  {
+   "id": "hiss/nodsignalsystem/markning",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "MÄRKNING"
+   ],
+   "text": "• Se ”Riktlinje märkning och numrering”.\n• Se även ”hissdirektivet 2014/33/eu och maskindirektivet 2006/42/eg med därtill harmoniserade standarder”."
+  },
+  {
+   "id": "hiss/nodsignalsystem/markning-av-hiss",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "MÄRKNING AV HISS"
+   ],
+   "text": "• Anslag och instruktioner enligt standard beroende på hisstyp.\n• Märkning i hissmaskinrum/maskinutrymme utförs så att det lätt och säkert går att finna följande komponenter för respektive hiss:\n− Huvudelkopplare\n− Hissmaskin\n− Apparatskåp\n− Hastighetsbegränsare\n− Nödsignalaggregat\n− Nödtelefon\n− Strömställare för schaktbelysning.\n• Hissar i grupp ska märkas med hissnummer (platsbeteckning i byggnaden) på samtliga våningsplan.\n• Destinations-, anrops-, dörr- och övriga knappars kulör, form och märkning gäller,"
+  },
+  {
+   "id": "hiss/nodsignalsystem/markning-av-hiss/ss-en-81-70",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "MÄRKNING AV HISS",
+    "SS-EN 81-70."
+   ],
+   "text": "• Text på täcklock och på för trafikanter synliga skyltar ska vara utförd i kulör med god kontrastverkan mot bakgrunden.\n• Informationstavla med våningsinformation monteras i hisskorg ovan destinationstablå. Informationstavla tillhandahålls av beställaren."
+  },
+  {
+   "id": "hiss/nodsignalsystem/markning-i-hisskorg",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "MÄRKNING I HISSKORG"
+   ],
+   "text": "• Märkning, i hisskorg, för tillåten märklast och tillåtet antal personer enligt Hissdirektivet 2014/33/EU, bilaga 1, kapitel 5 för elektriska och hydrauliska hissar samt enl. Maskindirektivet 2006/42/EC för lågfartshissar.\n• Bevismärken (besiktningsskylt) i hisskorg, över aktuellt service- och ackrediterat besiktningsorgan, ska finnas uppsatta i hisskorgen enligt BFS 2025:11 BFS 2025:12 BFS 2025:13"
+  },
+  {
+   "id": "hiss/nodsignalsystem/markning-for-ackrediterad-besiktning-och-service",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "MÄRKNING FÖR ACKREDITERAD BESIKTNING OCH SERVICE"
+   ],
+   "text": "• Märkning, över aktuellt företag för ackrediterad besiktning och serviceföretag, ska redovisas.\n• Märkning över service- och ackrediterat besiktningsorgan ska placeras minst 2,0 m över golv ovan korgtablå vid korgöppning.\n• Märkning ska placeras på en plåt av samma material som korgtablå. Plåt 200 x 100 mm (B x H) inklusive transparent makrolonskiva med samma mått, som fästs på korgvägg med försänkt skruv."
+  },
+  {
+   "id": "hiss/nodsignalsystem/markning-av-apparatskap/utsida-apparatskap",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "MÄRKNING AV APPARATSKÅP",
+    "Utsida apparatskåp"
+   ],
+   "text": "• Apparatskåp ska märkas med beteckning som finns på byggnadens huvudledningsschema.\n• Märkskylt placeras på utsida apparatskåp.\n• Märkskylt ska även innehålla uppgift om beteckning på objekt i matande huvudlednings andra ände.\n• Omkopplare, placerade på dörr eller kapsling, ska positions- och funktionsmärkas."
+  },
+  {
+   "id": "hiss/nodsignalsystem/markning-av-apparatskap/insida-apparatskap",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "MÄRKNING AV APPARATSKÅP",
+    "Insida apparatskåp"
+   ],
+   "text": "• Samtliga ingående komponenter ska positionsmärkas enligt tillhörande elschema för lätt identifiering:\n− Apparater\n− Omkopplare\n− Säkringar/dvärgbrytare\n− PLC/mikroprocessor\n− Kontaktorer\n− Reläer\n− Överspännings- och överströmsskydd\n− Frekvensomriktare\n− Kretskort\n− Kopplingsplintar och kontaktdon\n− Etcetera.\n• Säkringsspecifikationerna såsom värde och typ ska anges på säkringen/dvärgbrytaren.\n• Ritning med samtliga ingående apparater inklusive apparatförteckning ska finnas uppsatt på insida dörr på apparatskåpet."
+  },
+  {
+   "id": "hiss/nodsignalsystem/kontroll-och-injustering",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "KONTROLL OCH INJUSTERING"
+   ],
+   "text": "Innan en hiss tas i drift ska den underkastas konstruktions- och installationskontroll enligt"
+  },
+  {
+   "id": "hiss/nodsignalsystem/dokumentation",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "DOKUMENTATION"
+   ],
+   "text": "Se ”Riktlinje BIM, CAD och dokumentation samt ”Specifikation handlingar”.\nSe även hissdirektivet 2014/33/eu och maskindirektivet 2006/42/eg med därtill harmoniserade standarder.\nUtöver ovanstående, ska även kopia av:\n• Besiktningsprotokollen skickas till besiktning@karlstad.se\n• Serviceprotokollen skickas till serviceprotokoll@karlstad.se"
+  },
+  {
+   "id": "hiss/nodsignalsystem/dokumentation/och-underhall",
+   "path": [
+    "NÖDSIGNALSYSTEM",
+    "DOKUMENTATION",
+    "OCH UNDERHÅLL"
+   ],
+   "text": "• Drift, skötsel och underhåll, enligt BFS 2025:11 BFS 2025:12 BFS 2025:13 med servicebesök ingår under garantitiden.\n• Servicebesök under garantitiden om minst 2 besök per år. Utöver servicebesök, ska entreprenören medverka vid återkommande besiktning.\n• Drift, tillsyn, skötsel och underhåll ska omfatta förebyggande underhåll och reparationer samt avhjälpande av fel, inklusive jourtjänst.\n• Besöken ska samordnas med beställarens drift- och underhållspersonal.\n• Drift- och underhållspersonal ska beredas tillfälle att vara närvarande vid besöken.\n• Larmmottagning och provlarm för hisstelefon ska ingå under garantitid.\n• Entreprenören ska tillhandahålla reservdelar.\n• Entreprenören ska föra journal över tillsyns-, skötsel- och underhållsåtgärder som ska uppvisas vid garantibesiktning. Journal som inte är ifylld, betraktas som att tillsyn, skötsel och underhåll inte är utförda.\n• Journalen ska hållas tillgänglig för ackrediterat kontrollorgan vid kontrollen och för tillsynsmyndigheten.\n• Kontroll av Brandlarmsfunktion med detektorprovare vid hiss i byggnad utan automatiskt brandlarmsystem, utförs i samband med service besök. Provet och resultat dokumenteras i servicejournal.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

@@ -1,0 +1,678 @@
+{
+ "doc": "styr-och-overvakning",
+ "title": "Riktlinje Styr och övervakning",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-Styr-och-övervakning-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "styr-och-overvakning/att-tanka-pa/mer-information-finns",
+   "path": [
+    "ATT TÄNKA PÅ",
+    "Mer information finns"
+   ],
+   "text": "• Styr ska kopplas upp till Karlstads kommuns befintliga på karlstad.se överordnade system (ÖS).\n• I arbetet ingår att leverera erforderliga och detaljerade uppgifter till Karlstads kommun som utför systemintegrationen beskrivet i anvisningar för respektive överordnat system.\n• Styr- och övervakningsanläggningen ska utföras med datoriserat system.\n• I entreprenaden ska ingå att projektera, leverera, montera, programmera, driftsättning samt att injustera styr- och övervakningsanläggningen till fullt funktions- och driftfärdigt skick.\n• Uppdateringar/bugfixar av mjukvaror ska ingå under garantitiden.\n• Entreprenören är skyldig att ställa teknisk personal, som är väl förtrogen med offererade tekniska lösningar, till Karlstads kommuns förfogande.\n• För elinstallationsarbeten ska entreprenören lämna uppgift på behörig installatör."
+  },
+  {
+   "id": "styr-och-overvakning/allmanna-krav/fabrikatval",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "FABRIKATVAL"
+   ],
+   "text": "• Om inte annat anges ska sakvaror, don och apparater vara av fabrikat vanligt förekommande i Sverige med lätt tillgängliga reservdelar och med service- och försäljningsorganisation i Sverige.\n• Om det i handling föreskrivs fabrikatsangivna produkter, får de bytas mot likvärdiga. Karlstads kommuns projektansvariga avgör likvärdigheten efter samråd med sakkunniga inom respektive teknikområde."
+  },
+  {
+   "id": "styr-och-overvakning/allmanna-krav/dimensionerande-data",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA"
+   ],
+   "text": "• Inneklimatkrav enligt VVS Tekniska föreningens skrift R1\n• Termiskt klimat\n• Termisk klimatklass TQ2"
+  },
+  {
+   "id": "styr-och-overvakning/allmanna-krav/dimensionerande-data/dimensionerande-utetemperatur",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Dimensionerande utetemperatur"
+   ],
+   "text": "• Vinter -22°C\n• Sommar +25°C, relativ fuktighet 50%\nKommunens standard rumstemperaturer vid dimensionerande utetemperatur vinter\n• Skolor +20°C\n• Kontor +21°C\n• Förskolor och bostäder +22°C\n• Äldreboende och liknande verksamheter +23°C\n• Verkstadslokaler, gymnastik/idrottssalar +18°C"
+  },
+  {
+   "id": "styr-och-overvakning/allmanna-krav/dimensionerande-data/dimensionerade-temperaturer-i-varmesystem",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Dimensionerade temperaturer i värmesystem"
+   ],
+   "text": "• Fjärrvärme tillopp vinter enligt ”F:101 Fjärrvärmecentralen – utförande och installation”\n• Fjärrvärme tillopp sommar enligt ”F:101 Fjärrvärmecentralen – utförande och installation”\n• Radiatorsystem tillopp +55°C\n• Ventilationsvärmesystem tillopp +50°C\n• Tappvarmvatten vid tappstället +55°C\n• VVC retur lägst +50°C"
+  },
+  {
+   "id": "styr-och-overvakning/allmanna-krav/dimensionerande-data/dimensionerade-temperaturer-i-kylsystem",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Dimensionerade temperaturer i kylsystem"
+   ],
+   "text": "• Fjärrkyla tillopp enligt ”F:102 Fjärrkylcentralen – utförande och installation”\n• Fjärrkyla retur enligt ”F:102 Fjärrkylcentralen – utförande och installation”"
+  },
+  {
+   "id": "styr-och-overvakning/allmanna-krav/dimensionerande-data/dimensionerande-tryck",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Dimensionerande tryck"
+   ],
+   "text": "• Tappvattensystem 10 bar\n• Värmesystem 6 bar\n• Fjärrvärme 16 bar\n• Fjärrkyla 16 bar\n• Köldbärarsystem 10 bar\n• Kylmedelsystem 10 bar"
+  },
+  {
+   "id": "styr-och-overvakning/styr-och-overvakningssystem/systemutformning/styrsystem-ddc-direct-digital-control",
+   "path": [
+    "STYR OCH ÖVERVAKNINGSSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Styrsystem – DDC (Direct digital control)"
+   ],
+   "text": "• Systemet ska bestå av fritt programmerbara styrenheter innehållande CPU, I/O och kommunikationsenheter huvudsakligen placerade i apparatskåp. Prefabricerade DDC:er kan förekomma, detta är då föreskrivet i förfrågningsunderlag\n• Vissa installationer styrs direkt av detta system. I andra fall sker signalutbyte med detta system för övervakning och samordning av anläggningsövergripande funktioner.\n• Hårdvarugränssnitt (potentialfria kontakter) förkommer för signalutbyte mellan DDC andra system exempelvis larm från elsystem."
+  },
+  {
+   "id": "styr-och-overvakning/styr-och-overvakningssystem/systemutformning/kommunikation",
+   "path": [
+    "STYR OCH ÖVERVAKNINGSSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Kommunikation"
+   ],
+   "text": "• Ett tekniskt datanät (LAN) ska installeras av entreprenören och utgöra infrastruktur för styrsystemets utbyte av information.\n• Mätning av media ska ske via trådbunden M-BUS."
+  },
+  {
+   "id": "styr-och-overvakning/styr-och-overvakningssystem/systemutformning/styrutrustning-i-befintlig-byggnad",
+   "path": [
+    "STYR OCH ÖVERVAKNINGSSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Styrutrustning i befintlig byggnad"
+   ],
+   "text": "• I projekt där befintligt styrsystem ska bytas ut eller utökas är det tillåtet att nyttja befintlig kommunikationsslinga. I dessa fall ska överenskommelse med beställare ske.\n• Däremot ska prestanda enligt denna riktlinje garanteras vid val av denna metod.\n• Se även övergripande systemkrav enligt denna riktlinje.\n• Beroende på vald slutgiltig systemlösning kan även annan fältbuss komma i fråga."
+  },
+  {
+   "id": "styr-och-overvakning/styr-och-overvakningssystem/styrutrustning",
+   "path": [
+    "STYR OCH ÖVERVAKNINGSSYSTEM",
+    "STYRUTRUSTNING"
+   ],
+   "text": "Styrutrustning ska vara av fabrikat enligt nedan eller likvärdigt:\n• SAIA\n• Siemens Building Automation\nFör specifika krav, se rubrik ”enheter i programmerbara styrsystem”."
+  },
+  {
+   "id": "styr-och-overvakning/styr-och-overvakningssystem/styrutrustning-2",
+   "path": [
+    "STYR OCH ÖVERVAKNINGSSYSTEM",
+    "STYRUTRUSTNING"
+   ],
+   "text": "Innan beställning av prefab-styr ska samråd med beställare hållas.\nPrefab-styr ska kopplas upp direkt mot överordnat system ej via DDC/PLC.\nSignalutbyte mellan centralutrustningar för tredjeparts styrsystem, till exempel prefabricerade centralutrustningar för värmepump, luftbehandlingsaggregat och DDC/PLC, ska utformas med uppläsning av:\n• Mätvärden för samtliga givare\n• Manövrar och indikeringar för ingående motorer\n• Styrsignaler för styr- och ställdon\n• Larmsignaler\nDubbelriktat signalutbyte ska gälla för:\n• Enskilda börvärden samt brytpunkter i börvärdeskurvor\n• Larmgränser\n• Signal för tidsfunktioner\nAngivna parametrar ska presenteras grafiskt i driftbild för respektive system i DDC/PLC alternativt i överordnat styrsystem/SCADA.\nDriftbilder i DDC/PLC för värmepump och luftbehandlingsaggregat ska förses med hyperlänkar eller motsvarande till värmepumpens och luftbehandlingsaggregatets interna webserver."
+  },
+  {
+   "id": "styr-och-overvakning/styr-och-overvakningssystem/overgripande-systemkrav/systemets-kapacitet",
+   "path": [
+    "STYR OCH ÖVERVAKNINGSSYSTEM",
+    "ÖVERGRIPANDE SYSTEMKRAV",
+    "Systemets kapacitet"
+   ],
+   "text": "• Anläggningens kapacitet ska beräknas enligt behov som framgår i denna riktlinje med tillhörande bilagor samt för nedan angivna reservkapaciteter och utbyggnadsmöjligheter.\n• Avser vid fullt utbyggd anläggning inklusive reserver och utbyggnadsmöjlighet.\nDär inte annat anges ska systemet ha en total reglernoggrannhet enligt följande:\nLuftbehandling och rörsystem (reglernoggrannhet inom givarens arbetsområde)\n• Vid temperaturgivare i lokal ± 0,5ºC\n• Vid temperaturgivare i kanal ±0,5ºC\n• För tryckgivare i kanal ≤ ±3% av mätområdet\n• Koldioxidgivare i kanal och rum ±50 ppm (mätområde 0–2000 ppm)\n• Vid temperaturgivare i rörledning (värme/kyla) ±0,5ºC\n• För tryckgivare i rör (vätska) ≤ ±5% av mätområdet\n• Fuktgivare relativ fuktighet ≤ ±2% daggpunktsberäkning för till exempel kylbafflar. ≤ ±5% övriga fuktgivare.\nFörekommande avvikelse ska vara konstant och alltså inte som periodisk pendling. Inställbar kalibrering av givare ska finnas (offset-funktion) med åtkomst via DDC och ÖS."
+  },
+  {
+   "id": "styr-och-overvakning/styr-och-overvakningssystem/overgripande-systemkrav/serviceomkopplare-tillika-systemomkopplare",
+   "path": [
+    "STYR OCH ÖVERVAKNINGSSYSTEM",
+    "ÖVERGRIPANDE SYSTEMKRAV",
+    "Serviceomkopplare tillika systemomkopplare"
+   ],
+   "text": "• Förutom displaypanelen ska det även finnas serviceomkopplare (vred) monterade vilka används för enkel manövrering av aggregat/system. Lägen ska vara Service – AUTO.\n• Läge Service ska innebära att manöverkrets till fläktar i luftbehandlingsaggregat/system bryts. Fläktar ska då inte kunna startas från vare sig ÖS eller från DDC.\n• Serviceomkopplare ska vara anslutna till DDC så att DDC realiserar det funktionsläge som systemomkopplare står i.\n• Vid läge ”Serviceomkopplare ej i auto” ska larm aktiveras."
+  },
+  {
+   "id": "styr-och-overvakning/styr-och-overvakningssystem/overgripande-systemkrav/matinsamlingssystem",
+   "path": [
+    "STYR OCH ÖVERVAKNINGSSYSTEM",
+    "ÖVERGRIPANDE SYSTEMKRAV",
+    "Mätinsamlingssystem"
+   ],
+   "text": "• Mätinsamlingssystemet för M-Bus-mätare ska vara helt fristående från styrsystemet"
+  },
+  {
+   "id": "styr-och-overvakning/styr-och-overvakningssystem/overgripande-systemkrav/ddc",
+   "path": [
+    "STYR OCH ÖVERVAKNINGSSYSTEM",
+    "ÖVERGRIPANDE SYSTEMKRAV",
+    "(DDC)."
+   ],
+   "text": "• Samtliga mediamätare ska kommunicera direkt med Karlstads kommuns energiuppföljningssystem via det tekniska LAN-nätet.\n• M-Bus-gateway ska levereras, installeras och konfigureras som en del av installationen.\n• I samband med driftsättningen ska M-Bus-nätverket etableras och verifieras. Det ska säkerställas att samtliga mätvärden är korrekta genom hela signalkedjan – från fysisk mätare till visualiseringsbild i överordnat system.\n• Samtliga M-Bus-mätare ska konfigureras så att de är fullt förberedda för integration till det överordnade systemet (SCADA), inklusive komplett och korrekt datapunktslista. Datapunktslista ska överlämnas till systemintegratören för det överordnade systemet"
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/allmant/utgangar",
+   "path": [
+    "FUNKTIONER",
+    "ALLMÄNT",
+    "Utgångar"
+   ],
+   "text": "• Digitala/analoga utgångar programmeras så att ”handkörning” av dessa fortfarande är möjlig även när det ligger larm på de funktioner som de tillhör."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/ventilationsanlaggning/start-av-aggregat",
+   "path": [
+    "FUNKTIONER",
+    "VENTILATIONSANLÄGGNING",
+    "Start av aggregat"
+   ],
+   "text": "• Via tidkanal, utöver inställd tid ska start kunna göras via övertidstimer. Placering av timer i samråd med beställare.\n• Tidkanal ska alltid finnas för låg- och högfart.\n• I kök där funktionen ”nattmatlagning” finns så startas den via timer i kök.\n• Uppstartsekvensen ska programmeras och driftsättas på ett sådant sätt så att stora pendlingar och utlöst frysvakt inte sker.\n• Om nattkylefunktionen har varit aktivt under natten ska värmesignal förreglas vid uppstart och inställbar tid efteråt."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/ventilationsanlaggning/frysvakt-varmebatteri",
+   "path": [
+    "FUNKTIONER",
+    "VENTILATIONSANLÄGGNING",
+    "Frysvakt värmebatteri"
+   ],
+   "text": "• Frysvaktsregulator övertar regleringen vid 12°C, stopp 8°C, varmhållning 20°C (värdena ska vara inställbara). Manuell återställning."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/ventilationsanlaggning/verkningsgradsberakning",
+   "path": [
+    "FUNKTIONER",
+    "VENTILATIONSANLÄGGNING",
+    "Verkningsgradsberäkning"
+   ],
+   "text": "• Verkningsgrad för värmeväxlare beräknas i DDC med frånluftstemperatur, avluftstemperatur och utetemperatur i kanal\n• Verkningsgraden ska liksom alla analoga mätvärden loggas i ÖS."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/ventilationsanlaggning/forregling",
+   "path": [
+    "FUNKTIONER",
+    "VENTILATIONSANLÄGGNING",
+    "Förregling"
+   ],
+   "text": "• Generellt ska frånluftsfläkt vara förreglad över tilluftsfläkt och omvänt men undantag kan ske vid storköksinstallationer."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/ventilationsanlaggning/ozonrening",
+   "path": [
+    "FUNKTIONER",
+    "VENTILATIONSANLÄGGNING",
+    "Ozonrening"
+   ],
+   "text": "• I anläggningar där rening av luft sker med ozon (ozongenerator eller UV-ljus) ska föreskrivna funktioner för dessa vara med, såsom driftindikering, förreglingar, larm och efterblåsningstid.\n• Personlarm, signal och blixtljus, för hög ozon-nivå ska förregla ozonproduktion och köra aggregat."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/ventilationsanlaggning/kyla",
+   "path": [
+    "FUNKTIONER",
+    "VENTILATIONSANLÄGGNING",
+    "Kyla"
+   ],
+   "text": "• Funktion för nattkyla med separat tidkanal ska finnas både i DDC och ÖS. Samtliga inställningar för nattkyla ska vara inställbara via DDC och ÖS.\n• Funktion för kylåtervinning."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/ventilationsanlaggning/matning",
+   "path": [
+    "FUNKTIONER",
+    "VENTILATIONSANLÄGGNING",
+    "Mätning"
+   ],
+   "text": "• Flödesmätning för tilluft och frånluft ska anges i liter per sekund.\n• Tryck och flödesgivare ska kunna läsas av direkt på givaren."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/ventilationsanlaggning/tryckstyrning",
+   "path": [
+    "FUNKTIONER",
+    "VENTILATIONSANLÄGGNING",
+    "Tryckstyrning"
+   ],
+   "text": "• Tryckbörvärden för låg- och högfart.\n• Tryckreglering för högfart utförs efter en utetemperaturkurva.\nTryckreglering för lågfart utförs med ett fast tryckbörvärde (inställbart)."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/ventilationsanlaggning/drifttid",
+   "path": [
+    "FUNKTIONER",
+    "VENTILATIONSANLÄGGNING",
+    "Drifttid"
+   ],
+   "text": "• Då ventilationsaggregat har varit i drift längre än 24 h ska larm gå ut som ett B-larm. (Gäller ej aggregat med drift 24/7).\n• Drifttidsmätning av fläktar, pumpar, drifttidslarm ska kunna blockeras.\n• Vid nyproduktion ska emissionsventilering ske utanför ordinarie drifttid för ventilationsaggregaten under första året, denna ventilering ska motsvara ca 0,35 l/s per kvadratmeter. Ventilationsentreprenören tillhandahåller detta flöde, aggregatets minsta flöde ska beaktas. Vid ombyggnationsprojekt bestäms behovet av med beställaren."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/ventilationsanlaggning/idrottshall-matsal-samlingssal-aula",
+   "path": [
+    "FUNKTIONER",
+    "VENTILATIONSANLÄGGNING",
+    "Idrottshall/Matsal/Samlingssal/Aula"
+   ],
+   "text": "• Rörelsevakt startar ventilation på grundflöde. Rörelsevakter ska kopplas direkt till DDC.\n• Behovsstyrd ventilation (forcerat flöde) via rumstemp och koldioxidgivare.\nRumskoldioxidgivare ökar luftflödet genom att öppna forceringsspjäll vid hög koldioxidhalt.\nRumstemperaturgivare ökar luftflödet genom att öppna forceringsspjäll vid hög temperatur, om temperaturen på tilluftsgivaren överskrider temperaturen på rumsgivaren så stängs spjällen."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/ventilationsanlaggning/varme-for-ventilationsaggregat",
+   "path": [
+    "FUNKTIONER",
+    "VENTILATIONSANLÄGGNING",
+    "Värme för ventilationsaggregat"
+   ],
+   "text": "• Vid värmebehov förreglar cirkulationspumpen ventilationsaggregatet.\n• Cirkulationspump för värme ska gå när utetemperaturen understiger 10°C (inställbart) eller när ventil öppnar > 5% stänger < 3% samt motionskörs.\n• Driftindikering för pump erhålls via signalkontakt för driftindikering i respektive pump eller strömrelä."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/varmesystem",
+   "path": [
+    "FUNKTIONER",
+    "VÄRMESYSTEM"
+   ],
+   "text": "• VS styrs efter en utekompenserad kurva med fem brytpunkter.\n• Separat tidkanal ska finnas för nattsänkning/ekonomidrift. Tidkanal ska vara aktiv vid komfortdrift.\n• Avstängning av värme via kalenderfunktion eller driftval ska finnas.\n• På fjärrvärmeanläggningar som periodvis har höga energiuttag för varmvattenproduktion ska en funktion för effektreducering genomföras.\n• Behovsstyrda värmegrupper via öppningsgrad på i systemet ingående ventiler eller aktuellt värmebehov styr utgående börvärde.\n• Värmegrupper förses med tillopp och returgivare.\n• Summalarm hämtas från undertrycksavgasare.\nNär fjärrvärmeventilen för varmvatten öppnat tillräckligt mycket blockeras ventiler för VVX-värme för att reducera fjärrvärmeuttag. Automatisk återgång när varmvattentappningen avtar. Driftindikering till DHC. Funktion ska kunna aktiveras/avaktiveras via DDC och ÖS."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/tappvarmvatten-och-vvc-system",
+   "path": [
+    "FUNKTIONER",
+    "TAPPVARMVATTEN- OCH VVC-SYSTEM"
+   ],
+   "text": "• Tappvarmvattengivare på fjärrvärmeanläggningar så sätts givaren efter värmeväxlaren och en givare efter skållningsskyddet (mekanisk blandningsventil) där sådant är monterat.\n• En temperaturgivare sätts på den samlade VVC-returen.\n• En temperaturgivare sätts i änden där VVC-slingan vänder (där TA-Term eller liknande sitter) på varje tappvarmvattenstråk i anläggningen."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/pumpar",
+   "path": [
+    "FUNKTIONER",
+    "PUMPAR"
+   ],
+   "text": "• Cirkulationspumpar för VS ska starta när utetemperaturen understiger 15°C (inställbart) eller när det är värmebehov.\n• Driftindikering för pump erhålls via signalkontakt för driftindikering i respektive pump eller strömrelä."
+  },
+  {
+   "id": "styr-och-overvakning/funktioner/flaktar",
+   "path": [
+    "FUNKTIONER",
+    "FLÄKTAR"
+   ],
+   "text": "• Alla fläktar för ventilation ska övervakas via larmkontakt, tryckgivare eller strömrelä, t.ex. golv-, grund- och radonfläktar."
+  },
+  {
+   "id": "styr-och-overvakning/el-och-tele",
+   "path": [
+    "EL OCH TELE"
+   ],
+   "text": "• Kabel för digitala och analoga signaler ska vara av typ EBB-AL/FQAR-PG/ELQRB eller likvärdig."
+  },
+  {
+   "id": "styr-och-overvakning/programvaror",
+   "path": [
+    "PROGRAMVAROR"
+   ],
+   "text": "• Programfiler samt versionsinfo på programmeringsverktyg för DDC och Displayer, ska levereras till Karlstads kommun vid projektöverlämnande.\n• Vid servicejobb där förändringar gjorts ska ny version av programfil skickas till beställare."
+  },
+  {
+   "id": "styr-och-overvakning/frekvensomformare",
+   "path": [
+    "FREKVENSOMFORMARE"
+   ],
+   "text": "• Frekvensomformaren monteras nära pump/fläkt, skyddsform anpassas till omgivande miljö.\nKommunen godkänner ej integrerade frekvensomformare i fläktmotorer.\n• Installation och anslutning ska ske enligt leverantörens installationsanvisningar.\n• Ledning mellan omformare och motor förlägges med avstånd till övriga ledningar.\n• Där frekvensomformare monteras tillräckligt nära motor placeras säkerhetsbrytare före frekvensomformare.\n• Finns det även termokontakt, klixson och dylikt anslutet vid motorplint ska även dessa kopplas in till omformaren som externt larm och stopp av omformaren."
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap",
+   "path": [
+    "APPARATSKÅP"
+   ],
+   "text": "• Apparatskåp ska ha skyddsform anpassad till omgivande miljö.\n• Golvskåp förses med sockel.\n• Kopplingsplintar i apparatskåp ska ha provningsmöjlighet.\n• Dvärgbrytare för trefasgrupper ska vara trepoliga.\n• Överspänningsskydd av typ mellanskydd ska finnas på inkommande matning i apparatskåp. (I vissa byggnader kan det finnas skydd i central. Krav ska därför stämmas av i varje projekt).\n• Överspänningsskydd ska ha larmkontakt som ansluts till DDC som larm.\n• I entreprenaden ingående motorskyddsbrytare, kontaktorer och startkopplare ska om möjligt vara av samma fabrikat.\n• Huvudbrytare ska klara att bryta högsta förekommande kortslutningsström i anläggningen.\n• Brytarna ska kunna bryta märkströmmen vid cos φ=0,35.\n• Motorskydds- och effektbrytare ska vara försedd med en slutande samt en brytande signalkontakt.\n• Motorskydd ska vara inställbara.\n• Lågspänningskontaktor ska vara utförd för maximal manöverspänning 230 VAC, med erforderligt antal hjälpkontakter för angiven funktion.\n• Strömrelä monteras för mindre pumpar/fläktar som saknar larm/återföring."
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap/dimensionering",
+   "path": [
+    "APPARATSKÅP",
+    "DIMENSIONERING"
+   ],
+   "text": "• Apparatskåp ska ha 25% reservutrymme för varje apparattyp vid färdigbyggd anläggning.\n• Apparatskåp ska ha minst 25% reservutrymme för utökning av respektive in- och utgångstyp till DDC efter färdigställd anläggning.\n• Temperatur i apparatskåp får inte överstiga 35°C.\n• Apparatskåp ska vara dimensionerat för en omgivningstemperatur av 27°C.\n• På varje skena ska 5% reservplintar sättas upp.\n• Monteringsskena ska även ha plats för ytterligare 20% plintar, dock minst plats för tolv plintar."
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap/disposition-av-komponenter",
+   "path": [
+    "APPARATSKÅP",
+    "DISPOSITION AV KOMPONENTER"
+   ],
+   "text": "• Displaypanel för handhavande monteras infällt i dörr.\nNedan exempel på disposition av komponenter i apparatskåp:"
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap/disposition-av-komponenter/utrustning",
+   "path": [
+    "APPARATSKÅP",
+    "DISPOSITION AV KOMPONENTER",
+    "Utrustning"
+   ],
+   "text": "• Apparatskåp ska innehålla huvudbrytare.\n• Apparatskåp förses med erforderliga datauttag, ett för varje enhet som kommunicerar med överordnat- eller mätinsamlingssystem. Det är ej tillåtet med en extern (ej från Karlstads kommuns IT-avd.) hub/switch i apparatskåpet.\n• Apparatskåp ska förses med 2 vägs 230V uttag och invändig belysning. Uttag och belysning ska matas från grupp som inte bryts av huvudbrytare till apparatskåpet och vara skyddat av personskyddsautomat. Jordfelsbrytare/personskyddsbrytare ska vara försedda med automatisk återstart (självåterställning) efter tillfälligt fel samt avbrottsfri motionering (självtestfunktion).\n• Kan VU matas via jordfelsbrytare i elcentral behövs ingen jordfelsbrytare i apparatskåpet.\n• Vid nyproduktion utgår 2-vägs 230V-uttag och personskyddsautomat i apparatskåp. Vid större renovering enligt överenskommelse med beställare.\n• Fack för apparatskåpsdokumentation och ritningar ska finnas på insidan av dörr.\n• Fack för gruppförteckning ska finnas på insidan av dörr.\n• Elmätning av apparatskåpet ska ske via mätare i apparatskåp eller elcentral."
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap/elsakerhet",
+   "path": [
+    "APPARATSKÅP",
+    "ELSÄKERHET"
+   ],
+   "text": "• Alla spänningsförande delar ska vara beröringsskyddade.\n• Manöverspänningskretsar ska sektioneras så att ett system avsäkras separat. Övriga funktioner avsäkras på lämpligt sätt.\n• Interna förbindningsledningar i apparatskåp förläggs i ledningskanaler. Fri längd utanför kanal max 100 millimeter.\n• Samtliga in- och utgående ledare ska kopplas över plint.\n• Huvudledning ska anslutas direkt på huvudelkopplare.\n• Säkerhetsbrytare för motorer över 2kW som är installerad med kontaktorstyrning ska vara försedd med hjälpkontakt som förreglar kontaktor för motor."
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap/ljusgivare",
+   "path": [
+    "APPARATSKÅP",
+    "LJUSGIVARE"
+   ],
+   "text": "• Givare ska användas för ”ljusreläfunktion” och ha mätområde 5–2000 lux, noggrannhet ±10.\n• Givare ska vara av typ ingångsignal 0–10V."
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap/ljusgivare/rorelsedetektor-i-elsystem",
+   "path": [
+    "APPARATSKÅP",
+    "LJUSGIVARE",
+    "RÖRELSEDETEKTOR I ELSYSTEM"
+   ],
+   "text": "• Signal från detektor till respektive styrning ska kunna behandlas oberoende av varandra för till exempel tidsfördröjning av frånslag. Till- och frånslagsfördröjning ska var inställbar i"
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap/ljusgivare/ddc",
+   "path": [
+    "APPARATSKÅP",
+    "LJUSGIVARE",
+    "DDC."
+   ],
+   "text": "• Där det behövs ska detektor vandalskyddas. Beslut tas i samråd med beställare."
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap/ljusgivare/apparater-i-brandlarmsystem",
+   "path": [
+    "APPARATSKÅP",
+    "LJUSGIVARE",
+    "APPARATER I BRANDLARMSYSTEM"
+   ],
+   "text": "• Brandskyddsdokumentationen avgör driftfall på fläktar via signal från centralt brandlarm. Dock ska signalen vara förberedd i apparatskåp och DDC. Vid ej använd funktion sätts en bygel på ovansidan plint.\n• Noggrann samordning ska ske mellan elentreprenör och kommunens säkerhetssamordnare."
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap/ljusgivare/apparater-i-brandlarmsystem/rokdetektorer",
+   "path": [
+    "APPARATSKÅP",
+    "LJUSGIVARE",
+    "APPARATER I BRANDLARMSYSTEM",
+    "Rökdetektorer"
+   ],
+   "text": "• Rökdetektor i ventilationskanal ska vara av typ som avleder en kontrollerad mängd luft ur ventilationskanalen.\n• Rökdetektor ansluts till kontrollenhet monterad i apparatskåp.\n• Kontrollenhet ska ge larm och servicelarm samt stoppa ventilationsaggregat. Larm återställs manuellt på kontrollenhet.\n• Ej dubbelt montage av rökdetektorer (centralt/lokalt). Se i brandskyddsdokumentationen vad som gäller för aktuell anläggning."
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap/ljusgivare/larm-fran-elsystem",
+   "path": [
+    "APPARATSKÅP",
+    "LJUSGIVARE",
+    "LARM FRÅN ELSYSTEM"
+   ],
+   "text": "Larm från jordfelsbrytare, överspänningsskydd, nödbelysningsutrustning och solpaneler/växelriktare med flera ska indikeras. Omfattningen är projektspecifikt och stäms av med beställaren."
+  },
+  {
+   "id": "styr-och-overvakning/apparatskap/ljusgivare/overvakning",
+   "path": [
+    "APPARATSKÅP",
+    "LJUSGIVARE",
+    "ÖVERVAKNING"
+   ],
+   "text": "• Elektrisk styrutrustning som monteras utomhus ska ha lägsta kapslingsklass (IP) för omgivande miljö.\n• Komponenter ska vara i halogenfritt utförande."
+  },
+  {
+   "id": "styr-och-overvakning/givare",
+   "path": [
+    "GIVARE"
+   ],
+   "text": "• Givare ska levereras komplett med tillbehör.\n• Elektrisk anslutning ska utföras så att givare kan demonteras för kontroll utan elektrisk omkoppling.\n• Givare monterad i idrottshall förses med bollskydd.\n• Givare ska placeras så att störande påverkan från omgivningen minimeras.\n• Där givare kräver anslutningsslangar till luftkanal ska dessa levereras och anslutas i entreprenaden, även nipplar ska levereras och monteras.\n• Rumsgivare ska vara kombigivare Temp/CO² och minst 4 st per plan. Vid större byggnader kan även fler givare behövas. Antal givare och placering av dessa görs i samråd med beställaren. Rumsgivare är styrande för nattkyla och värmekurvor."
+  },
+  {
+   "id": "styr-och-overvakning/givare/kanalmonterade",
+   "path": [
+    "GIVARE",
+    "KANALMONTERADE"
+   ],
+   "text": "• Givare ska placeras där risken för skiktbildning är som lägst.\n• En givare för mätning av uteluft ska monteras i kanal. Givaren ska finnas för styrfunktion kylåtervinning."
+  },
+  {
+   "id": "styr-och-overvakning/givare/rumsmonterade",
+   "path": [
+    "GIVARE",
+    "RUMSMONTERADE"
+   ],
+   "text": "• Placering av rumsgivare ska samordnas på plats med övrig inredning och installation, undvik i största grad att montera på yttervägg.\n• Rumsgivare ska monteras 1700 millimeter över golv om inget annat anges."
+  },
+  {
+   "id": "styr-och-overvakning/givare/rormonterade",
+   "path": [
+    "GIVARE",
+    "RÖRMONTERADE"
+   ],
+   "text": "• Frysvaktsgivare ska vara av instickstyp och monteras i kallaste röret i värmebatteriets returvattensida.\n• Givare till tappvatten ska vara av instickstyp."
+  },
+  {
+   "id": "styr-och-overvakning/givare/utomhusmonterade",
+   "path": [
+    "GIVARE",
+    "UTOMHUSMONTERADE"
+   ],
+   "text": "• Givare på fasad ska monteras minst 3,5 meter över marknivå.\n• Utetemperaturgivare ska monteras på norrfasad."
+  },
+  {
+   "id": "styr-och-overvakning/givare/kokskyla-kyl-och-frysrum",
+   "path": [
+    "GIVARE",
+    "KÖKSKYLA, KYL- OCH FRYSRUM"
+   ],
+   "text": "• I kyl- och frysrum monteras separata temperaturgivare, lämplig för ändamålet, för larmhantering i överordnat system, hög- och lågtemperaturlarm med inställbara larmvärden och fördröjningar.\n• Larm från kylmaskiner ska kopplas upp för larmhantering i överordnat system.\nDriftstoppslarm ska vara A-larm och utringande till beredskapen."
+  },
+  {
+   "id": "styr-och-overvakning/givare/givare-for-tryck/kanalmonterade",
+   "path": [
+    "GIVARE",
+    "GIVARE FÖR TRYCK",
+    "Kanalmonterade"
+   ],
+   "text": "• Givare ska mäta differenstryck.\n• Mätområde samordnas med luftentreprenören."
+  },
+  {
+   "id": "styr-och-overvakning/givare/givare-for-tryck/rormonterade",
+   "path": [
+    "GIVARE",
+    "GIVARE FÖR TRYCK",
+    "Rörmonterade"
+   ],
+   "text": "• Givare ska vara avsedd för mätning av differenstryck.\n• Mätledningar ska utföras i koppar och vara avsedda för anslutning till avstängningsventiler, monterade på avstick från huvudledning. Mätledningar samt montage ska ingå i denna entreprenad. Rörentreprenören levererar avstängningsventiler."
+  },
+  {
+   "id": "styr-och-overvakning/givare/givare-for-fukt",
+   "path": [
+    "GIVARE",
+    "GIVARE FÖR FUKT"
+   ],
+   "text": "• Givare ska mäta relativ fuktighet.\n• Givare ska skyddas mot nedsmutsning."
+  },
+  {
+   "id": "styr-och-overvakning/givare/givare-for-koncentration",
+   "path": [
+    "GIVARE",
+    "GIVARE FÖR KONCENTRATION"
+   ],
+   "text": "• Givare ska inte behöva ha tätare kalibreringsintervall än vart femte år.\n• Givare ska vara av typ ingångsignal 0–10V."
+  },
+  {
+   "id": "styr-och-overvakning/givare/givare-for-systemtryck-expansionskarl",
+   "path": [
+    "GIVARE",
+    "GIVARE FÖR SYSTEMTRYCK EXPANSIONSKÄRL"
+   ],
+   "text": "• Givare ska dynamiskt (0-10V) mäta systemtryck.\n• Larm från givare ska gå ut som högprioritetslarm (A-larm, kategori 10)\n• Larm både för högt och lågt tryck."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon",
+   "path": [
+    "STÄLLDON"
+   ],
+   "text": "• Generellt ska märkspänning vara 24V, avsteg från detta kan göras med vissa funktioner såsom vid externa styrningar eller vid långa kabelvägar. Avsteg görs i samråd med beställaren."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/stalldon-for-spjall",
+   "path": [
+    "STÄLLDON",
+    "STÄLLDON FÖR SPJÄLL"
+   ],
+   "text": "• Spjällmotor som monteras i uteluftskanal ska vara dimensionerad till omgivningstemperaturen."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/brandspjall",
+   "path": [
+    "STÄLLDON",
+    "BRANDSPJÄLL"
+   ],
+   "text": "• Om brandspjäll ingår i anläggningen ska uppgifter om dess beteckning, placering och betjäningsområde framgå i driftkort. Brandspjäll ska vara stängda vid stoppat tillhörande ventilationsaggregat."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/stalldon-for-ventil",
+   "path": [
+    "STÄLLDON",
+    "STÄLLDON FÖR VENTIL"
+   ],
+   "text": "• Ventilställdon ska vara försett med handmanöverdon och lägesindikering, om separat verktyg krävs ska detta kedjas fast vid ställdonet.\n• Handmanöver av ställdonet får inte påverka injustering av ändlägen.\n• Manuell manöver av ställdon ska vara överordnad styrning och reglering från DDC.\n• Ventilställdon ska vara anpassade för montage på installerade ventiler."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/datorundercentral-duc-ddc",
+   "path": [
+    "STÄLLDON",
+    "DATORUNDERCENTRAL – DUC/DDC"
+   ],
+   "text": "• DDC ska monteras i apparatskåp."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/datorundercentral-duc-ddc/ddc-ska-besta-av",
+   "path": [
+    "STÄLLDON",
+    "DATORUNDERCENTRAL – DUC/DDC",
+    "DDC ska bestå av"
+   ],
+   "text": "• Datorenhet med centralprocessor.\n• Primärminnet ska ha erforderlig storlek med hänsyn till anläggningens funktion inklusive 30% i reserv för framtida utbyggnad."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/datorundercentral-duc-ddc/ddc-ska-ha-foljande-egenskaper",
+   "path": [
+    "STÄLLDON",
+    "DATORUNDERCENTRAL – DUC/DDC",
+    "DDC ska ha följande egenskaper"
+   ],
+   "text": "• DDC ska kunna kommunicera med andra DDC:er via datanät LAN.\n• Alla DDC:er ska vara åtkomliga från ÖS via datanät LAN.\n• DDC ska byggas upp med behovsanpassade utbytbara moduler. Där inte annat är överenskommet med beställaren.\n• DDC inklusive in och utgångar ska ha tålighet mot ledningsbundna elektriska störningar enligt SS 436 15 03 klass ML2.\n• Batteri för klocka och primärminne ska ha en livslängd på minst 5 år och vara lätt utbytbart.\n• Batteriets funktion ska övervakas av automatiska testrutiner.\n• Larm ska gå ut vid låg batterinivå."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/datorundercentral-duc-ddc/ddc-ska-inneha-foljande-funktioner",
+   "path": [
+    "STÄLLDON",
+    "DATORUNDERCENTRAL – DUC/DDC",
+    "DDC ska inneha följande funktioner"
+   ],
+   "text": "• Efter spänningsbortfall ska utrustningen automatiskt återstartas samt realtid uppdateras.\n• Funktion för automatisk omställning sommar - vintertid ska finnas och vara inställningsbar för minst 1 år framåt i tiden.\n• Om fel uppstår på någon DDC ska larm i display aktiveras med hjälp av övriga DDC (watchdogfunktion). Om system är uppkopplat till ÖS utgår lokal funktion och funktion för watchdog läggs i ÖS."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/datorundercentral-duc-ddc/tidkanaler",
+   "path": [
+    "STÄLLDON",
+    "DATORUNDERCENTRAL – DUC/DDC",
+    "Tidkanaler"
+   ],
+   "text": "• Tidkanaler ska ligga i DDC och ska kunna påverkas från displaypanel och ha funktion för helgdagsstyrning.\n• Alla tidkanaler ska konstrueras för att möjliggöra att tidkanalprogram skriver direkt till"
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/datorundercentral-duc-ddc/ddc",
+   "path": [
+    "STÄLLDON",
+    "DATORUNDERCENTRAL – DUC/DDC",
+    "DDC."
+   ],
+   "text": "• Program i DDC behöver anpassas för att uppfylla dessa krav."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/datorundercentral-duc-ddc/ddc/ddc-ska-kunna-arbeta-oberoende-av-os-med-foljande-funktioner",
+   "path": [
+    "STÄLLDON",
+    "DATORUNDERCENTRAL – DUC/DDC",
+    "DDC.",
+    "DDC ska kunna arbeta oberoende av ÖS med följande funktioner"
+   ],
+   "text": "• Styrning\n• Reglering\n• Övervakning via displaypanel\n• Larmhantering via displaypanel"
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/datorundercentral-duc-ddc/ddc/ddc-ska-stodja-foljande-protokoll",
+   "path": [
+    "STÄLLDON",
+    "DATORUNDERCENTRAL – DUC/DDC",
+    "DDC.",
+    "DDC ska stödja följande protokoll"
+   ],
+   "text": "• Modbus\n• LON\n• KNX (EIB)\n• BACnet\n• S-bus"
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/displaypanel",
+   "path": [
+    "STÄLLDON",
+    "DISPLAYPANEL"
+   ],
+   "text": "• Driftpersonal ska ha möjlighet att påverka och övervaka styrsystemet lokalt via displaypanel.\n• Om displaypanelen har funktion för tydlig visuell larmindikering kan denna användas. Annars ska en separat summalarmslampa monteras i apparatskåpsfront. Den här indikeringen visas vid larm som är aktiva men ej kvitterade.\n• Blinkande lampa = okvitterat larm, Fast sken = kvitterat larm\n• Larm av mindre viktig karaktär (exempelvis larm för serviceomkopplare) ska inte lagras i displaypanel då larmet kvitterats och återgått i ÖS.\n• Text som visas i display ska vara på svenska.\n• Via display ska information finnas för att kunna påverka och läsa av betjänade system i en sådan omfattning att drift kan upprätthållas utan ett fungerande ÖS.\n• Om flera DDC är placerade i samma apparatskåp ska man kunna nå värden i respektive DDC från samma panel utan att göra någon fysisk omkoppling.\n• Klockfunktionen ska kunna läsas och justeras, år, månad, dag, veckodag, timmar, minuter och sekunder. Timmar ska visas som 24-timmarsvisning.\n• Om flera DDC är placerade i fastigheten ska man kunna nå värden samt kunna påverka börvärden och lokala tidkanaler från samtliga displayer. Projektspecifikt kan detta undantas i samråd med beställaren.\n• Återställning av systemstopp exempelvis utlöst frysvakt ska ske via displaypanel. Återställning ska vara enkel att komma åt via få knapptryckningar."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/displaypanel/panel-ska-presentera-foljande-parametrar",
+   "path": [
+    "STÄLLDON",
+    "DISPLAYPANEL",
+    "Panel ska presentera följande parametrar"
+   ],
+   "text": "• Avläsning av analoga och digitala insignaler.\n• Avläsning samt påverkan av analoga och digitala utsignaler.\n• Avläsning samt kvittering av larm.\n• Avläsning samt påverkan av börvärden och lokala tidkanaler."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/kommunikationsenheter-i-datorenhet",
+   "path": [
+    "STÄLLDON",
+    "KOMMUNIKATIONSENHETER I DATORENHET"
+   ],
+   "text": "• DDC ska vara försedd med erforderliga kommunikationskort och ha inbyggd Ethernet (RJ45) gränssnitt för kommunikation med övriga DDC samt ÖS."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/enheter-med-digitala-ingangar",
+   "path": [
+    "STÄLLDON",
+    "ENHETER MED DIGITALA INGÅNGAR"
+   ],
+   "text": "• Digitala ingångar ska vara avsedda för potentialfria kontakter och för 24 V matning. Ingångsström ska uppgå till minst 5 mA.\n• Varje ingång ska vara försedd med visuell indikering som visar insignalens status.\n• Avbrott eller kortslutning får inte skada ingången."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/enheter-med-analoga-ingangar",
+   "path": [
+    "STÄLLDON",
+    "ENHETER MED ANALOGA INGÅNGAR"
+   ],
+   "text": "• Avbrott eller kortslutning får inte skada ingången. Larm ska avges vid avbrott/kortslutning."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/enheter-med-digitala-utgangar",
+   "path": [
+    "STÄLLDON",
+    "ENHETER MED DIGITALA UTGÅNGAR"
+   ],
+   "text": "• Digitala utgångar ska ha utgångsspänning och utgångsström anpassad till ansluten belastning. Utgångar ska vara galvaniskt skilda från övrig elektronik i DDC.\n• Manuell inställning av utgångar ska vara möjlig via displaypanel.\n• Utgångar ska vara försedda med visuell indikering som visar utsignalens status.\n• Avbrott eller kortslutning får inte skada utgången."
+  },
+  {
+   "id": "styr-och-overvakning/stalldon/enheter-med-analoga-utgangar",
+   "path": [
+    "STÄLLDON",
+    "ENHETER MED ANALOGA UTGÅNGAR"
+   ],
+   "text": "• Analoga utgångar ska ha utgångsspänning och utgångsström anpassad till anslutna ställdon. Förstahandsvalet ska vara 0–10V.\n• Utgångars status indikeras via display. Manuell styrning av anslutna objekt sker antingen via displaypanel eller via omställare på analog utgångsenhet.\n• Avbrott eller kortslutning får inte skada utgången."
+  },
+  {
+   "id": "styr-och-overvakning/kontroll-och-injusterng/provning",
+   "path": [
+    "KONTROLL OCH INJUSTERNG",
+    "PROVNING"
+   ],
+   "text": "• Samtliga system ska provas och dokumenteras i daterade och signerade provningsprotokoll som överlämnas till beställaren.\n• Samordnad kontroll ska utföras.\n• Överordnat system och skyltning av yttre komponenter (monterade på lämpligt läsbart ställe samt skruvade) ska vara färdigställt innan samordnad kontroll."
+  },
+  {
+   "id": "styr-och-overvakning/kontroll-och-injusterng/injustering",
+   "path": [
+    "KONTROLL OCH INJUSTERNG",
+    "INJUSTERING"
+   ],
+   "text": "• Metod och omfattning av injustering avgörs vid projektering och anges i förfrågningsunderlag och bygghandling.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 
+from aida import knowledge
 from aida.agents.alternatives import _format_epd_list, _load_epd_alternatives
 from aida.agents.chat_agent import _format_state, _sanitize_history
 from aida.api_client import DEFAULT_MODEL, extract_text, get_client
@@ -59,7 +60,7 @@ _CLASSIFY_TOOL = [{
                     "new_project: en projektbeskrivning att analysera (byggnadstyp, "
                     "yta, åtgärder), eller en uttrycklig begäran att börja om. "
                     "advisory_question: en fråga som söker kunskap eller råd "
-                    "(material, klimat, metod, hur verktyget fungerar) och som kan "
+                    "(material, klimat, metod, byggriktlinjerna, hur verktyget fungerar) och som kan "
                     "besvaras utan att ändra projektets state. "
                     "flow_action: en korrigering, ett val, en borttagning, en "
                     "omkörningsbegäran eller ett 'gå vidare'-kommando som rör "
@@ -78,7 +79,7 @@ Din enda uppgift: klassificera användarens meddelande i exakt en intent genom a
 
 Vägledning:
 - Om INGET projekt finns ännu och meddelandet beskriver ett bygge ("renovera matsal 100 m2, nya golv och fönster") → new_project.
-- Om INGET projekt finns och meddelandet är en fråga ("vilket golv har lägst klimatpåverkan?", "vad betyder GWP?") → advisory_question. Den ska INTE tolkas som en projektbeskrivning.
+- Om INGET projekt finns och meddelandet är en fråga ("vilket golv har lägst klimatpåverkan?", "vad betyder GWP?", "vad säger byggriktlinjerna om plastmatta?") → advisory_question. Den ska INTE tolkas som en projektbeskrivning.
 - Om ett projekt finns: en fråga om resonemang, material eller metod ("varför är betong sämre?", "vilket av alternativen är bäst för fukt?") → advisory_question.
 - Om ett projekt finns: en instruktion som ändrar projektet ("ta bort fönstren", "välj Tarkett", "byt golvet till parkett", "räkna om", "kör vidare", "tänk bredare på golv") → flow_action.
 - Tveksamt mellan advisory och flow_action: om meddelandet ber Aida GÖRA något med projektet → flow_action. Om det ber om KUNSKAP → advisory_question.
@@ -91,8 +92,9 @@ Användaren ställer en RÅDGIVNINGSFRÅGA. Du ska svara, inte ändra något i p
 PRINCIPER:
 - Svara på svenska, kortfattat och konkret.
 - Varje siffra ska ha en källa. Använd verktyget `lookup_materials` för att hämta verkliga EPD-värden (kg CO2e per enhet) när användaren frågar om ett materialslag (golv, innervägg, fönster, dörr, isolering, tak, belysning, ventilation, sanitet m.fl.). Fabricera aldrig siffror.
+- Frågor om Karlstads byggriktlinjer eller om hur Aida räknar: sök med `search_knowledge` innan du svarar. Ange dokument, utgåva och avsnitt, till exempel "Riktlinje Bygg, utgåva 8, Plastmattor". Citera bara hela meningar, ordagrant ur utdragen du fått och inom citattecken, och tillskriv aldrig riktlinjerna ett krav som inte står där.
 - Om frågan rör ett pågående projekt: använd projektets state (komponenter, baslinje, alternativ, val) i ditt svar.
-- GWP-GHG A1-A3 (produktskedet) är primärt mått, i linje med Boverkets klimatdeklarationskrav.
+- Klimatmåttet är GWP-fossil för skedena A1-A3 (produktskedet), samma som i Boverkets klimatdatabas och i Aidas beräkningar.
 - Om du jämför material: nämn att lägre kg CO2e/enhet är bättre, men att praktiska krav (fukt, slitage, ljud, tillgänglighet) kan utesluta det klimatbästa.
 - Om frågan inte går att besvara med tillgänglig data: säg det ärligt och föreslå hur användaren kan komma vidare (t.ex. starta ett projekt så att Aida kan räkna baslinje och alternativ).
 - Avsluta gärna med en kort öppning till nästa steg ("Vill du att jag startar en analys för det här?") när det är relevant, men ställ inga onödiga frågor.
@@ -117,7 +119,10 @@ _LOOKUP_TOOL = [{
     },
 }]
 
-_MAX_ADVISORY_TURNS = 4
+# A guideline question can take two searches and a material lookup before the
+# answer, so four turns ran out on questions that were going fine.
+_MAX_ADVISORY_TURNS = 6
+_ADVISORY_TOOLS = _LOOKUP_TOOL + [knowledge.SEARCH_TOOL]
 
 
 def classify_intent(
@@ -253,7 +258,7 @@ def answer_advisory(
                 model=ADVISORY_MODEL,
                 max_tokens=1200,
                 system=system_prompt,
-                tools=_LOOKUP_TOOL,
+                tools=_ADVISORY_TOOLS,
                 messages=messages,
             )
 
@@ -269,6 +274,9 @@ def answer_advisory(
                     category = (block.input or {}).get("category", "")
                     result_text = _lookup_materials(category)
                     tool_calls.append({"name": "lookup_materials", "input": block.input})
+                elif block.name == "search_knowledge":
+                    result_text = knowledge.run_search(block.input)
+                    tool_calls.append({"name": "search_knowledge", "input": block.input})
                 else:
                     result_text = f"Okänt verktyg: {block.name}"
                 tool_results.append({

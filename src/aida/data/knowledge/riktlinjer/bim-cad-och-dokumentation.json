@@ -1,0 +1,291 @@
+{
+ "doc": "bim-cad-och-dokumentation",
+ "title": "Riktlinje BIM, CAD och dokumentation",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-BIM-CAD-och-dokumentation-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "bim-cad-och-dokumentation/att-tanka-pa",
+   "path": [
+    "ATT TÄNKA PÅ"
+   ],
+   "text": "• Riktlinjerna kräver god kännedom om BIM och/eller Mer information finns CAD-projektering. på karlstad.se\n• Använd samma program och version som krävs för relation vid framtagande eller revidering av modellfiler – annars krävs en komplicerad och kostsam konvertering."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/styrande-dokument",
+   "path": [
+    "STYRANDE DOKUMENT"
+   ],
+   "text": "Relationshandlingar och relationshandlingars format beskrivs i det Läs SPECIFIKATION uppdragsspecifika dokumentet ”Specifikation handlingar”. HANDLINGAR innan arbetet påbörjas"
+  },
+  {
+   "id": "bim-cad-och-dokumentation/sakerhet/sakerhetskopiering",
+   "path": [
+    "SÄKERHET",
+    "SÄKERHETSKOPIERING"
+   ],
+   "text": "• Under pågående projektering ansvarar respektive konsult för kontinuerlig säkerhetskopiering av uppdraghandlingar i digital form. Det gäller även handlingar som levereras till projektplats.\n• Karlstads kommun betalar inte ut någon ersättning för ny projektering på grund av förlorade projekthandlingar eller relationshandlingar."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/sakerhet/datavirus",
+   "path": [
+    "SÄKERHET",
+    "DATAVIRUS"
+   ],
+   "text": "• Samtliga konsulter ansvarar för att filer som levereras inte innehåller någon form av datavirus eller skadliga filer.\n• Karlstads kommun betalar inte ut någon ersättning för eventuella driftstörningar orsakade av datavirus.\n• Störningar orsakade av datavirus ska rapporteras till projektledaren för att denna ska vidta åtgärder för att förhindra spridning."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/sakerhet/giltliga-licenser",
+   "path": [
+    "SÄKERHET",
+    "GILTLIGA LICENSER"
+   ],
+   "text": "• I uppdraget ansvarar respektive deltagare för att de (och eventuellt egen anlitad konsult) har giltiga licenser för de programvaror som används."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/sprak",
+   "path": [
+    "SPRÅK"
+   ],
+   "text": "Alla relationshandlingar ska lämnas på svenska. Det innebär att alla texter i modellfiler, ritningar, beskrivningar, förteckningar, protokoll, drift- och underhållsanvisningar, driftkort, funktionsbeskrivningar, manualer, produktdatablad, byggvarubeskrivningar och så vidare ska vara författade på eller korrekt översatta till svenska. Instruktionsfilmer ska ha svenskt tal eller svensk textning."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/samordning/projektplats",
+   "path": [
+    "SAMORDNING",
+    "PROJEKTPLATS"
+   ],
+   "text": "I större projekt används en projektplats. När, var och hur leveranserna ska ske redovisas av informationssamordnaren vid första informationssamordningsmötet. När projektplatsen är utvald får ingen sidokommunikation ske."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/samordning/underlag-startpaket",
+   "path": [
+    "SAMORDNING",
+    "UNDERLAG – STARTPAKET"
+   ],
+   "text": "På teknik- och fastighetsförvaltningen i Karlstads kommun finns informationsförvaltare som tillhandahåller de underlag som finns i form av gamla ritningar, modellfiler och annan digital information."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/samordning/underlag-startpaket/kvalitet",
+   "path": [
+    "SAMORDNING",
+    "UNDERLAG – STARTPAKET",
+    "KVALITET"
+   ],
+   "text": "I de fall som ett startpaket har lämnats ut i samband med en utredning ska informationssamordnaren begära att nya underlag lämnas ut innan projektering påbörjas.\nKonsulten ska, innan uppdraget påbörjas, förvissa sig om ritningarnas måttriktighet."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/programvaror-och-format",
+   "path": [
+    "PROGRAMVAROR OCH FORMAT"
+   ],
+   "text": "Teknik- och fastighetsförvaltningen använder följande programvaror och format.\nProgramvara Version Leverantör Format Används för Revit Aktuell Autodesk rvt Modellfiler vid all nybyggnation och större ombyggnation Aktuell Autodesk nwd Samgranskning internt av Navis Works * Ifc BIM-modeller AutoCAD Aktuell Autodesk dwg Modellfiler där dwg finns och krav på Revit saknas AutoCAD LT Aktuell Autodesk dwg Modeller för scheman, orienterings- och serviceritningar MagiCAD Aktuell Cadcom pln Installationsberäkningar (MagiCAD för Revit) lin för el, ventilation och rör (komplement till AutoCAD/Revit) ElproCAD 6.7 Autodesk dwg Scheman (med AutoCAD LT/AutoCAD) Office 365 Microsoft docx Instruktioner, beskrivningar, xlsx förteckningar, och så vidare Microsoft Foton 2021 Microsoft jpg Foton Acrobat reader Acrobat Reader DC Adobe pdf Produktblad, skannade intyg och andra statiska dokument. Sparas i PDF/A-1 (SS-ISO 19005–1:2005) Bluebeam Aktuell Bluebeam pdf Produktblad, skannade intyg och andra statiska dokument. Sparas i PDF/A-1 (SS-ISO 19005-1:2005 Trix drawingcenter 7.0 Provanum tif Äldre skannade ritningar cal\nI dokumentet ”Specifikation handlingar” framgår vilka handlingar som ska lämnas som relation, i vilket format och hur de ska organiseras.\n*Anger endast vilken programvara som används internt. Entreprenörer kan fritt välja programvara för samgranskning."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/modellfiler",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "MODELLFILER"
+   ],
+   "text": "• Samtliga projektörer i projektgruppen ska använda samma version av programvara.\n• Om projekthandlingar utförs enligt annan standard än den som specificerats, ska BIM- /CAD‐filer och övriga dokument som levereras konverteras, med 100 % kompatibilitet, till ställda krav i samband med upprättande av relationshandlingar.\n• Entreprenören ansvarar för att ingen information går förlorad vid konvertering. Detta gäller även vid leverans av modeller för samgranskning vid BIM-projektering.\n• Vid större ombyggnationer och nybyggnation skapas modellen eller modellerna i Autodesk Revit, rvt-format.\n• BIM-modeller ska vara 100 % kompatibla med Autodesk Revit, rvt-format. Ritningar ska levereras i modellen eller modellerna utifrån de vyer som skapats enligt leveransspecifikationen.\n• CAD‐modeller som levereras ska vara 100 % kompatibla med Autodesk AutoCAD dwg‐ format med svenskt lagersystem SB11 (färger och linjetjocklek enligt bilaga).\n• Applikationsprogrammen MagiCAD (MagiCAD för Revit) och ElproCAD kan användas för beräkningar och scheman.\n• Modellfiler ska utföras enligt senaste utgåva av SIS Bygghandlingar med de tillägg som redovisas i denna riktlinje och i ”Specifikation handlingar”.\n• Generellt gäller att varje objekt endast får förekomma i den modell som ”äger” informationen.\n• Numreringar, beteckningar och indelningar för objekt, byggnader, plan, lägenheter, lokaler och rum beskrivs i ”Riktlinje märkning och numrering”.\n• Filnamn beskrivs i ”Specifikation handlingar”."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/koordinatsystem",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "KOORDINATSYSTEM"
+   ],
+   "text": "• Ett lokalt koordinatsystem skapas som är parallellt med stomlinjerna i byggnaden.\n• Lokalt origo placeras i närheten av själva modellen så att hela modellen får positiva X- och Y-koordinater.\nProjektorigo ska kopplas till koordinatsystem SWEREF 99 13 30."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/hojdsystem-och-plushojd",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "HÖJDSYSTEM OCH PLUSHÖJD"
+   ],
+   "text": "• Objekten placeras på rätt höjd (plushöjd).\n• Objektet ska ritas med positiva koordinater och positiva plushöjder kopplat till kommunens höjdsystem RH 2000."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/skala",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "SKALA"
+   ],
+   "text": "• Alla modeller ska ritas i skala 1:1 och i enheten millimeter eller meter (mark).\n• Samtliga layouter/sheets och ritningar ska förses med skalstock.\nSå här kan en skalstock se ut:"
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/textfonter-autocad",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "TEXTFONTER (AUTOCAD)"
+   ],
+   "text": "• I AutoCAD ska AutoCADs egna textfonter för ISOCP eller ISOCP2 användas.\n• Godkända texthöjder är 3,5 millimeter, 5 millimeter och 7 millimeter vilket ger 1,75 millimeter, 2,5 millimeter och 3,5 millimeter i halvskala."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/lagerstruktur",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "LAGERSTRUKTUR"
+   ],
+   "text": "• Lagerhantering ska utföras enligt SS-ISO 13567, SB-Rekommendationer 11, BSAB 96.\n• Färger på objekt ska alltid vara BY LAYER med undantag för ram och namnruta där teknik- och fastighetsförvaltningens mall gäller. Detta gäller såväl filer som är skapade i en AutoCAD produkt eller exporter från andra system."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/linjetyper",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "LINJETYPER"
+   ],
+   "text": "• Linjetyper och andra definitioner ska vara de som ingår i mallen. (Färger och linjetjocklekar för CAD enligt bilaga).\n• Egna linjetyper får inte användas.\nNummer Färg Linjetjocklek 1 Röd 0,25 millimeter 2 Gul 1,4 millimeter 3 Grön 0,35 millimeter 4 Cyan 0,18 millimeter 5 Blå 1,0 millimeter 6 Magenta 0,7 millimeter 7 svart/vit 0,5 millimeter"
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/mallar-och-stampel",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "MALLAR OCH STÄMPEL"
+   ],
+   "text": "• Mallar för Revit och AutoCAD med namnruta och ändringsruta tillhandahålls av teknik- och fastighetsförvaltningens informationsförvaltare.\n• I AutoCAD ska den sättas in som ett block i layouten.\n• Namnrutan ska infogas på respektive sheet/layout."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/externa-referenser-autocad",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "EXTERNA REFERENSER (AUTOCAD)"
+   ],
+   "text": "• Externa referenser ska definieras med relativ sökväg i overlay‐läge. De sätts i UCS World. Insättningspunkt 0,0.\n• Det får inte förekomma externa referenser i layouterna.\n• För AutoCad gäller att A-modellen refereras in i installationsmodellerna.\n• Externa referenser ska bifogas."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/lankar-revit",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "LÄNKAR (REVIT)"
+   ],
+   "text": "• K-modellen ska länkas in i A-modellen, och A-modellen ska länkas in installationsmodellerna.\n• Generellt gäller att varje objekt endast får förekomma i den modell som ”äger” informationen.\n• I vissa fall tillåts A och K använda samma objekt, men var och en bör hålla sig till sina delar, exempelvis att K sätter hål för fönster och A sätter in fönstren.\nOBS! Revit-modeller ska länkas in origo till origo (Auto – Origin to Origin). De modeller som länkas in måste ”låsas” innan arbetet påbörjas."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/norrpil",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "NORRPIL"
+   ],
+   "text": "Samtliga layouter/sheets och ritningar ska innehålla norrpil.\nExempel norrpil:"
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/orienteringsfigur",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "ORIENTERINGSFIGUR"
+   ],
+   "text": "En gemensam orienteringsfigur för samtliga konsulter tas fram i 2D för aktuellt uppdrag. Samtliga layouter/sheets och ritningar ska förses med orienteringsfigur.\nExempel orienteringsfigur:"
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/ritningar-pa-layouter-sheets",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "RITNINGAR PÅ LAYOUTER/SHEETS"
+   ],
+   "text": "Ritningar ska finnas som layouter/sheets i modellfilen. Det ska alltså inte levereras några ritningsdefinitionsfiler. Layouter/sheets ska innehålla den information som behövs för att koppla ihop utsnitt ur modellen med den grafik som behövs till presentation av ritningen. Namnet på layoutfliken/sheets ska överensstämma med ritningsnumret."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/ritningarnas-utformning",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "RITNINGARNAS UTFORMNING"
+   ],
+   "text": "• A-ritning skalas till att visa hela plan, om inte annat specificerats. Undertak och måttsättning ska inte visas.\n• A-ritning ska sparas i utzoomat läge och vara monokrom.\n• Installationsritningar skalas till att visa hela plan, om inte annat specificerats.\n• Installationsritningar ska sparas i utzoomat läge.\n• Installationsritningar kan framställas i färg.\n• Ritningar ska sparas i PDF/A-1 enligt SS-ISO 19005–1:2005.\n• Alla ritningar ska vara roterade till läsläge.\nSe i övrigt de Teknikområdesspecifika anvisningarna för ritningarnas utformning."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/rasterritningar",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "RASTERRITNINGAR"
+   ],
+   "text": "I vissa fall lämnas tiff- eller cals-original ut som underlag. Om de ska återlämnas uppdaterade i samma format, ritas om helt eller delvis är beroende på de krav som ställs i uppdragets ”Specifikation handlingar”."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/datering-av-handlingar",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "DATERING AV HANDLINGAR"
+   ],
+   "text": "Relationsdatum på dokument och ritningar ska anges på samtliga levererade handlingar."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/teknikomradesspecifika-anvisningar",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "TEKNIKOMRÅDESSPECIFIKA ANVISNINGAR"
+   ],
+   "text": "Arkitekt\nObjekt som projekteras i 3D är:\n• ytterväggar\n• innerväggar\n• rum/zoner\n• yttertak\n• innertak\n• utvändiga vägg- och yttertakskompletteringar\n• golv/bjälklag inklusive grund\n• schakt\n• dörrar/portar\n• fönster/partier\n• trappor/räcken\n• hissar\n• balkonger/räcken\n• fast inredning.\nMåttsättning utförs i överensstämmelse med SIS Bygghandlingar. Mått redovisas i särskilt lager enligt lagerstrukturen. Måttsättningslager ska släckas vid leverans av relationshandlingar. Befintliga utrymmesobjekt i modellen ska i första hand ändras (och ska alltså inte raderas och ritas på nytt, detta på grund av ett unikt ID, så kallat GUID) i objektmodellen. Utrymmesobjekt skapas för lägenheter, lokaler och rum. Areamätning för utrymmesobjekt ska ske enligt den senaste utgåvan av SS 210 54.\nPå planritningen redovisas: för rum:\n• rumsnummer\n• rumsnamn\n• nettoarea (NTA).\nför lägenheter:\n• lägenhetsnummer\n• Lantmäteriets lägenhetsnummer\n• bruksarea (BRA).\nför lokaler med flera hyresgäster:\n• rumsnummer\n• bruksarea (BRA)\n• hyresgäst.\nUtrymmesförteckning ska om så krävs, exporteras ur modellen. Vid ny eller kompletterande numrering, ska ”Riktlinje märkning och numrering” följas."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/teknikomradesspecifika-anvisningar/el",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "TEKNIKOMRÅDESSPECIFIKA ANVISNINGAR",
+    "EL"
+   ],
+   "text": "• Samtliga ingående komponenter i El- och telesystem och Brandlarm projekteras som objekt i 3D.\n• Mindre objekt eller detaljer av ringa betydelse behöver ej modelleras i 3D, utan kan anges som en 2D-symbol i modellen. Exempelvis: små el-lister, mikrobrytare, slutbleck, kopplingsplintar, kablage, pendlar med mera.\n• I vissa fall behöver även mindre objekt enligt ovan projekteras i 3D, för att tydliggöra placering inför exempelvis samgranskning.\n• Inbrottslarm projekteras i separat modell.\n• Orienteringsritning för inbrottslarm projekteras i 2D, i separat modell."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/teknikomradesspecifika-anvisningar/brand",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "TEKNIKOMRÅDESSPECIFIKA ANVISNINGAR",
+    "Brand"
+   ],
+   "text": "• Utrymningsplaner projekteras i 2D, i separat modell.\n• Orienterings- och serviceritningar projekteras i 2D, i separat modell.\n• Brandskyddsritningar projekteras i 2D, i separat modell.\nKonstruktion\nObjekt som projekteras i 3D är:\n• bärande väggar\n• håltagning\n• balkar\n• stag\n• takstolar\n• pelare\n• bjälklag\n• pålar\n• platta\n• plintar\n• trappor\n• ramper\n• schakt.\nMark\nObjekt som projekteras i 2D är:\n• situationsplan\n• ledningsplan (VA, el, tele, fjärrvärme, bergvärme)\n• höjder\n• markplanering\n• växter\n• markutrustning.\nFör att minska antalet modeller är det möjligt att kombinera flera delar i samma modell. Även på ritningslayouter kan flera delar kombineras. Hänsyn tas till ritningens läsbarhet.\nStyr\nObjekt som projekteras i 2D är:\n• apparatskåpsschema\n• planritning.\nVarje apparatskåp ska läggas i en egen modellfil med utskriftslayouter för varje schema. En pdf-fil ska innehålla alla scheman för ett apparatskåp (ett schema per sida). På planritning anges placering av skåp, givare, don och tryckknappar. Varje plan läggs på en egen modellfil. En pdf-fil per plan."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/teknikomradesspecifika-anvisningar/ventilation",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "TEKNIKOMRÅDESSPECIFIKA ANVISNINGAR",
+    "Ventilation"
+   ],
+   "text": "• Samtliga ingående komponenter i Ventilationssystemet projekteras som objekt i 3D.\n• Följande uppgifter ska framgå av ventilationsritningen:\no rumsnummer o rumsnamn o antal personer.\nDimensioneringsdata ska kunna exporteras och ska då innehålla:\nFörteckning Nummer Beskrivning Personer Övrigt Rum – max antal personer Rumsnummer Rumsnamn Antal Luftmängd"
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/teknikomradesspecifika-anvisningar/varme-och-sanitet",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "TEKNIKOMRÅDESSPECIFIKA ANVISNINGAR",
+    "Värme och sanitet"
+   ],
+   "text": "• Samtliga ingående komponenter för värme, vatten och sanitet ska projekteras som objekt i 3D."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/ovriga-dokument",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "ÖVRIGA DOKUMENT"
+   ],
+   "text": "• Dokument ska levereras i de format som anges i leveransspecifikationen.\n• Karlstads kommun arbetar i Microsoft Office‐miljö. Det innebär att förteckningar, beskrivningar och liknande ska vara i Microsoft Office format. Makron är inte tillåtna.\n• Besiktningsprotokoll, provningsprotokoll och liknande skannas efter undertecknande till arkivformatet PDF/A-1 (SS-ISO 19005–1:2005).\n• Teknik- och fastighetsförvaltningen tar inte emot databasfiler.\n• Programfiler för styrning av DUC, display ska kunna lämnas som relation.\n• Om foton ska ingå i relationshandlingen ska de levereras i GIF-, TIF- eller JPG-format.\n• Dokument som levereras ska bestå av en fil per dokument. Försättsblad, huvuddokument och bilagor ska finnas med i samma fil. Ett dokument får alltså inte bestå av flera separata filer som tillsammans utgör ett dokument.\n• PDF-dokument (utom produktinformation) ska sparas i arkivformatet PDF/A-1.\n• Alla levererade dokument ska vara roterade till läsläge.\n• Produktinformation levereras i leverantörens PDF-originalformat (inte skannas). Normalt sparas de i mappen 4E Produktinformation. Undantag är då drift- och skötselanvisningar ligger i samma dokument, då läggs dokumenten under 2L Drift och underhåll."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/bim-filer",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "BIM-FILER"
+   ],
+   "text": "När en bygghandling justeras till status relationshandling ska följande ändringar och kontroller utföras:\n• Så kallad överinformation ska rensas bort från BIM-modellerna.\n• Kontrollera att revideringar ligger i rätt fas (Phase).\n• Ritningsstatus ska ändras till ”Relationshandling”.\n• Ritningens datum ska ändras till det bestämda relationshandlingsdatumet.\n• Alla revideringsnoteringar ska tas bort och ändringstabellen ska tömmas.\n• Revideringsmoln och revideringspilar ska tas bort.\n• Vyer och layouter ska städas från arbetskopior, byggritningar och detaljer.\n• Länkar och referenser som inte används ska tas bort.\n• Alla länkar ska ha relativa sökvägar.\n• Kör följande kommandon i Revit:\n− Save to central\n− Detach from central\n− Audit\n− Detach and preserve worksets\n− Purge unused objects\n− All objects relinquished"
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/cad-filer",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "CAD-FILER"
+   ],
+   "text": "När en bygghandling justeras till status relationshandling ska följande ändringar och kontroller utföras:\n• Ritningsstatus ska ändras till ”Relationshandling”.\n• Ritningsdatum ska ändras till det bestämda relationshandlingsdatumet.\n• Alla revideringsnoteringar ska tas bort, ändringstabell ska tömmas.\n• Revideringsmoln och revideringspilar ska tas bort.\n• Filerna ska rensas från inaktuella externa referenser.\n• ”Purgekommandot” (Purge all) ska köras för att rensa bort lager, block och texter som inte används.\n• Kör även ”AUDIT” kommandot för att hitta eventuella fel.\n• Kontrollera att externa referenser är relativa och inlagda med overlay.\n• Alla externa referenser förutom till A och egen modell ska bindas.\n• Filen ska vara fullt utzoomad (zoom extents) i modelläget vid leverans.\n• Kontrollera att inga refererade filer saknas.\n• Vid leverans ska alltid lager 0 vara aktivt.\n• Lager för måttsättning och undertak ska vara släckta."
+  },
+  {
+   "id": "bim-cad-och-dokumentation/modeller-och-ritningar/cad-filer/relationshandlingar",
+   "path": [
+    "MODELLER OCH RITNINGAR",
+    "CAD-FILER",
+    "RELATIONSHANDLINGAR"
+   ],
+   "text": "Handlingar ska alltid levereras som relationshandlingar enligt ”Specifikation handlingar”.\n• Informationssamordnaren ansvarar för att samtliga handlingar ingående i leveransspecifikationen levereras till projektplatsen (eller annat överenskommet leveranssätt) innan slutbesiktning.\n• Alla handlingar ska vara uppdaterade efter slutligt utförande.\n• Dokument ska dateras enligt det datum som överenskommit i uppdraget.\n• Vid revidering ska revideringsdatum, version och den upprättande konsultens namn anges.\n• På samtliga handlingar ska det tydligt framgå vem och vilket företag som är ansvarig för upprättande och/eller ändring av handlingarna.\n• När allt är kvalitetsmässigt godkänt meddelas (eller skickas leveransen till) projektledaren. Leveranstiden är en del i uppdraget.\n• Uppdraget avslutas först efter att alla relationshandlingar kontrollerats och godkänts av kommunens projektledare och informationsförvaltare.\n• Så snart slutleverans av relationshandlingar skett ska entreprenören vidta åtgärder som säkerställer att eventuella senare revisioner av relationshandlingar levereras till kommunen. Leverans av nya revisioner och nya dokument ska ske via mejl till adressen: fastighetsdokumentation@karlstad.se.\n• Entreprenörens projektplats ska stängas för uppdateringar. Kommunen har inte möjlighet att bevaka externa projektportaler efter överenskommen slutleverans.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

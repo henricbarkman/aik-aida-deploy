@@ -1,0 +1,425 @@
+{
+ "doc": "ventilation",
+ "title": "Riktlinje Ventilation",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-Ventilation-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "ventilation/att-tanka-pa",
+   "path": [
+    "ATT TÄNKA PÅ"
+   ],
+   "text": "Mer information finns på karlstad.se\n• Handboken, Minimikrav på luftväxling, ska användas som handledning vid projektering av luftflöden. Handboken hittar du på byggtjanst.se\n• Vid nyproduktion ska avsedd personbelastning föras in på ritning."
+  },
+  {
+   "id": "ventilation/allmanna-krav/fabrikatval",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "FABRIKATVAL"
+   ],
+   "text": "• Om inte annat anges ska sakvaror, don och apparater vara av fabrikat vanligt förekommande i Sverige med lätt tillgängliga reservdelar samt service och försäljningsorganisation i Sverige.\n• Om det i handling föreskrivs fabrikatsangivna produkter, får dessa bytas mot likvärdig till kvalitet, funktion och prestanda.\n• Beställarens sakkunnig avgör likvärdigheten."
+  },
+  {
+   "id": "ventilation/allmanna-krav/overordnat-styrsystem",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "ÖVERORDNAT STYRSYSTEM"
+   ],
+   "text": "• Samtliga apparater såsom fläktar och liknande ska kunna kopplas upp och larmhanteras till Beställarens överordnade styrsystem."
+  },
+  {
+   "id": "ventilation/allmanna-krav/dimensionerande-data",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA"
+   ],
+   "text": "• Inneklimatkrav enligt VVS Tekniska föreningens skrift R1\n• Termiskt klimat\n• Termiskt klimatklass TQ2."
+  },
+  {
+   "id": "ventilation/allmanna-krav/dimensionerande-data/dimensionerande-utetemperatur",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Dimensionerande utetemperatur"
+   ],
+   "text": "• Vinter -22 °C\n• Sommar +25 °C, relativ fuktighet 50 %."
+  },
+  {
+   "id": "ventilation/allmanna-krav/dimensionerande-data/dimensionerande-lagsta-innetemperatur",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Dimensionerande lägsta innetemperatur"
+   ],
+   "text": "• Skolor +22 °C\n• Kontor +21 °C\n• Förskolor och bostäder +22 °C\n• Äldreboende och liknande verksamheter +23 °C\n• Verkstadslokaler, gymnastik/idrottssalar +18 °C."
+  },
+  {
+   "id": "ventilation/allmanna-krav/dimensionerande-data/dimensionerade-temperaturer-i-varmesystem",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Dimensionerade temperaturer i värmesystem"
+   ],
+   "text": "• Ventilationsvärmesystem tillopp +50 °C."
+  },
+  {
+   "id": "ventilation/allmanna-krav/skyltning",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "SKYLTNING"
+   ],
+   "text": "• Avser alla utrymmen såsom klassrum, grupprum, arbetsrum där två eller fler personer har sin arbetsplats samt samlingssalar eller liknande. Skylten ska placeras i det utrymme som den avser.\n• Skylt ska finnas med uppgift om antal personer som rummet är dimensionerat för avseende luftmängd. På förskolor räcker det att skylta på avdelningsnivå.\n• Skylt till timer- eller forceringstryckknapp ska ha en förklarande text så verksamheten förstår, till exempel ”Timer förlängd ventilation”.\n• I anläggningar där ozon eller UV ljus förekommer ska skyltar med information om detta finnas, exempelvis på kökskåpa, aggregat, och rensluckor placerade utanför teknik och fläktrum. Skylten ska vara gul med svart text ”OZON”. Se exempel nedan:"
+  },
+  {
+   "id": "ventilation/luftbehandlingssystem/energieffektivitet",
+   "path": [
+    "LUFTBEHANDLINGSSYSTEM",
+    "ENERGIEFFEKTIVITET"
+   ],
+   "text": "• Riktvärde för ventilationssystemets specifika fläkteffekt (SFP) för från- och tilluft med värmeåtervinning är 1,5 kW/(m³/s). Verkligt SFP värde ska alltid redovisas.\n• En varvtalsreserv på 20% ska alltid finnas.\n• Vid VAV-system kan högre SFP tillåtas under kortare drifttider med högre flöden. Även vid ombyggnad av befintliga system kan högre SFP tillåtas. Beslut tas i varje enskilt uppdrag/projekt."
+  },
+  {
+   "id": "ventilation/luftbehandlingssystem/obligatorisk-ventilationskontroll-ovk",
+   "path": [
+    "LUFTBEHANDLINGSSYSTEM",
+    "OBLIGATORISK VENTILATIONSKONTROLL (OVK)"
+   ],
+   "text": "• OVK ska alltid utföras efter en nyinstallation och/eller en systemförändring i ett befintligt system.\n• Intyg om godkänd OVK besiktning ska anslås av entreprenören på en av beställaren angiven plats i byggnaden inför slutbesiktning."
+  },
+  {
+   "id": "ventilation/luftbehandlingssystem/allmanventilationssystem/emissionsventilation",
+   "path": [
+    "LUFTBEHANDLINGSSYSTEM",
+    "ALLMÄNVENTILATIONSSYSTEM",
+    "Emissionsventilation"
+   ],
+   "text": "• Första driftåret ska ventilationsaggregaten köras 24/7 för att ventilera bort emissioner. Tider utöver vanlig tidkanal ska aggregatet gå på minflöde. Luftentreprenören ska lämna minflöden till styr- och övervakningsentreprenören som skapar en tidkanal för emissionsventilation."
+  },
+  {
+   "id": "ventilation/luftbehandlingssystem/allmanventilationssystem/omblandande-system",
+   "path": [
+    "LUFTBEHANDLINGSSYSTEM",
+    "ALLMÄNVENTILATIONSSYSTEM",
+    "Omblandande system"
+   ],
+   "text": "• Ventilationssystem ska i första hand utföras som omblandande system."
+  },
+  {
+   "id": "ventilation/luftbehandlingssystem/allmanventilationssystem/behovsstyrt-system",
+   "path": [
+    "LUFTBEHANDLINGSSYSTEM",
+    "ALLMÄNVENTILATIONSSYSTEM",
+    "Behovsstyrt system"
+   ],
+   "text": "• Ventilationssystem ska utföras behovsstyrd där så är lämpligt, till exempel VAV, sektionering med tidkanaler eller närvaro. Beslut tas i samråd med beställaren. Beakta systemuppbyggnad med hänsyn till verksamheternas användningstider.\n• Vid behovsstyrning av luftflöden ska anläggningen dimensioneras så att alla projekterade luftflöden kan erhållas samtidigt."
+  },
+  {
+   "id": "ventilation/luftbehandlingssystem/allmanventilationssystem/status-pa-befintlig-anlaggning",
+   "path": [
+    "LUFTBEHANDLINGSSYSTEM",
+    "ALLMÄNVENTILATIONSSYSTEM",
+    "Status på befintlig anläggning"
+   ],
+   "text": "• Befintliga anläggningars status ska undersökas innan ombyggnad eller åtgärd. I undersökningen ska verksamheternas nuvarande personbelastning beaktas.\n• Undersökningen ska ligga till grund för projekteringsåtgärder.\n• Mätning av flöden och tryck ska göras innan ingrepp i befintliga system sker."
+  },
+  {
+   "id": "ventilation/luftbehandlingssystem/allmanventilationssystem/kyla",
+   "path": [
+    "LUFTBEHANDLINGSSYSTEM",
+    "ALLMÄNVENTILATIONSSYSTEM",
+    "Kyla"
+   ],
+   "text": "• Normalt ingen komfortkyla i Karlstads kommuns lokaler.\n• Behov av eventuell kyla tas i samråd med beställaren.\nServicetillgänglighet För mer information\n• Beakta alltid servicetillgängligheten. om servicetillgänglighet se broschyren Rätt arbetsmiljö för VVS- Termometrar montörer och drift- personal på sbuf.se\n• Termometrar placeras i ute-, till-, från- och avluftskanaler."
+  },
+  {
+   "id": "ventilation/kok/storkok",
+   "path": [
+    "KÖK",
+    "STORKÖK"
+   ],
+   "text": "• Eget ventilationssystem ska utföras för kök och diskrum eller andra utrymmen där större mängder luftföroreningar kan uppstå.\n• Kökssystem kan även betjäna till exempel matsal samt övriga utrymmen i anslutning till kök där viss matlukt kan accepteras.\n• Där aggregat betjänar storkök ska ett extra stickat filter sitta före frånluftsfiltret i luftriktningen räknat.\n• Val av återvinningstyp är extra viktigt i dessa fall om ”andra utrymmen” ska kopplas på aktuellt system.\n• Fettfilter ska vara utbytbara."
+  },
+  {
+   "id": "ventilation/kok/kok-pentry",
+   "path": [
+    "KÖK",
+    "KÖK/PENTRY"
+   ],
+   "text": "• Utred behovet av kanalansluten spisfläkt i pentry eller kök.\n• Kolfilterfläktar ska endast användas i undantagsfall och då i kombination med allmänventilation."
+  },
+  {
+   "id": "ventilation/kok/imkanaler",
+   "path": [
+    "KÖK",
+    "IMKANALER"
+   ],
+   "text": "För mer information,\n• Vid projektering av imkanaler ska branschrekommendationen se imkanal.se senaste version av ”imkanal” följas när det gäller klassning av ozonventilation.se kanaler med mera. Arbetsmiljöverket\n• Där det är möjligt ska ozonfri rening väljas.\n• Om ozon eller ozonalstrande UV ljus installeras i imkanaler för rening, ska arbetsmiljöverkets föreskrifter och anvisningar i ozonventilation.se samt imkanal.se följas.\n• Om ozonrening utförs ska det finnas ett larm med ljudsignal i rummet."
+  },
+  {
+   "id": "ventilation/kok/processventilationssystem",
+   "path": [
+    "KÖK",
+    "PROCESSVENTILATIONSSYSTEM"
+   ],
+   "text": "• Om ventilerade golv eller ventilerade krypgrunder förekommer ska val av system för detta utredas av entreprenören och beslutas i samråd med beställaren."
+  },
+  {
+   "id": "ventilation/kok/teknikrum",
+   "path": [
+    "KÖK",
+    "TEKNIKRUM"
+   ],
+   "text": "• Teknikrum ska ventileras i första hand med allmänventilation.\n• Teknikrum med värmelast förses med separat fläkt för kylning med uteluft, beräknad värmeeffekt dimensionerar luftflöden/fläkt."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/aggregatsspecifikation",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "AGGREGATSSPECIFIKATION"
+   ],
+   "text": "Aggregatspecifikation monteras i ram på aggregatets front. Specifikationen ska innehålla uppgifter om vilka funktionsdelar som ingår:\n• Totalflöde\n• Tryckuppsättning\n• Betjäningsområde\n• Driftdata\n• Filterdata\n• Datum för installation\n• Entreprenör.\nAlla in- och utgångar på aggregatet ska vara pluggade tills anslutning av kanal sker."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/luftfilter",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "LUFTFILTER"
+   ],
+   "text": "Kolla in SP Sveriges Tekniska Forsknings-\n• Luftfilter ska vara P-märkta enligt SP Sveriges Tekniska institut för mer Forskningsinstitut. information\n• Filterklasser: Tilluft PM1-60%, Frånluft PM10-60%. Till varje filterplats ska 1 omgångar extra filter ingå.\n• Tryckfallsmätare (U-rör) ska monteras över filter samt skylt med begynnelse- och sluttryckfall."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/eurovent-certifierade",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "EUROVENT-CERTIFIERADE"
+   ],
+   "text": "• Luftbehandlingsaggregat ska vara Eurovent-certifierade."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/flaktar",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "FLÄKTAR"
+   ],
+   "text": "• Fläktar ska vara direktdrivna och varvtalsreglerade med frekvensomformare eller vara utrustade med EC-motorer."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/frekvensomformare",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "FREKVENSOMFORMARE"
+   ],
+   "text": "• Leverans av frekvensomformare samordnas med styrentreprenör.\n• Kommunen godkänner ej integrerade frekvensomformare i fläktmotorer."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/montering-av-aggregat",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "MONTERING AV AGGREGAT"
+   ],
+   "text": "• Aggregat ska monteras på balkram eller stativ, uppställt på gummivibrationsdämpare.\n• Ram/stativhöjd ska vara minst 150 millimeter."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/atervinning",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "ÅTERVINNING"
+   ],
+   "text": "• Roterande återvinnare ska väljas i första hand, då inte ozon eller UV ljus är installerat i systemet. I de fall väljs värmeväxlare där inte någon återföring av luft kan förekomma."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/varmevaxlare",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "VÄRMEVÄXLARE"
+   ],
+   "text": "• Värmeväxlare ska vara inspekterbar utan ingrepp med verktyg."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/luftvarmare",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "LUFTVÄRMARE"
+   ],
+   "text": "• Luftvärmare för uppvärmning av uteluft ska vara fryssäkrade.\n• Elektriska luftvärmare bör inte användas i fastigheter med vattenburet värmesystem. Beslutas i samråd med beställaren."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/visuella-matare-for-flode-och-tryck",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "VISUELLA MÄTARE FÖR FLÖDE OCH TRYCK"
+   ],
+   "text": "• Aggregat ska vara försedda med visuella mätare för totalflöde och tryck."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/spjall",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "SPJÄLL"
+   ],
+   "text": "• Aggregat ska förses med uteluftspjäll och avluftspjäll oavsett typ av luftvärmare."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/aggregatluckor",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "AGGREGATLUCKOR"
+   ],
+   "text": "• Aggregatluckor ska vara försedda med gångjärn, vred och lås."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/trimspjall",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "TRIMSPJÄLL"
+   ],
+   "text": "• Aggregat ska vara försett med trimspjäll för tryckutjämning över värmeväxlare för att minimera kortslutningseffekter där det behövs."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/arbetsplattform-for-service",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "ARBETSPLATTFORM FÖR SERVICE"
+   ],
+   "text": "• Om aggregatet är högre än 1800 millimeter ska en stabil stege med plattform, rullställning eller liknande finnas."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/aggregat-i-kallt-utrymme",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "AGGREGAT I KALLT UTRYMME"
+   ],
+   "text": "• Om aggregat eller värmare placeras i ett kallt utrymme, ska en glykolkrets med värmeväxlare med mera föreskrivas."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/styr-och-overvakning",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "STYR OCH ÖVERVAKNING"
+   ],
+   "text": "• Aggregat ska i första hand levereras utan styr- och övervakningsutrustning, eftersom det ingår i styr- och övervakningsentreprenaden.\n• Aggregat kan dock levereras elkopplat internt till plint för vidare anslutning till apparatskåp.\n• I vissa fall då ingen övrig styr- och övervakningsutrustning finns eller ska installeras i en byggnad kan aggregat med prefabricerad styrutrustning väljas i samråd med Beställaren. Om sådana aggregat ska anslutas till överordnat system ställs krav i ”Riktlinje styr och övervakning samt Riktlinje märkning och numrering”."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/batterivarmevaxlare",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "BATTERIVÄRMEVÄXLARE"
+   ],
+   "text": "• Propylen-/etylenglykol ska användas som frostskyddsmedel.\n• Varje system ska ha eget blandningskärl.\n• Blandningskärl ska placeras oåtkomligt för obehöriga.\n• Batterier och blandningskärl ska märkas med mediatyp, blandningsförhållande och leverantör. Varuinformationsblad ska anslås på eller i anslutning till kärlet. Blandningskärl för glykol- och vattenblandning ska tömmas efter påfyllning.\n• Batteri för värmeåtervinning och eventuell kyla ska vara försedd med dropplåt och dränering. Dräneringsledning dras till golvbrunn."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/tra-och-textilslojdslokaler",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "TRÄ- OCH TEXTILSLÖJDSLOKALER"
+   ],
+   "text": "• I trä- och textilslöjdslokaler ska luftrenare monteras. Behov av spånsugsanläggning ska utredas."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/luftspjall",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "LUFTSPJÄLL"
+   ],
+   "text": "• Flöde, tryck, och spjällbladets läge ska märkas på injusteringsspjäll.\n• Flöde ska anges på ritning.\n• Pil med luftriktning samt text ”frånluft/tilluft” monteras vid injusteringsspjäll."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/luftspjall/brandgasspjall",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "LUFTSPJÄLL",
+    "BRANDGASSPJÄLL"
+   ],
+   "text": "• Spjäll med brandfunktion ska vara typgodkända med påmonterade ställdon.\n• Spjäll med motorställdon forcering, brandspjäll med mera ska monteras så att spjällets läge enkelt kan avläsas."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/ljuddampare",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "LJUDDÄMPARE"
+   ],
+   "text": "• Då baffelljuddämpare monteras i frånluftsystem ska de vara utdragbara och åtkomliga för rengöring."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/ventilationskanaler",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "VENTILATIONSKANALER"
+   ],
+   "text": "• Cirkulära kanaler täthetsklass C.\n• Rektangulära kanaler täthetsklass B.\n• Fasta mätuttag i huvud- och grenkanaler ska finnas.\n• Borrade mäthål i kanaler som fast mätpunkt, godtas om dessa anges på ritning, med projekterade värden, samt injusterade data i form av flöde och tryck.\n• Mätuttag med flöde ska anges på ritning.\n• Alla kanaler ska vara pluggade i ändarna innan montage påbörjas."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/synliga-kanaler",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "SYNLIGA KANALER"
+   ],
+   "text": "Upphängningar med pendel och svep."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/intagskanaler",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "INTAGSKANALER"
+   ],
+   "text": "• Placering av uteluftintag ska samordnas med VS, så att odörer från avloppssystemens luftare inte kan överföras till ventilationen.\n• Tänk på väderskydd vid val av uteluftintag.\n• Intagskanal ska ha en väl tilltagen renslucka.\n• Om intagsgaller väljs ska lufthastighet över gallrets nettoarea inte överstiga 2,0 m/s.\n• Insektsnät i intagsgaller får aldrig förekomma.\n• Intagsgaller placeras i första hand mot norr om det inte är uppenbart olämpligt, exempelvis mot parkering eller lastintag.\n• Entreprenören utreder behov av dräneringsavlopp för intagskanal.\n• Beakta särskilt behov av extra väderskydd vid användande av intagsgaller.\n• Huvar och galler ska vara lackade i kulör enligt arkitekt.\n• Avluftöppning på kombinationshuv ska förses med smådjursskydd i form av nät."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/rensning",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "RENSNING"
+   ],
+   "text": "• Samtliga kanalsystem inklusive fläktar, luftvärmare, eventuella luftkylare, don och dylikt ska utföras rensbart och med lätt åtkomliga rensluckor.\n• Rensluckor ska placeras så att samtliga kanalsträckor kan rensas.\n• Om rensluckor i kanaler är inbyggda ska inspektionslucka finnas."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/flexibel-slang",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "FLEXIBEL SLANG"
+   ],
+   "text": "• Flexibla kanaler, slang och dylikt ska inte användas, om det absolut inte nödvändigt exempelvis vid vibrationer."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/dragskap",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "DRAGSKÅP"
+   ],
+   "text": "• Separata gnistsäkra frånluftsfläktar ska finnas för dragskåp och giftskåp.\n• Begränsa antalet dragskåp per fläkt, sträva efter mindre system.\n• Undertrycksmätare vid dragskåp kopplas till lokalt larm.\n• Inbyggda (och svåråtkomliga) frånluftskanaler från dragskåp, ska vara invändigt skyddsbehandlade.\n• För frånluftsfläktar som betjänar dragskåp ska klassning avgöras i varje projekt i samråd med brandsakkunnig.\n• Vid ombyggnation se till att befintlig allmänventilation kan balanseras med antalet dragskåp."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/luftdon",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "LUFTDON"
+   ],
+   "text": "• Till- och frånluftsdon ska vara utförda i metall och vara fabrikslackerade.\n• I lokaler med kökskåpor ska även allmän frånluft finnas.\n• Underhållsfria textildon får användas efter samråd med Karlstads kommun."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/overluft",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "ÖVERLUFT"
+   ],
+   "text": "• Springa under dörr kan användas till ”okänsliga” rum, till exempel städ, förråd och liknande. I övrigt ska överluftsdon användas."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/provning",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "PROVNING"
+   ],
+   "text": "• Samtliga system ska provas och dokumenteras i provningsprotokoll.\n• Samordnad provning ska utföras."
+  },
+  {
+   "id": "ventilation/luftbehandlings-aggregat/injustering",
+   "path": [
+    "LUFTBEHANDLINGS-AGGREGAT",
+    "INJUSTERING"
+   ],
+   "text": "• Metod och omfattning av injustering avgörs vid projektering och anges i förfrågningsunderlag och bygghandling.\n• Injusteringsvärden ska anges i protokoll och på ritning.\n• Injusteringsprotokollet ska alltid innehålla ett komplett protokoll med driftdata på ventilationsaggregatet efter injusteringen. Detta ska innehålla uppgifter om uppmätta tryck, totalluftflöden, motoreffekter, drifteffekter och utsignaler samt verkligt SFP värde och övrigt relevanta uppgifter.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

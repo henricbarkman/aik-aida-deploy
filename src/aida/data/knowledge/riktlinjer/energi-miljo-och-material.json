@@ -1,0 +1,174 @@
+{
+ "doc": "energi-miljo-och-material",
+ "title": "Riktlinje Energi, miljö och material",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-Energi,-miljö-och-material-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "energi-miljo-och-material/att-tanka-pa",
+   "path": [
+    "ATT TÄNKA PÅ"
+   ],
+   "text": "• Miljöcertifieringssystemet Miljöbyggnad är normgivande för all förvaltning och byggnation. Kravet på aggregerad nivå är SILVER, utöver det aggregerade kravet finns även enskilda krav på utvalda indikatorer.\n• Byggvarubedömningen används för dokumentation och bedömning av byggvaror och material.\n• För att byggvaror ska vara godkända att använda ska de uppfylla följande:\n− Nivån ”Rekommenderas” eller ”Accepteras” i Byggvarubedömningen\n− Krav enligt Miljöbyggnad utifrån vald betygsnivå\n− Fristående krav i denna riktlinje.\n• För att jobba i linje med Karlstads kommuns klimatmål ”klimatneutral 2030” krävs ett resurseffektivt arbetssätt vilket bland annat innebär överväganden av systemval, materialval, utförande med mera."
+  },
+  {
+   "id": "energi-miljo-och-material/resurseffektivitet/kommunens-fastigheter",
+   "path": [
+    "RESURSEFFEKTIVITET",
+    "KOMMUNENS FASTIGHETER"
+   ],
+   "text": "Arbetet med kommunens fastigheter ska i första hand utgå från det befintliga fastighetsbeståndet. Genom god förvaltning, effektiv drift och långsiktigt underhåll kan byggnaders funktion, värde och livslängd bibehållas. Ett effektivt nyttjande av befintliga lokaler minskar behovet av resurskrävande åtgärder och nyproduktion. När nyproduktion är nödvändig ska den planeras för lång livslängd, flexibilitet och energieffektivitet.\n1. Optimera användningen Utgå från att använda och nyttja befintliga lokaler och byggnader så effektivt som möjligt.\n2. Anpassa och utveckla När behov förändras ska befintliga byggnader i första hand anpassas, renoveras eller byggas om.\n3. Bygg nytt vid behov Nybyggnation ska endast ske när andra lösningar inte kan tillgodose behovet."
+  },
+  {
+   "id": "energi-miljo-och-material/resurseffektivitet/materialoptimering",
+   "path": [
+    "RESURSEFFEKTIVITET",
+    "MATERIALOPTIMERING"
+   ],
+   "text": "Materialanvändning ska optimeras och material med låg klimatpåverkan ska prioriteras. Byggnadens klimatpåverkan ska beaktas under hela dess livscykel."
+  },
+  {
+   "id": "energi-miljo-och-material/resurseffektivitet/aterbruk-och-cirkularitet",
+   "path": [
+    "RESURSEFFEKTIVITET",
+    "ÅTERBRUK OCH CIRKULARITET"
+   ],
+   "text": "Vid renovering, ombyggnation och nyproduktion ska möjligheten till återbruk av byggmaterial och komponenter prövas. Lösningar som möjliggör flexibilitet, demontering och framtida återanvändning bör eftersträvas."
+  },
+  {
+   "id": "energi-miljo-och-material/resurseffektivitet/energieffektiv-drift",
+   "path": [
+    "RESURSEFFEKTIVITET",
+    "ENERGIEFFEKTIV DRIFT"
+   ],
+   "text": "Fastigheterna ska förvaltas och utvecklas med fokus på energieffektivitet och minskad miljöpåverkan. Energianvändningen ska optimeras och behovet av uppvärmning och kyla minimeras. Vid nyproduktion ska byggnader utformas för låg energianvändning och effektiv drift över hela livscykeln."
+  },
+  {
+   "id": "energi-miljo-och-material/miljobyggnad",
+   "path": [
+    "MILJÖBYGGNAD"
+   ],
+   "text": "Miljöbyggnad är normgivande för all förvaltning och byggnation. Nyproducerade byggnader och större tillbyggnader ska certifieras. En systematisk hantering av energi, innemiljö och material gör att kommunen har bättre förutsättningar för att kunna tillhandahålla byggnader med låg miljöpåverkan som är bra för människors hälsa. Målsättningen är att minskad energianvändning, god innemiljö samt minskat användande av byggvaror som innehåller farliga ämnen ska ge nöjdare kunder.\n• Målet för nyproducerade byggnader och större tillbyggnader är lägst SILVER."
+  },
+  {
+   "id": "energi-miljo-och-material/styrande-dokument",
+   "path": [
+    "STYRANDE DOKUMENT"
+   ],
+   "text": "Miljöbyggnad tillhandahåller ett antal manualer som bland annat innehåller bedömningskriterier. Dessa bedömningskriterier är styrande för alla som arbetar med kommunens lokaler och anslutande mark.\nManualerna reglerar vad som behöver göras för att nå respektive betyg. Manualerna styr därför byggnadens utformning, vilken typ av energi som ska användas, vilken ljudmiljö som kan godtas med mera.\nFöljande är styrande:\n• Metodik för nyproducerade och befintliga byggnader.\n• Miljöbyggnads bedömningskriterier för nyproducerade och befintliga byggnader.\nManualer finns på SGBC’s hemsida, sgbc.se"
+  },
+  {
+   "id": "energi-miljo-och-material/energikallor",
+   "path": [
+    "ENERGIKÄLLOR"
+   ],
+   "text": "• Karlstads kommun strävar efter att använda förnybara och/eller fossilfria energikällor i så stor utsträckning som möjligt.\n• För att minska kommunens elvärmeanvändning ska i första hand fjärrvärme nyttjas. För komplexa byggnader som kräver samtidig kyla, värme och/eller avfuktning ska en holistisk energisystemlösningen tas fram.\n• Vid nybyggnation eller större om- eller tillbyggnad ska möjligheten till energilager/batterilager utvärderas. Detta gäller om byggnaden är anpassad för, eller planeras att på sikt anpassas för reservkraftsdrift eller civilberedskap. Beslut fattas för varje enskilt projekt och tas av beställaren."
+  },
+  {
+   "id": "energi-miljo-och-material/energianvandning",
+   "path": [
+    "ENERGIANVÄNDNING"
+   ],
+   "text": "• Betygsnivå för Miljöbyggnads indikator ”Energianvändning” ska för nyproducerade byggnader vara som lägst nivå SILVER.\n• Vid renovering/ombyggnationer av befintliga byggnader kan nivån för Miljöbyggnad skilja sig åt beroende på tekniska förutsättningar och verksamhet i det aktuella objektet.\n• Vid ombyggnationer/utbyten av mindre byggnadsdelar/komponenter (exempelvis golv, väggar, dörrar) där energianvändning inte beräknas för byggnaden, ska val av U-värden för utförande och produkter harmonisera med betygsnivå SILVER.\n• Byggnadens energihushållningskrav ska vara teknikneutralt. Klimatskärmens uppbyggnad ska alltså inte bero på om byggnaden har värmepump eller producerar egen energi. Utgångspunkten för kravnivån och för energiberäkning ska vara fjärrvärme (vid vattenburen värme) och att ingen egenproducerad energi tillgodoräknas förutom till energianvändning kopplat till produktion av komfortkyla.\n• Vid beräkning av byggnadens energiprestanda ska tempererad area (A temp) för varmvind i normalfallet inte medräknas alternativt begränsas. Begränsningen eller avsteg från denna punkt stäms av med beställaren.\n• Vid renovering av befintliga byggnader ska hänsyn tas till att byggnader successivt behöver förbättras för att på sikt uppfylla kraven på mycket hög energiprestanda och bidra till omställningen mot nollutsläppsbyggnader senast år 2050, i enlighet med EU:s direktiv om byggnaders energiprestanda och dess införlivande i Boverkets föreskrifter. Inför varje renoveringsprojekt ska därför en genomgång göras för att identifiera vilka bygg- och installationsåtgärder som är lämpliga att genomföra i samband med renoveringen. Åtgärder ska genomföras om de är tekniskt, ekonomiskt och funktionellt genomförbara. Åtgärder bör planeras och genomföras i en ordning som möjliggör en stegvis och kostnadseffektiv energirenovering. Åtgärderna ska i första hand samordnas med planerat underhåll eller när byggnadsdelar och installationer ändå behöver bytas ut av annan anledning. Detta förhindrar förtida åtgärder, säkerställer effektiv resursanvändning och minimerar kostnader och störningar, samtidigt som byggnadens livslängd och energiprestanda förbättras."
+  },
+  {
+   "id": "energi-miljo-och-material/radon",
+   "path": [
+    "RADON"
+   ],
+   "text": "• För nybyggnation ska Radonmätning med långtidsmätning i enlighet med strålskyddsmyndighetens rekommenderade metod ska understiga 100 Bq/m³."
+  },
+  {
+   "id": "energi-miljo-och-material/solvarmelast",
+   "path": [
+    "SOLVÄRMELAST"
+   ],
+   "text": "• Betygsnivå för Miljöbyggnads indikator ”Solvärmelast” ska för nyproducerade byggnader vara lägst SILVER. Detta för att begränsa övertemperaturer och behovet av komfortkyla."
+  },
+  {
+   "id": "energi-miljo-och-material/solel",
+   "path": [
+    "SOLEL"
+   ],
+   "text": "• Inför omläggning av befintliga tak ska en installation av en eventuell solcellsanläggning utvärderas. Installationen ska utföras så att den solenergiproducerande potentialen optimeras för hög kostnadseffektivitet och hög egenanvändning av producerad solel. En installation ska utföras om detta är teknisk, ekonomiskt och funktionellt genomförbart.\n• Vid nybyggnation ska alltid en solcellsanläggning installeras. Byggnaden ska konstrueras så att den solenergiproducerande potentialen optimeras för hög kostnadseffektivitet och hög egenanvändning av producerad solel.\n• Producerad solel ska i första hand kunna användas av den egna byggnaden/fastigheten. Den egenanvända andelen ska vara större än 70%.\n• Solcellsanläggningar ska i normalfallet, oavsett andel egenanvändning av producerad solel, inte vara mindre än 15 kilowatt i toppeffekt (kWp)."
+  },
+  {
+   "id": "energi-miljo-och-material/ventilation",
+   "path": [
+    "VENTILATION"
+   ],
+   "text": "• Mängden formaldehyd i inomhusluften ska understiga 0,06 mg/m³.\n• Risken för hög kvävedioxidhalt i inomhusluften på grund av närhet till trafik ska beaktas."
+  },
+  {
+   "id": "energi-miljo-och-material/ventilation/produktval-och-dokumentation/del-1",
+   "path": [
+    "VENTILATION",
+    "PRODUKTVAL OCH DOKUMENTATION"
+   ],
+   "part": 1,
+   "text": "• Vid val av material i lokaler och anslutande mark ska stor vikt läggas vid materialens påverkan på människor och miljö. Försiktighetsprincipen gäller, är ett material inte beprövat ska materialet utredas innan det får användas.\n• Byggvaror och material ska bedömas och dokumenteras. Detta ska göras digitalt genom användandet av Byggvarubedömningens loggboksverktyg. Kravet gäller för utvalda produktkategorier, se sida 8. Byggvaror som tillhör verksamheten ska inte ingå.\n• Genom att i ett tidigt skede arbeta med produktval via loggboken ökar möjligheten till att göra kloka avväganden och hållbara materialval.\n• Loggbok med mappstruktur skapas av beställaren. Entreprenören är ansvariga för att projektets loggbok blir korrekt och komplett ifylld. Efter utfört projekt ansvarar projektansvarig hos beställaren för att tillgängliggöra och informera de förvaltningsansvariga om loggboken och dess innehåll.\n• Varor som uppfyller nivån ”Rekommenderas” eller ”Accepteras” är godkända för användning. Rekommenderad byggvara ska prioriteras före accepterad.\n• Observera att träråvaror har speciella krav under rubriken ”Trä”.\n• Byggvaror i kategorin ”Undviks” får endast användas/köpas in efter upprättande av avvikelserapport och godkännande från beställaren. Avvikelserapporten hanteras via loggbokens avvikelsehantering. Motivering om varför produkten behöver användas och vilka åtgärder som har gjorts för att hitta alternativa produkter med bättre miljö- och/eller hälsoaspekter ska finnas. Även mängd och produktens placering ska anges.\n• Utfasningsämnen enligt Kemikalieinspektionens kriterier får endast användas om särskilda skäl föreligger. Byggvaran får endast användas/köpas in efter upprättande av avvikelserapport samt efter godkännande från beställaren."
+  },
+  {
+   "id": "energi-miljo-och-material/ventilation/produktval-och-dokumentation/del-2",
+   "path": [
+    "VENTILATION",
+    "PRODUKTVAL OCH DOKUMENTATION"
+   ],
+   "part": 2,
+   "text": "• I första hand ska endast bedömda produkter användas. Om produkten inte finns bedömd i Byggvarubedömningen ska entreprenören kontakta leverantören för att uppmana till bedömning. Leverantören ska stå för kostnaden för bedömningen. Om leverantören ej bedömer produkten ska entreprenören i första hand söka likvärdig bedömd produkt. I andra hand söka likvärdig bedömd produkt i annat likvärdigt byggvarubedömningssystem. Exempelvis BASTA, SundaHus eller Svanen. Produkt vald i annat system ska som utgångspunkt klara krav motsvarande nivån ”accepteras” eller ”rekommenderas” i Byggvarubedömningen. Om inte något bedömt alternativ finns eller om val av produkt gjorts med hänvisning till annat byggvarubedömningssystem ska detta hanteras via loggbokens avvikelsehantering samt godkännas av beställaren. I avvikelsehanteringen ska det framgå hur miljö- och hälsoaspekter har beaktats. Produkten läggs till som en ”egen produkt”.\n• Även återbrukade byggvaror ska dokumenteras i loggboken. Byggvara taggas som ”återbrukad” via funktion i loggboksverktyget. Om inte någon bedömning av den återbrukade byggvaran finns i Byggvarubedömningen eller om val av byggvaran gjorts med hänvisning till annat byggvarubedömningssystem ska byggvaran hanteras via loggbokens avvikelsehantering samt godkännas av beställaren. I avvikelsehanteringen ska det framgå hur miljö- och hälsoaspekter har beaktats. Produkten läggs till som en ”egen produkt”. Mängd och byggvarans placering ska anges.\n• Observera att i vissa fall innebär Miljöbyggnads kriterier ytterligare och/eller högre krav jämfört med anvisningarna i riktlinjen. Kraven beror på vilken betygsnivå (BRONS, SILVER, GULD) som valts för respektive indikator och vilken kriterieversion man arbetar med. I loggboksverktyget visas vilken betygsnivå som byggprodukten uppfyller.\n• Teknik- och fastighetsförvaltningens ambition är att byggvaror ska vara fria från såväl utfasningsämnen inkl. hormonstörande ämnen på SIN-listan samt prioriterade riskminskningsämnen och nanomaterial. Ett aktivt arbete med att fasa ut dessa ämnen ska finnas i alla projekt men ska vara extra prioriterat i projekt rörande förskolor och skolor."
+  },
+  {
+   "id": "energi-miljo-och-material/ventilation/utvalda-produktkategorier",
+   "path": [
+    "VENTILATION",
+    "UTVALDA PRODUKTKATEGORIER"
+   ],
+   "text": "• Kraven för dokumentation och bedömning gäller för utvalda produktkategorier enligt BSAB-koder*. Aktuella produktkategorier: C, D, E, F, G, H, I, J, K, L, M, N, P, Q, R, S, X, Z.\n• Observera nedanstående exkluderade produkter i produktkategorierna:"
+  },
+  {
+   "id": "energi-miljo-och-material/ventilation/utvalda-produktkategorier/c-n-p-q-s-x",
+   "path": [
+    "VENTILATION",
+    "UTVALDA PRODUKTKATEGORIER",
+    "C, N, P, Q, S, X."
+   ],
+   "text": "C: Exkludera sten och grus.\nN: Exkludera mindre beslag (knoppar, kläd- och/eller handdukshängare, etcetera).\nP: Exkludera tekniskt komplicerade sammansatta produkter som till exempel pumpanläggningar och pannor under koderna PF, PH, PJ, PK, PL, PM.\nQ: Exkludera tekniskt komplicerade sammansatta produkter som till exempel fläktar under koderna QA, QB, QE, QF.\nS: Endast el-installationer ur koderna SC (El- och telekablar), SD (elkanalisation) och SN (ljusarmaturer, ljuskällor). Exkludera övriga koder.\nX: Endast produkter ur koderna XB: Inredningar i undervisningslokaler med mera. Exkludera övriga koder.\nÄven produkter som till exempel vitvaror, ventilationsaggregat, hissar, solcellsanläggningar samt spik, skruv, mutter, plåtband, hålband, plaststrips etcetera exkluderas.\n• Kravet gäller också utemiljöprodukter som finns under flera BSAB-koder: Utemöbler,lekutrustning, gummibeläggningar, konstgräs, stängsel, plank, pergola etcetera.\n*BSAB är en katalogstruktur som tillhandahålls av Byggtjänst. Läs mer här: https://byggkatalogen.byggtjanst.se/bsab"
+  },
+  {
+   "id": "energi-miljo-och-material/tra",
+   "path": [
+    "TRÄ"
+   ],
+   "text": "• Trä ska alltid utvärderas som materialval.\n• Träråvaror ska uppfylla nivån ”Rekommenderas” i Byggvarubedömningen. Leverantörer av träråvara ska inneha en tredjepartscertifiering som för hela leveranskedjan säkerställer spårbarhet av skogs- och trädbaserade produkter. Bevis för detta krav är en giltig tredjepartscertifiering enligt FSC, PEFC eller likvärdig.\n• Tryckimpregnerat lösvirke ska undvikas i förskolor och skolor. Tryckimpregnerat lösvirke får inte förekomma på ytor där barn kommer i direktkontakt med materialet, såsom räcken, odlingslådor, pallkragar eller sittplatser etcetera. Användning får dock ske när det är nödvändigt ur hållbarhets- eller säkerhetsperspektiv, exempelvis i konstruktioner med direkt markkontakt."
+  },
+  {
+   "id": "energi-miljo-och-material/betong",
+   "path": [
+    "BETONG"
+   ],
+   "text": "• Platsgjutna betongkonstruktioner för betonggrund, mellanbjälklag och väggar ska som lägst utföras enligt klimatförbättrad betong nivå 4. För platsgjutna betongkonstruktioner ska även utvärdering och optimering av föreslagen hållfasthetsklass redovisas till beställaren. Detta med syfte att säkerställa att även hållfasthetsklass beaktas som en del i att minska klimatutsläppen.\n• Prefabricerade betongelement ska som lägst utföras enligt klimatförbättrad betong nivå 3.\nBetongnivåerna ovan är enligt Svensk Betongs Vägledning klimatförbättrad betong (utgåva 2)."
+  },
+  {
+   "id": "energi-miljo-och-material/stal",
+   "path": [
+    "STÅL"
+   ],
+   "text": "• Konstruktionsstål av typen balk ska vara skrotbaserad. Klimatpåverkan får som mest vara 900 kg CO₂e/ton (A1-A3)."
+  },
+  {
+   "id": "energi-miljo-och-material/armering",
+   "path": [
+    "ARMERING"
+   ],
+   "text": "• Klimatpåverkan för armering får som mest vara 500 kg CO₂e /ton (A1-A3)."
+  },
+  {
+   "id": "energi-miljo-och-material/vitvaror",
+   "path": [
+    "VITVAROR"
+   ],
+   "text": "• Disk- och tvättmaskiner ska kopplas till både kall- och varmvatten där det är möjligt.\n• Större torkbehov av tvätt ska ske så energieffektivt som möjligt till exempel med avfuktning eller med värme från byggnadens värmesystem.\n• Vid val av vitvaror ska god energiklass eftersträvas. Val av vitvaror ska stämmas av med beställarens driftorganisation.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

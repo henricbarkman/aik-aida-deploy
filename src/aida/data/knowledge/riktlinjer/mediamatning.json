@@ -1,0 +1,68 @@
+{
+ "doc": "mediamatning",
+ "title": "Riktlinje Mediamätning",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-Mediamätning-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "mediamatning/att-tanka-pa",
+   "path": [
+    "ATT TÄNKA PÅ"
+   ],
+   "text": "Detaljerade krav och beskrivning för anslutning av mediamätare Mer information finns finns i ”Riktlinje Styr och övervakning” och ”Anvisning Citect”. på karlstad.se Detaljerade krav och beskrivning för märkning och benämning av mediamätare finns i ”Riktlinje Märkning och numrering”."
+  },
+  {
+   "id": "mediamatning/begreppsforklaringar",
+   "path": [
+    "BEGREPPSFÖRKLARINGAR"
+   ],
+   "text": "Begrepp Förklaring Debiteringsmätare Mätare som ska användas för debitering ska vara godkända för detta ändamål enligt MID MI003 Annex B och D (Metering Instrument Directive). Fastighetsenergi Den del av byggnadens energianvändning som är relaterad till byggnadens behov där den energikrävande apparaten finns inom, under eller anbringad på utsidan av byggnaden. I fastighetsenergin ingår fast belysning i allmänna utrymmen och driftsutrymmen. Dessutom ingår energi som används i värmekablar, pumpar, fläktar, motorer, styr- och övervakningsutrustning och dylikt.\nÄven externt lokalt placerad apparat som försörjer byggnaden, exempelvis pumpar och fläktar för frikyla, inräknas. Fastighetsel Med fastighetsel menas den del av fastighetsenergi som är elbaserad. Mediamätare Elmätare, Värmemängdsmätare, Kylmängdsmätare, Vattenmätare, Flödesmätare med mera. M-BUS M-BUS är en förkortning för Meter Bus är en standardiserad teknik för att fjärravläsa mediamätare. Verksamhetsenergi Den el eller annan energi som används för verksamheten i lokaler. Exempel på detta är belysning, datorer, kopiatorer, TV, kyl-/frysdiskar, maskiner samt andra apparater för verksamheten samt spis, kyl, frys, diskmaskin, tvättmaskin, torkapparater, andra hushållsmaskiner och dylikt. Verksamhetsel Med verksamhetsel menas den delen av verksamhetsenergi som är elbaserad."
+  },
+  {
+   "id": "mediamatning/omfattning-av-matning",
+   "path": [
+    "OMFATTNING AV MÄTNING"
+   ],
+   "text": "Vid nybyggnation och vid större tillbyggnader och renoveringar ska följande mätas separat:\n• Fastighetsenergi\n– Fastighetsel\n– Energi för uppvärmning\n– Energi för komfortkyla\n– Energi för tappvarmvatten.\nTotal verksamhetsel mäts inte utan beräknas utifrån total köpt el och uppmätt fastighetsel. I de fall fastigheten består av flera byggnader ska total energianvändning för varje byggnad mätas separat. Även fastighetsenergi ska mätas separat för varje byggnad. För gränsdragning mellan fastighet- och verksamhetsenergi se Boverkets gränsdragningslista.\nUtöver ovanstående krav ska nedanstående mätas separat:\nEL Elmätare ska vara godkända för debitering. Elsystem ska konstrueras på sådant sätt att total fastighetsel går att särskiljas på så få mätare som möjligt. Undermätare för el ska utrustas med M-BUS.\nVärmepump\nEl till värmepump ska mätas separat för kompressor respektive elspets/elpatron.\nSolceller\nTotal producerad energi från solceller.\nStorkök\nTotal el för servering-, mottagning- och tillagningskök.\nVentilation Storkök\nEl till ventilationsaggregat som betjänar storkök.\nElbilsladdning\nLaddstolpar och utrustning som används för laddning av elbilar i egen verksamhet ska mätas med en totalmätare. (Publika laddstolpar och utrustning ska i normalfallet ha eget elabonnemang.)"
+  },
+  {
+   "id": "mediamatning/omfattning-av-matning/varme-vatten",
+   "path": [
+    "OMFATTNING AV MÄTNING",
+    "VÄRME & VATTEN"
+   ],
+   "text": "Fjärrvärme\nFjärrvärmemängd ska mätas. Fjärrvärmeleverantörens huvudmätare ska utrustas med dubbla M-BUS-anslutningar så att parallell anslutning går att genomföra.\nKylmaskiner återvinning\nOm återvinning av värme sker från kylmaskiner eller andra processer ska denna värmemängd mätas.\nStorkök\nDär servering-, mottagning- och tillagningskök har eget ventilationsaggregat ska värmemängd som går till värmebatteri mätas.\nKallvatten\nTotal volymmängd kallvatten ska mätas via mätare levererad av VA-avdelningen. Undermätare för volymmängd kallvatten ska utrustas med M-BUS. Volymmängd kallvatten i serverings-, mottagnings- och tillagningskök ska mätas separat.\nVarmvatten\nVärmemängd ska mätas för varmvattenberedning och varmvattencirkulation.\n• Värmemängd varmvatten beräknas via uppmätt volymmängd kallvatten för tappvarmvattenberedning samt temperaturgivare på utgående varmvatten och inkommande kallvatten.\n• Värmemängd varmvattencirkulation beräknas via volymmängd varmvattencirkulation samt utgående varmvattentemperatur och returtemperatur på varmvattencirkulation.\n• I produktionskök ska volymmängd varmvatten mätas separat. Värmemängd beräknas av beställaren i energiuppföljningssystemet."
+  },
+  {
+   "id": "mediamatning/omfattning-av-matning/sammanstallning-matvarden",
+   "path": [
+    "OMFATTNING AV MÄTNING",
+    "SAMMANSTÄLLNING MÄTVÄRDEN"
+   ],
+   "text": "I kommunens energiuppföljningssystem sammanställs mätvärden från alla mediamätare. Mer om detta under rubriken ”Vem gör vad?”. Med mediamätare avses:\n• Elmätare\n• Värmemängdsmätare\n• Kylmängdsmätare\n• Vattenmätare (kallvattenmätare och varmvattenmätare)\n• Mätare för andra energislag (exempelvis olja, pellets)."
+  },
+  {
+   "id": "mediamatning/matarstruktur-matplan",
+   "path": [
+    "MÄTARSTRUKTUR & MÄTPLAN"
+   ],
+   "text": "För att klargöra hur mätarstrukturen ser ut ska en mätplan upprättas. Totalentreprenören ansvarar för att mätplanen är komplett ifylld och uppfyller ställda krav vid överlämnande /slutbesiktning.\nFigur 1. Exempel på mätplan\nDenna mätplan ska innehålla information om alla mätare som installeras och ska fungera som ett underlag för att kunna bekräfta att byggnaden/byggnaderna som byggts uppfyller gällande BBR- krav, miljöbyggnadskrav samt krav på mätpunkter som ställs i denna riktlinje. Dokumentet mätplan tjänar som underlag till utförande, men även som underlag till när mätare ska läggas upp i kommuns energiuppföljningssystem.\nUtöver mätplan ska detaljerad information om mätare redovisas i respektive disciplins handlingar, exempelvis principschema värme, kyla, huvudledningsschema el och driftkort styr."
+  },
+  {
+   "id": "mediamatning/vem-gor-vad",
+   "path": [
+    "VEM GÖR VAD?"
+   ],
+   "text": "I det här avsnittet presenteras en översiktlig orientering av hur arbetet ska gå till från att en mätplan påbörjas till att energistatistik kommer in i energiuppföljningssystemet.\nAktivitet Utförs av Kommentar Initial planering av mätarstruktur Projektledare tillsammans med Mätplan påbörjas. för förfrågningsunderlag eller respektive projektör (El, VS, Styr) systemhandling. och teknisk specialist. Inarbetning av mätpunkter Entreprenör/Projektörer Mätare med rätt beteckningar i granskningshandlingar. (EL, VS, STYR) ritas in på principschema VS, Placering, beteckning, huvudledningsschema EL anslutning, och så vidare. samt i driftkort för styr. Granskning av Karlstads kommun granskningshandlingar Projektledare och och mätplan. teknisk specialist. Bygghandling Entreprenör Driftsättning av mätare. Styrentreprenör Installationsrapport från M-BUS gateway sparas och bifogas med övriga dokumentation för styr. Mätplan färdigställs. Totalentreprenör ansvarig för att Besiktningsman för EL, VS och mätplan är komplett ifylld och finns STYR kontrollerar mätare och tillgänglig för besiktningsmän. godkänner komplett ifylld mätplan. Implementering av Karlstads kommun Mätplan används som underlag mätare i kommunens för att lägga upp mätare i energiuppföljningssystem. energiuppföljningssystem."
+  },
+  {
+   "id": "mediamatning/vem-gor-vad/insamling-av-matvarden",
+   "path": [
+    "VEM GÖR VAD?",
+    "INSAMLING AV MÄTVÄRDEN"
+   ],
+   "text": "Insamling av mätvärden sker på tre olika sätt:\nInsamling via leverantör av media\nKarlstads kommun erhåller mätvärden från energileverantörer. I första hand timvärden och i andra hand månadsvärden.\nInsamling via M-BUS gateway\nMätvärden samlas in via gateway som är ansluten via M-BUS. Överföring av mätvärden till kommunens energiuppföljningssystem sker en gång per dygn.\nManuell insamling\nFör de mediamätare som ännu inte är fjärravlästa (vatten, olja med mera) sker insamling av värden via manuell avläsning. Värden från avläsning matas sedan in i kommunens energi- uppföljningssystem. Intervall på denna avläsning är en gång per månad, vissa fastigheter som har en väldigt liten förbrukning läses endast tertialvis.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

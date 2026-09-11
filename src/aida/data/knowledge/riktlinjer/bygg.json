@@ -1,0 +1,350 @@
+{
+ "doc": "bygg",
+ "title": "Riktlinje Bygg",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-Bygg-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "bygg/fukt",
+   "path": [
+    "FUKT"
+   ],
+   "text": "• Branschstandarden ByggaF ska användas som metod för att säkerställa en fuktsäker byggprocess.\n• Allt material ska förvaras skyddat från nederbörd, fukt och smuts samt pallas upp från mark så att luft kan cirkulera."
+  },
+  {
+   "id": "bygg/tillganglighet",
+   "path": [
+    "TILLGÄNGLIGHET"
+   ],
+   "text": "• Senaste versionen av ”Bygg ikapp” ska gälla för projektet."
+  },
+  {
+   "id": "bygg/rivning",
+   "path": [
+    "RIVNING"
+   ],
+   "text": "• Rivning ska utföras som selektiv rivning.\n• Möjlighet att återbruka inventarier och materiel ska utredas i samråd med beställaren."
+  },
+  {
+   "id": "bygg/grundkonstruktioner",
+   "path": [
+    "GRUNDKONSTRUKTIONER"
+   ],
+   "text": "Grundkonstruktion för nybyggnad ska utföras som platta på mark av platsgjuten betong, kantbalk med bruten köldbrygga. Syll för yttervägg ska placeras på gjuten sockel minst 150 mm över färdigt golv."
+  },
+  {
+   "id": "bygg/grundkonstruktioner/platta-pa-mark",
+   "path": [
+    "GRUNDKONSTRUKTIONER",
+    "PLATTA PÅ MARK"
+   ],
+   "text": "• Hänsyn till risk för tjällyftning ska tas.\n• Befintliga byggnader grundlagda med betongplatta på mark som saknar underliggande fuktspärr får inte beläggas med plastmatta eller annan fuktkänslig golvbeläggning utan att särskilda åtgärder vidtas. Beslut tas i samråd med beställaren."
+  },
+  {
+   "id": "bygg/grundkonstruktioner/varmgrund-och-krypgrund",
+   "path": [
+    "GRUNDKONSTRUKTIONER",
+    "VARMGRUND OCH KRYPGRUND"
+   ],
+   "text": "• Eventuella krypgrunder ska utföras som varmgrund. Detta innebär att temperaturen i varmgrunden ska vara högst 2-3 grader lägre än inomhustemperaturen.\n• Marken ska värmeisoleras på dränerande skikt.\n• I marktäckningen ska finnas avdunstningsskydd av minst 0,2 mm åldersbeständig plastfolie. Plastfoliens våder ska överlappa varandra med minst 300 mm."
+  },
+  {
+   "id": "bygg/grundkonstruktioner/kallarvaggar",
+   "path": [
+    "GRUNDKONSTRUKTIONER",
+    "KÄLLARVÄGGAR"
+   ],
+   "text": "• Motfylld källarvägg ska utvändigt förses med dränerande isolerskivor med en tjocklek av minimum 100 mm.\n• Isolerskivorna ska skyddas med geotextil mot återfyllnadsmaterial."
+  },
+  {
+   "id": "bygg/grundkonstruktioner/radon",
+   "path": [
+    "GRUNDKONSTRUKTIONER",
+    "RADON"
+   ],
+   "text": "• Markradonhalten ska mätas inför projektering av ny- eller tillbyggnad om det inte redan finns en dokumenterad mätning för området.\n• Behov av radonslang i grundplattan ska utredas i samråd med beställaren."
+  },
+  {
+   "id": "bygg/stomme/trastomme",
+   "path": [
+    "STOMME",
+    "TRÄSTOMME"
+   ],
+   "text": "• Möjligheten att använda massivträ och träkonstruktion ska utredas tillsammans med beställaren."
+  },
+  {
+   "id": "bygg/yttertak",
+   "path": [
+    "YTTERTAK"
+   ],
+   "text": "• Yttertak ska vara gångbart och kunna beträdas av en vuxen person, samt förses med taksäkerhet.\n• Möjligheten att använda sedumtak ska utredas tillsammans med beställaren. Där sedumtak används ska det finnas möjlighet till bevattning med vattenutkast i direkt närhet.\n• Vid takbeläggning med papp ska produkten vara mekaniskt fastsatt och vara anpassad för nordiskt klimat."
+  },
+  {
+   "id": "bygg/yttertak/takavvattning",
+   "path": [
+    "YTTERTAK",
+    "TAKAVVATTNING"
+   ],
+   "text": "• Invändig takavvattning får inte förekomma.\n• Stuprör och hängrännor ska utföras i belagd förzinkad plåt.\n• Utvändiga stuprör ska anslutas med självrensande lövsil 1,5 m ovan mark till vandalsäkert rör."
+  },
+  {
+   "id": "bygg/yttertak/snorasskydd",
+   "path": [
+    "YTTERTAK",
+    "SNÖRASSKYDD"
+   ],
+   "text": "• Snörasskydd ska utföras i varmförzinkat stål och generellt monteras över entréer och gångstråk.\n• I skolor och förskolor ska snörasskydd monteras på alla sidor på samtliga tak."
+  },
+  {
+   "id": "bygg/yttervagg/fasad",
+   "path": [
+    "YTTERVÄGG",
+    "FASAD"
+   ],
+   "text": "• Avstånd mellan markyta och träpanel ska vara minst 200 mm."
+  },
+  {
+   "id": "bygg/yttervagg/yttre-klimatskarm",
+   "path": [
+    "YTTERVÄGG",
+    "YTTRE KLIMATSKÄRM"
+   ],
+   "text": "• Yttervägg som är uppbyggd av regelverk ska på insidan utföras med minst 45 mm indragen ångspärr för att möjliggöra installationszon."
+  },
+  {
+   "id": "bygg/yttervagg/ytterdorrar",
+   "path": [
+    "YTTERVÄGG",
+    "YTTERDÖRRAR"
+   ],
+   "text": "• Brevinkast i ytterdörrar får inte förekomma.\n• Samtliga ytterdörrar i förskolor och F-6-skolor där elever rör sig ska ha klämskydd. Integrerade klämskydd väljs i första hand där så är möjligt.\n• Vid eftermontage av klämskydd i befintliga förskolor och skolor ska utanpåliggande klämskydd av 1,5 mm gummiduk med inläggning som fästs med kantlist av aluminium, höjd minst 1 800 mm, monteras på ytterdörrens insida."
+  },
+  {
+   "id": "bygg/yttervagg/ytterdorrar/ytterdorrar-av-aluminium",
+   "path": [
+    "YTTERVÄGG",
+    "YTTERDÖRRAR",
+    "Ytterdörrar av aluminium"
+   ],
+   "text": "• Utförs av typ SAPA eller likvärdigt.\n• Utförs med modulprofiler och gerade hörn i någon av standardkulörerna."
+  },
+  {
+   "id": "bygg/yttervagg/fonster",
+   "path": [
+    "YTTERVÄGG",
+    "FÖNSTER"
+   ],
+   "text": "• Fönster ska bestå av trä med aluminiumklädd utsida, gäller dock ej rum utsatta för fukt, exempelvis storkök och badhus.\n• Minst ett fönster per rum ska vara öppningsbart. Från våning två och uppåt ska det öppningsbara fönstret vara inåtgående.\n• Alla öppningsbara fönster ska förses med barnsäkra vädringsbeslag."
+  },
+  {
+   "id": "bygg/inre-rumsbildande-delar/vaggar/innervaggar-galler-aven-insida-yttervagg",
+   "path": [
+    "INRE RUMSBILDANDE DELAR",
+    "VÄGGAR",
+    "Innerväggar (gäller även insida yttervägg)"
+   ],
+   "text": "• Material på lättväggar i torra utrymmen ska bestå av 2*13 mm skivor på var sida vägg, varav den yttersta av gips. Val av underliggande skiva bestäms i varje enskilt projekt m.h.t. slitage och åverkan, ljud, brand, rumsinredning m.m.\n• Utanpåliggande hörnlist monteras på särskilt utsatta hörn.\n• Hörnlist typ Gyproc HS 0,4 mm eller likvärdigt monteras till minst 2 100 mm över färdigt golv och ska överspacklas, där utanpåliggande hörnlist inte monteras."
+  },
+  {
+   "id": "bygg/inre-rumsbildande-delar/vaggar/vaggar-i-vatutrymmen",
+   "path": [
+    "INRE RUMSBILDANDE DELAR",
+    "VÄGGAR",
+    "Väggar i våtutrymmen"
+   ],
+   "text": "• Dörrar och fönster får inte förläggas så att vatten från duschar eller andra tappställen kan skada karm, foder, dörrblad eller fönster.\n• Placering av duschblandare i yttervägg får inte förekomma."
+  },
+  {
+   "id": "bygg/inre-rumsbildande-delar/listverk",
+   "path": [
+    "INRE RUMSBILDANDE DELAR",
+    "LISTVERK"
+   ],
+   "text": "• Foderlister enligt standard SS 23 28 12."
+  },
+  {
+   "id": "bygg/inre-rumsbildande-delar/golv/kok-vatrum-wc",
+   "path": [
+    "INRE RUMSBILDANDE DELAR",
+    "GOLV",
+    "Kök/våtrum/WC"
+   ],
+   "text": "• Tätskikt på golv ska dras upp minst 100 mm på anslutande väggar.\n• Mellan utrymmen med olika ytskiktsmaterial får inte nivåskillnader förekomma."
+  },
+  {
+   "id": "bygg/inre-rumsbildande-delar/golv/flytande-golv",
+   "path": [
+    "INRE RUMSBILDANDE DELAR",
+    "GOLV",
+    "Flytande golv"
+   ],
+   "text": "• Flytande golv får inte beläggas med keramiska plattor."
+  },
+  {
+   "id": "bygg/inre-rumsbildande-delar/innertak",
+   "path": [
+    "INRE RUMSBILDANDE DELAR",
+    "INNERTAK"
+   ],
+   "text": "• I skolor årskurs F-9 samt gymnasium och idrottsanläggningar ska innertak i duschutrymmen, WC och RWC utföras som fasta innertak.\n• Val av undertak i omklädningsrum på idrottsanläggningar ska göras med hänsyn till åverkan och omfattning beslutas i varje enskilt projekt."
+  },
+  {
+   "id": "bygg/invandiga-ytskikt/malning/malningsbehandling-pa-golv-vagg-och-tak",
+   "path": [
+    "INVÄNDIGA YTSKIKT",
+    "MÅLNING",
+    "Målningsbehandling på golv, vägg och tak"
+   ],
+   "text": "• Vid målning av insida av källarvägg och källargolv ska denna utföras med ånggenomsläpplig målarfärg\n• Glansvärden på vägg- och takytor bestäms i samråd med beställaren.\n• Vägg- och takytor i teknikutrymmen ska färdigmålas före montage av apparater och installationer."
+  },
+  {
+   "id": "bygg/invandiga-ytskikt/malning/vav",
+   "path": [
+    "INVÄNDIGA YTSKIKT",
+    "MÅLNING",
+    "Väv"
+   ],
+   "text": "• Glasfiberväv på väggar ska inte användas."
+  },
+  {
+   "id": "bygg/invandiga-ytskikt/ytskikt-pa-golv",
+   "path": [
+    "INVÄNDIGA YTSKIKT",
+    "YTSKIKT PÅ GOLV"
+   ],
+   "text": "• Installationsbehandling ska utföras av samtliga golvbeläggningar."
+  },
+  {
+   "id": "bygg/invandiga-ytskikt/ytskikt-pa-golv/limmade-mattor",
+   "path": [
+    "INVÄNDIGA YTSKIKT",
+    "YTSKIKT PÅ GOLV",
+    "Limmade mattor"
+   ],
+   "text": "• Matt- och limrester ska tas bort till 100 % vid byte av golvbeläggning.\n• Limmad matta direkt mot befintligt källargolv och befintlig platta på mark som saknar fuktspärr eller värmeisolering mot markfukt får inte förekomma.\n• Vid limning mot betongunderlag ska alkaliresistent lim användas."
+  },
+  {
+   "id": "bygg/invandiga-ytskikt/ytskikt-pa-golv/plastmattor",
+   "path": [
+    "INVÄNDIGA YTSKIKT",
+    "YTSKIKT PÅ GOLV",
+    "Plastmattor"
+   ],
+   "text": "• Plastmatta ska vara homogen och minst 2,0 mm tjock, och ha ett ytskikt och fyllmedel så att torrpolering utan vax eller polish är möjlig.\n• I installationsutrymmen med golvbrunn så som fläktrum och UC ska plastmatta med min 100mm uppvik läggas."
+  },
+  {
+   "id": "bygg/invandiga-ytskikt/ytskikt-pa-golv/massagolv",
+   "path": [
+    "INVÄNDIGA YTSKIKT",
+    "YTSKIKT PÅ GOLV",
+    "Massagolv"
+   ],
+   "text": "• Massagolv ska vara av tjockfilmstyp, minst 4 mm tjockt. Golvet ska vara lämpligt för aktuellt användningsområde och klara kravställd halkdämpningsklass.\n• Sockel ska vara minst 100 mm och rundad."
+  },
+  {
+   "id": "bygg/huskompletteringar/entreer",
+   "path": [
+    "HUSKOMPLETTERINGAR",
+    "Entréer"
+   ],
+   "text": "• Entréer ska förses med utvändiga nedsänkta skrapgaller. Skrapgaller får väga max 10 kilo per del.\n• Vid vattenutkast ska stänkskydd monteras på fasad."
+  },
+  {
+   "id": "bygg/huskompletteringar/balkonger-och-racken",
+   "path": [
+    "HUSKOMPLETTERINGAR",
+    "Balkonger och räcken"
+   ],
+   "text": "• Räcken får inte vara klättringsbara. Säkerställ att detta uppfylls vid dubbla handledare.\n• Balkonggolv ska vara i nivå med rumsgolv eller max 15 mm i nivåskillnad.\n• Räcken och balkongräcken på förskolor samt vård-, demens-, och äldreboenden ska vara minst 1 300 mm höga.\n• Ledstänger i förskolor och F–6-skolor utförs dubbla på höjd 600 mm och 900 mm över stegnos. Gäller även utvändiga ledstänger."
+  },
+  {
+   "id": "bygg/rumskompletteringar/inredning/skrapmatta",
+   "path": [
+    "RUMSKOMPLETTERINGAR",
+    "INREDNING",
+    "Skrapmatta"
+   ],
+   "text": "• Invändig skrapmatta ska ha kombinerad skrap- och torkfunktion med gummilameller samt öppen botten i försänkt ram. Minimihöjd 20 mm.\n• Mattans totallängd ska vara mellan 1 000 och 1 500 mm, bestäms i samråd med beställaren. Varje del får väga högst 10 kilo."
+  },
+  {
+   "id": "bygg/rumskompletteringar/inredning/fast-inredning",
+   "path": [
+    "RUMSKOMPLETTERINGAR",
+    "INREDNING",
+    "Fast inredning"
+   ],
+   "text": "• Väggskåp och högskåp ska monteras med takanslutning.\n• Exponerade skåpsidor ska ha täcksida av högtryckslaminat. Där sida ansluts mot golv ska den stå på en fuktskyddande gummilist.\n• Luckor och lådfronter ska vara av högtryckslaminat.\n• Luckor och lådfronter ska förses med nickelfria handtag, modell bestäms i samråd med beställaren.\n• Där ho/tvättställ förekommer ska dessa ha stänkskydd på bakomvarande och eventuella anslutande väggar."
+  },
+  {
+   "id": "bygg/rumskompletteringar/inredning/elevskap-omkladningsskap",
+   "path": [
+    "RUMSKOMPLETTERINGAR",
+    "INREDNING",
+    "Elevskåp/omklädningsskåp"
+   ],
+   "text": "• Elevskåp och omklädningsskåp ska ha sluttande tak."
+  },
+  {
+   "id": "bygg/rumskompletteringar/innerdorrar",
+   "path": [
+    "RUMSKOMPLETTERINGAR",
+    "INNERDÖRRAR"
+   ],
+   "text": "• Innerdörrar ska minst ha bredden M10. Undantag är dörrar till WC där M9 kan godtas.\n• Samtliga dörrar i förskolor och F-6-skolor där elever rör sig ska ha klämskydd. På nya dörrar ska dessa utföras integrerade där så är möjligt."
+  },
+  {
+   "id": "bygg/rumskompletteringar/innerdorrar/innerdorrar-av-tra",
+   "path": [
+    "RUMSKOMPLETTERINGAR",
+    "INNERDÖRRAR",
+    "Innerdörrar av trä"
+   ],
+   "text": "• Innerdörrar utförs som laminatbeklädda massivdörrar med massiva kantlister av trä eller av plast."
+  },
+  {
+   "id": "bygg/rumskompletteringar/innerdorrar/innerdorrar-av-glasfiber",
+   "path": [
+    "RUMSKOMPLETTERINGAR",
+    "INNERDÖRRAR",
+    "Innerdörrar av glasfiber"
+   ],
+   "text": "• Innerdörrar inom storkök utförs av glasfiber med dörrbladstjocklek minst 40 mm, freonfri kärna samt med kantprofil och karm av aluminium."
+  },
+  {
+   "id": "bygg/rumskompletteringar/innerdorrar/dorrstopp",
+   "path": [
+    "RUMSKOMPLETTERINGAR",
+    "INNERDÖRRAR",
+    "Dörrstopp"
+   ],
+   "text": "• Dörrstopp ska monteras till samtliga dörrar, typ och placering bestäms i samråd med beställaren."
+  },
+  {
+   "id": "bygg/rumskompletteringar/innerdorrar/dorrhandtag",
+   "path": [
+    "RUMSKOMPLETTERINGAR",
+    "INNERDÖRRAR",
+    "Dörrhandtag"
+   ],
+   "text": "• Dörrhandtag ska vara nickelfria."
+  },
+  {
+   "id": "bygg/rumskompletteringar/innerdorrar/trosklar",
+   "path": [
+    "RUMSKOMPLETTERINGAR",
+    "INNERDÖRRAR",
+    "Trösklar"
+   ],
+   "text": "• Dörröppning utförs utan trösklar.\n• Om ljudkrav finns ska i första hand fasad trätröskel användas."
+  },
+  {
+   "id": "bygg/rumskompletteringar/vitvaror",
+   "path": [
+    "RUMSKOMPLETTERINGAR",
+    "VITVAROR"
+   ],
+   "text": "• I verksamheter där torktumlare, tvätt- och diskmaskiner används mer än en gång per dag ska det installeras minst semiprofessionella maskiner.\n• På äldreboenden i allmänna utrymmen ska det installeras proffstvättmaskiner med hygienprogram samt professionella torktumlare.\n• Om diskmaskin ska installeras på avdelning i förskola ska de vara minst semiprofessionella och innehålla ett program där temperaturen någon gång överstiger 80 grader.\n• Tvättmaskin och torktumlare som nyttjas av städpersonal ska vara proffsmodell. Tvättmaskiner som nyttjas av städpersonal ska ha störtavlopp och ha program avsett för moppar.\n• Torkskåp ska installeras med fuktsensor och frånluft.\n• Tvättmaskiner och torktumlare ska placeras på 300 mm hög sockel.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

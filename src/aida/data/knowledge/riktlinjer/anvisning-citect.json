@@ -1,0 +1,218 @@
+{
+ "doc": "anvisning-citect",
+ "title": "Riktlinje Anvisning Citect",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-Anvisning-Citect-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "anvisning-citect/nomenklatur/del-1",
+   "path": [
+    "NOMENKLATUR"
+   ],
+   "part": 1,
+   "text": "Applikation Ett program eller del av ett program Förvaltnings- Förvaltningsobjekts‐id är det ID-nummer som används för att hålla samman ett objekts-id förvaltningsobjekt ur systemhänseende. Exempel befintlig beteckning: 15002. Exempel ny beteckning: 1570. Byggnads-id Byggnads‐id består av förvaltningsobjektets‐id samt en bokstav på fastighetens ingående byggnader A, B, C, etcetera. Vid nybyggnation betecknas huvudbyggnaden A, därefter B, C, och så vidare medsols. Versaler används. Exempel: 15002A, 15002B, 15002C, 1570A. Citect SCADA Citect är ett öppet överordnat system (ÖS) med skalbar arkitektur samt klient/server- funktion. Inom ramen för mjukvaran Citect finns drivrutiner mot ett stort antal standard industriprotokoll. Systemet innehåller applikationsmjukvara för övervakning, trender, kommunikation och grafiskt användargränssnitt. SCADA står för Supervisory Control and Data Aquisition. CiFAS Citect Fastighets Automations Standard. Ett standardramverk innehållande standardmallar, bibliotek, symboler, genies (dynamiska objekt) och liknande. Baseras på en strukturerad taggbeteckning och dess suffix."
+  },
+  {
+   "id": "anvisning-citect/nomenklatur/del-2",
+   "path": [
+    "NOMENKLATUR"
+   ],
+   "part": 2,
+   "text": "DDC Direct Digital Control, eng. samlingsbegrepp för DUC/PLC. En DDC beskrivs som utrustningar/enheter vilka är försedda med analoga/digitala in- och utgångsmoduler(I/O), enheten ska vara kommunicerbar/adresserbar samt innehålla programmerbara logiska villkor för styrning och reglering. Systemen kan vara pollande eller händelsestyrda, och är inbördes anslutna via någon form av nätverk. Exempel på denna typ av system är PLC, DUC, Soft-PLC (PC-baserad styrning), Slot-PLC, fältbussystem (Field DDC) och så vidare. Driver/drivrutin Driver är en tolk, protokollomvandlare mellan olika ”språk” som ser till att upprätta ett likformigt informationsutbyte. Protokoll Språket som används för kommunikation mellan två enheter, en regelsamling som styr utbytet av information. Innehåller både handskakning och funktioner för sändning/ mottagning av parametrar. Exempelvis på protokoll Modbus, Comli, Profibus DP/FMS, http, FTP. Include-projekt Ett isolerat delprojekt i Citect som kan läggas till/tas bort utan att påverka befintlig miljö. Ett include-projekt definieras som tillägg av minst en ny styrenhet i Citects editeringsmjukvara Citect Studio, där dess signaler speglas upp med tillhörande grafik. Larmrouting Möjlighet att vidaresända larm. Oftast en separat applikation eller en tilläggsmodul i ett överordnat system. Operatörspanel Ett användargränssnitt ute i anläggningen, oftast placerat på ett apparatskåp. Andra benämningar kan vara display, operatörsterminal, panel, manöverpanel. SUL SignalUtbytesLista. Lista som skickas mellan styrentreprenör och systemintegratör vilken ska innehålla komplett signal- och larminformation. Den används för att möjliggöra en korrekt integration av styrenhetens signaler i SCADA-systemet."
+  },
+  {
+   "id": "anvisning-citect/generell-information",
+   "path": [
+    "GENERELL INFORMATION"
+   ],
+   "text": "Karlstads kommuns anvisningar med bilagor och manualer kompletterar Mer information finns kommunens byggriktlinjer. Den här anvisningen beskriver Karlstads på karlstad.se kommuns driftövervakningssystem, Citect SCADA.\nGällande utgåva för ”Anvisning Citect” med tillhörande bilagor och manualer kravställer förutsättningarna för ramverket. Handlingarna ska följas för att systemintegrationen för nya och uppdatering av befintliga anläggningar i Citect-plattformen ska kunna utföras korrekt."
+  },
+  {
+   "id": "anvisning-citect/generell-information/bilagor",
+   "path": [
+    "GENERELL INFORMATION",
+    "BILAGOR"
+   ],
+   "text": "CI-FAS Ramverk för Citect SCADA inom fastighetsautomation\nBilagan beskriver ramverket som utgör basen för systemet. När skillnader förekommer mellan denna anvisning och bilagan ”CI-FAS Ramverk för Citect SCADA inom fastighetsautomation” så gäller denna anvisning.\nSignalutbyteslista\nBilagan beskriver upplägget för leverans av signallista. I den skall styrentreprenören leverera entreprenadens signaler och larminformation för ingående DDC:er enligt förutsättningarna för ramverket."
+  },
+  {
+   "id": "anvisning-citect/generell-information/bilagor/egenprovningsprotokoll",
+   "path": [
+    "GENERELL INFORMATION",
+    "BILAGOR",
+    "Egenprovningsprotokoll"
+   ],
+   "text": "• Egenprovningsprotokoll förbrukningsmätare."
+  },
+  {
+   "id": "anvisning-citect/generell-information/bilagor/manualer",
+   "path": [
+    "GENERELL INFORMATION",
+    "BILAGOR",
+    "Manualer"
+   ],
+   "text": "• Användarmanual driftövervakningssystem Citect facilities."
+  },
+  {
+   "id": "anvisning-citect/ansvarsfordelning",
+   "path": [
+    "ANSVARSFÖRDELNING"
+   ],
+   "text": "När projekt utförs som berör den befintliga Citectplattformen behövs ett samspel mellan beställarorganisation och styrentreprenör. Det är viktigt att det finns en tydlig ansvarsfördelning mellan parterna."
+  },
+  {
+   "id": "anvisning-citect/ansvarsfordelning/bestallarorganisation",
+   "path": [
+    "ANSVARSFÖRDELNING",
+    "BESTÄLLARORGANISATION"
+   ],
+   "text": "Systemansvarig\nSystemansvarig har den totala överblicken för styr- och övervakningssystemet Citect. Systemansvarig har ansvar för hur arbeten ska genomföras i plattformen.\nCitectansvarig\nCitectansvarig ansvarar för Citectplattformens drift och projektuppgradering i applikationsmiljön på uppdrag av systemansvarig. Citectansvarig utför arbeten i projekt som berör Citectplattformen."
+  },
+  {
+   "id": "anvisning-citect/ansvarsfordelning/styrentreprenor",
+   "path": [
+    "ANSVARSFÖRDELNING",
+    "STYRENTREPRENÖR"
+   ],
+   "text": "Styrentreprenören ansvarar för att arbeten i projekt som berör underlag till Citectplattformen utförs enligt uppställda krav i denna handling med bilagor."
+  },
+  {
+   "id": "anvisning-citect/citects-applikationsserver",
+   "path": [
+    "CITECTS APPLIKATIONSSERVER"
+   ],
+   "text": "Citects applikationsserver utgörs av:\n• Citect SCADA. Serverlicens med flytande klienter\n• Modifierat CiFAS standardramverk\n• Nimbus, mjukvara för larmdistribution\n• Flextime, mjukvara för tidkanalshantering\n• PiiGAB, mjukvara för mediamätning."
+  },
+  {
+   "id": "anvisning-citect/citects-applikationsserver/kommunikation",
+   "path": [
+    "CITECTS APPLIKATIONSSERVER",
+    "KOMMUNIKATION"
+   ],
+   "text": "Kommunikation mellan Citect och DDC ska ske via Ethernet hela vägen från Citect server och fram till RJ45 kontakt i DDC utan mellanliggande nätverkskomponenter.\nNya anläggningar ska enbart integreras med direktkommunicerande drivrutiner mellan Citect och DDC.\nDrivrutin för kommunikation mellan Citect och DDC ska ske med någon av de som finns att tillgå i installerad version av Citect.\nVid uppkoppling av prefabricerad DDC så ska även åtkomstmöjligheter upprättas till styrenhetens web-gränssnitt. OBS! Dessa ska kopplas direkt mot Citect och inte via DDC."
+  },
+  {
+   "id": "anvisning-citect/citect-ramverk",
+   "path": [
+    "CITECT RAMVERK"
+   ],
+   "text": "Citect hos Karlstads kommun använder ett ramverk som i grunden består av CiFAS standardramverk men som är anpassat för kommunen. Ramverket innehåller standardmallar, bibliotek, symboler, genies (dynamiska objekt) och liknande. Ramverket är uppbyggt med strukturerade taggdefinitioner för att erhålla korrekt funktion. Variabeltaggarnas ändelse, suffix, är avgörande för att erhålla funktion i Citect."
+  },
+  {
+   "id": "anvisning-citect/signalutveckling",
+   "path": [
+    "SIGNALUTVECKLING"
+   ],
+   "text": "När en ny styrenhet, DDC, ska knytas till Citect alternativt vid korrigeringar i befintlig styrenhet så krävs uppgraderingsarbeten i Citectsystemet.\nCitectintegrationen utförs med hjälp av en SignalUtbytesLista, förkortning SUL. Styrentreprenören ska fylla i listan enligt kraven och leverera den till Citectansvarig på Karlstads kommun som utför Citectintegrationen."
+  },
+  {
+   "id": "anvisning-citect/signalutveckling/signalutbyteslista",
+   "path": [
+    "SIGNALUTVECKLING",
+    "SIGNALUTBYTESLISTA"
+   ],
+   "text": "SUL:en består av en arbetsbok i Excel. Styrentreprenören ska fylla i listan med hjälp av exempel från en tidigare färdigställd anläggning samt informationstexter som handledning. Det färdiga innehållet ska vara en lista över styrenhetens taggar och dess egenskaper inklusive larmbeskrivning som utgör underlag för Citectprojektet. OBS! Detta gäller även prefabricerade styrenheter och enheter för mediamätning.\nSUL innehåller information och skallkrav för:\n• exempel och suffixförklaringar\n• tidkanalers upplägg avseende afton och helgdagar\n• manuella styrningar\n• larmklasser\n• mediamätning.\nSUL skickas till berörd styrentreprenör för bearbetning i det aktuella projektet.\nStyrentreprenören skall fylla i SUL:en som ska omfatta:\n• DDC:ns erforderliga kommunikationsparametrar\n• inloggningsuppgifter till mediamätningens gateway\n• signallista med signaler som bland annat krävs enligt avsnittet Citectsammanfattning nedan och skall följa exemplifierad anläggning\n• larmtext och larmklass.\nKorrigering av signaler Det är bara nya signaler och larminformation som ska vara med i Signalutbyteslistan när ett befintligt projekt ska korrigeras. OBS! kom ihåg att kommentera raderna så det är enkelt att förstå vad som ska göras!\nNär man tagit bort en signal så ska raden vara med och rödmarkeras så man kan förstå att den ska raderas.\nVid förändring av en signal så ska cellen där förändring skett gulmarkeras så man kan förstå vad som har ändrats.\nFigur 1. Översikt av SUL:ens färdigställande.\n• B ska inte • Bearbeta SUL behöva lägga enligt information någon tid på att från projekt och ta fram startmöte. information som E ska leverera. B skickar tillbaka till E E bearbetar om fel"
+  },
+  {
+   "id": "anvisning-citect/signalutveckling/signalutbyteslista/sul",
+   "path": [
+    "SIGNALUTVECKLING",
+    "SIGNALUTBYTESLISTA",
+    "SUL"
+   ],
+   "text": "annars integration.\nB E skickar kontrollerar färdig SUL SUL till B\n• Parametrar, prefix, suffix, • SUL:en ska vara skalningar och helt färdig! kommentarer etc. kontrolleras."
+  },
+  {
+   "id": "anvisning-citect/integrationsprocess/startmote",
+   "path": [
+    "INTEGRATIONSPROCESS",
+    "STARTMÖTE"
+   ],
+   "text": "Ett startmöte mellan Systemansvarig och Styrentreprenör ska hållas för att verifiera:\n• projektspecifika detaljer\n• IP-adresser, situationsplan, förvaltningsobjekts- och byggnads-id\n• systemlösning för lokalt nätverk\n• kommunikation mellan Citectplattformens och projektets ingående styrsystem\n− val av drivrutin\n• tid för när underlag senast ska skickas till Citectansvarig.\nInformation till Citectansvarig:\n• Protokoll från startmöte.\n• När samordnad provning och besiktning är planerad enligt projektets tidplan så integrationen kan bokas in.\nNär anläggningen är utcheckad och avprovad färdigställer entreprenören SUL:en och skickar den till Citectansvarig på Karlstads kommun. OBS! SUL:en måste vara korrekt ifylld för att integrationen ska kunna påbörjas. Fel i SUL:en blir fel i Citect som följd.\nProjektet ska ha leverans av SUL som en milstolpe så Citectintegrationen hinns med före samordnad provning.\nStyrentreprenören levererar följande till Citectansvarig:\n• Driftkort som relationshandling\n• Information om var i byggnaden som apparatskåpet/systemet är placerat. Kan vara via en ritning, karta eller liknande. Informationen kommer att användas till anläggningsöversikten.\n• Signalutbyteslista\nCitectansvarig integrerar:\n• Systemintegration i Citect med signalutbyteslistan som underlag\n• länkar till driftkort (relationshandling)\n• tidkanaler i Flextime\n• mediamätning.\nFigur 2. Översikt av integrationsprocess för Citectprojekt.\n• B ska inte • E levererar: behöva lägga Driftkort, AS- någon tid på att placering och ta fram SUL. information som E ska leverera. E rättar upp B integrerar och går till projektet i bearbetning Citect"
+  },
+  {
+   "id": "anvisning-citect/integrationsprocess/startmote/sul",
+   "path": [
+    "INTEGRATIONSPROCESS",
+    "STARTMÖTE",
+    "SUL"
+   ],
+   "text": "B B testar av rapporterar projektet fel till E\n• Fel i avprovade funktioner • Test av rapporteras till E. funktioner etc. via Citect."
+  },
+  {
+   "id": "anvisning-citect/integrationsprocess/kontroll",
+   "path": [
+    "INTEGRATIONSPROCESS",
+    "KONTROLL"
+   ],
+   "text": "I samband med kontroll utförs följande:\n• Citectansvarig kontrollerar Citectfunktion mot funktionstexter i driftkort.\n• Provningsprotokoll skickas till Systemansvarig och Styrentreprenör.\n• Systemansvarig förmedlar att projektet är klart för besiktning."
+  },
+  {
+   "id": "anvisning-citect/integrationsprocess/besiktning",
+   "path": [
+    "INTEGRATIONSPROCESS",
+    "BESIKTNING"
+   ],
+   "text": "Besiktning av projektet utförs. Fel åtgärdas så snart som möjligt av entreprenören. Citectansvarig integrerar och kontrollerar åtgärderna."
+  },
+  {
+   "id": "anvisning-citect/citectsammanfattning/samverkan-mellan-ddc-ns-signaler-och-systembilder",
+   "path": [
+    "CITECTSAMMANFATTNING",
+    "SAMVERKAN MELLAN DDC:NS SIGNALER OCH SYSTEMBILDER"
+   ],
+   "text": "Citectsystemets funktion motsvaras av signalutbyteslistans innehåll. En systembild ska innehålla en tydlig spegling av systemets driftstatus. Systembilderna ska ha funktionalitet för att kunna påverka ansluten DDC fullt ut vilket beror av styrentreprenörens levererade SUL.\nSignalutbyteslistan ska innehålla signaler för att betjäna funktion i Citects systembilder:\n• Start och stopp av exempelvis ventilationssystem och pumpar.\n• Tidkanal för systemets olika driftfall via Flextime.\n• Statusindikering för drift och larm till exempelvis fläktar och pumpar.\n• Analoga värden såsom ärvärden, börvärden och utsignaler.\n• Börvärden såsom huvudbörvärden och gränsvärden.\n• Larmgränser och fördröjningar av för exempelvis avvikelselarm.\n• Regulatorparametrar (PID)\n• Handställning av reglerande utsignaler för exempelvis ställdon och frekvensomformare.\n• Handställning av utsignaler för exempelvis ventilationsaggregat och pumpar.\n• Driftval för funktion, Autodrift (för exempelvis ventilationsaggregat), Manuellt start och stopp.\n• Möjliga driftfall för ett ventilationsaggregat som exempelvis, hel- och halvfart, kylåtervinning, nattkyla etcetera med relevant information för att visa aggregatets drifttillstånd.\n• Drifttidsstatistik. Exempelvis så ska antalet starter för ett ventilationsaggregats till- och frånluftsfläktar samt värmebatteriets cirkulationspump återspeglas. Även cirkulationspump till exempelvis en värmekrets ska ha driftstatistik. Funktion för drifttidsstatistikens larmgräns ska kunna blockeras. Funktion för att nollställa drifttid och antal starter ska erhållas via resetknappar om man önskar nollställa loggade värden. Startdatum ska finnas för drifttiden och ska sätta drifttidslarm vid angiven larmgräns. Antal starter är bara en information."
+  },
+  {
+   "id": "anvisning-citect/citectsammanfattning/variablernas-taggstruktur",
+   "path": [
+    "CITECTSAMMANFATTNING",
+    "VARIABLERNAS TAGGSTRUKTUR"
+   ],
+   "text": "Variablernas taggstruktur ska byggas upp enligt följande för att få genomslagskraft i systemets fördefinierade funktioner: BYGGNADS-ID_SYSTEM_KOMPONENT_FUNKTION\nExempel: 20007A_LA01_GT1_PV\nVariabeltaggarnas suffix det vill säga variabeltaggens ”FUNKTION” måste följa CI-FAS ramverket för att erhålla funktion och uppfylla kraven i Citectsystemet. För en detaljerad beskrivning av taggarnas suffix se bilaga ”CI-FAS Ramverk för Citect SCADA inom fastighetsautomation” och SUL:ens flik för suffixförklaringar.\nOmfattning av datautbyte mellan Citect och DDC framgår av kravställda funktioner i denna handling och bilagan ”CI-FAS Ramverk för Citect SCADA inom fastighetsautomation”.\nOm signaler utöver nedanstående lista krävs för att uppfylla krav i denna handling med bilagor ska detta ingå i leverans av signalutbyteslistan.\nFöljande variabler från DDC ska taggas upp i Citect enligt nedan:"
+  },
+  {
+   "id": "anvisning-citect/citectsammanfattning/variablernas-taggstruktur/signaler-kopplade-till-fysiska-i-o",
+   "path": [
+    "CITECTSAMMANFATTNING",
+    "VARIABLERNAS TAGGSTRUKTUR",
+    "Signaler kopplade till fysiska I/O"
+   ],
+   "text": "• Mätvärden\n• Analoga utsignaler\n• Digitala utsignaler\n• Digitala insignaler."
+  },
+  {
+   "id": "anvisning-citect/citectsammanfattning/variablernas-taggstruktur/signaler-koppade-till-logiska-variabler-i-ddc",
+   "path": [
+    "CITECTSAMMANFATTNING",
+    "VARIABLERNAS TAGGSTRUKTUR",
+    "Signaler koppade till logiska variabler i DDC"
+   ],
+   "text": "• Börvärden\n• Beräknade börvärden och dess brytpunkter\n• Reglerparametrar (PID)\n• Digitala tillstånd (inklusive manuell påverkan)\n• Larm och larmgränser\n• Tidkanaler (endast för global påverkan).\n• Funktion för drifttidsstatistik krävs att det skapas funktioner i DDC. Signaler motsvarande Tabell 1 läggs upp i Citect för att erhålla funktion enligt ramverket.\nTabell 1. Variabeltaggar för driftstatistik\nSignal Suffix i Citect Kommentar Total drifttid sedan återställning (DT) Presenteras som värde i Citect. Ex 2007A_LA01_TF1_DT Datum för återställning av drifttid (SD) Presenteras som värde i Citect. Ex 20007A_LA01_TF1_SD Återställning av drifttid (DTR) Presenteras som knapp i Citect. Ex 20007A_LA01_TF1_DTR Larmgräns hög drifttid (DTG) Presenteras som inställbart värde i Ex 20007A_LA01_TF1_DTG Citect. Larm hög drifttid (DTAL) Presenteras som larm i Citect. Ex 20007A_LA01_TF1_DTAL Totalt antal starter sedan (NS) Presenteras som värde i Citect. återställning Ex 2007A_LA01_TF1_NS Återställning av totala antal starter (NSR) Presenteras som knapp i Citect. Ex 2007A_LA01_TF1_NSR"
+  },
+  {
+   "id": "anvisning-citect/citectsammanfattning/larm",
+   "path": [
+    "CITECTSAMMANFATTNING",
+    "LARM"
+   ],
+   "text": "I varje include-projekt i Citect skapas larm som ska levereras i signalutbyteslistan. För varje variabeltagg som syftar till ett larm ska tillhörande larmtaggar skapas."
+  },
+  {
+   "id": "anvisning-citect/citectsammanfattning/tidkanaler",
+   "path": [
+    "CITECTSAMMANFATTNING",
+    "TIDKANALER"
+   ],
+   "text": "Tidkanaler hanteras överordnat av FlexTime. Mjukvaran är anpassat för interaktion med Citect. DDC:n ska anpassas för att ge Flextime förutsättningen att överstyra sina lokala tidkanaler.\nRelevanta tidkanaler ska läggas upp i Flextime, såsom:\n• vardaglig drift (en start/stopp per dag), afton och helgdag\n• hel- och halvfart för ventilation\n• nattkyla\n• motionskörning\n• belysning.\nFör mer detaljerad funktion avseende samspel mellan DDC och FlexTime, se bilaga ”CI-FAS Ramverk för Citect SCADA inom fastighetsautomation” samt fliken tidkanaler i SUL:ens flik för tidkanaler."
+  },
+  {
+   "id": "anvisning-citect/citectsammanfattning/mediamatning",
+   "path": [
+    "CITECTSAMMANFATTNING",
+    "MEDIAMÄTNING"
+   ],
+   "text": "Projektets ingående mätare ska presenteras i Citect via M-bus omvandlare och ska utföras enligt mallprojekt.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

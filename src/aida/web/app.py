@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import anthropic
 
+from aida import knowledge
 from aida.agents.aggregate import compute_aggregate
 from aida.agents.alternatives import find_alternatives
 from aida.agents.baseline import calculate_baseline
@@ -416,11 +417,13 @@ def index():
         return render_template_string(HTML_TEMPLATE,
             supabase_url=SUPABASE_URL,
             supabase_anon_key=SUPABASE_ANON_KEY,
-            has_supabase=True)
+            has_supabase=True,
+            method_md=knowledge.method_markdown())
     if AIDA_PASSWORD and not session.get('authenticated'):
         return redirect(url_for('login'))
     return render_template_string(HTML_TEMPLATE,
-        supabase_url='', supabase_anon_key='', has_supabase=False)
+        supabase_url='', supabase_anon_key='', has_supabase=False,
+        method_md=knowledge.method_markdown())
 
 
 @app.route('/docs/<path:filename>')
@@ -1951,7 +1954,7 @@ html { scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent; }
 .mode-btn.active { background: var(--kk-charcoal); border-color: var(--kk-charcoal); color: white; font-weight: 600; }
 .mode-btn:focus-visible { outline: 2px solid var(--kk-dark-red); outline-offset: 2px; }
 
-/* === Sheet (Arbetsblad) ===
+/* === Sheet (the Chatt mode, key 'document') ===
    One scrolling column. Sections are separated by space and a hairline, not by
    boxes: the comp-cards inside are already boxes, and nesting them would read as
    a card kit rather than a document. No numbering anywhere, because the sheet is
@@ -1969,7 +1972,7 @@ html { scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent; }
    A cell reads as text until you touch it. Drawing every editable value as an
    input box would turn a results table into a form, and most of the time the
    user is reading, not typing. The affordance appears on hover and focus, which
-   is the spreadsheet convention the name Arbetsblad is borrowing from. */
+   is the spreadsheet convention. */
 .cell-input { width: 100%; font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 3px 6px; margin: -3px -6px; font-family: inherit; }
 .cell-input:hover:not(:disabled) { border-color: var(--kk-gray-200); background: white; }
 .cell-input:focus { outline: none; border-color: var(--kk-dark-red); background: white; box-shadow: 0 0 0 2px rgba(181,32,31,0.12); }
@@ -2032,6 +2035,14 @@ select.cell-input { cursor: pointer; }
 .modal-box ul { padding-left: 20px; margin: 8px 0; }
 .modal-box section { margin-bottom: 20px; }
 .modal-box h3 { font-size: 14px; font-weight: 600; color: var(--kk-charcoal); margin-bottom: 6px; }
+/* metod.md rendered: its ## sections read like the dialog's own h3 sections. */
+.about-method h2 { font-size: 14px; font-weight: 600; color: var(--kk-charcoal); margin: 20px 0 6px; }
+.about-method h2:first-child { margin-top: 0; }
+.about-method h3 { font-size: 13px; font-weight: 600; color: var(--kk-charcoal); margin: 12px 0 4px; }
+.about-method p { margin: 0 0 8px; }
+.about-method ul { padding-left: 18px; margin: 0 0 8px; }
+.about-method table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 6px 0 10px; }
+.about-method th, .about-method td { text-align: left; vertical-align: top; padding: 4px 6px; border-bottom: 1px solid var(--kk-gray-200, #e5e7eb); }
 .modal-close { position: absolute; top: 16px; right: 16px; background: none; border: none; cursor: pointer; color: var(--kk-gray-500); font-size: 20px; }
 .modal-close:hover { color: var(--kk-charcoal); }
 
@@ -2211,7 +2222,7 @@ select.cell-input { cursor: pointer; }
   </div>
   <div class="mode-switch" id="modeSwitch" role="group" aria-label="Vy">
     <button class="mode-btn active" id="mode-stepwise" onclick="setMode('stepwise')" title="Sex steg med bekr&#xE4;ftelse mellan varje">Stegvis</button>
-    <button class="mode-btn" id="mode-document" onclick="setMode('document')" title="Allt i ett ark, ingen best&#xE4;md ordning">Arbetsblad</button>
+    <button class="mode-btn" id="mode-document" onclick="setMode('document')" title="Allt i ett ark, ingen best&#xE4;md ordning">Chatt</button>
     <button class="mode-btn" id="mode-followup" onclick="setMode('followup')" title="Vad som faktiskt installerades, mot baslinje och plan">Uppf&#xF6;ljning</button>
   </div>
 </div>
@@ -2340,27 +2351,10 @@ select.cell-input { cursor: pointer; }
       <h3>Vad &#xE4;r Aida?</h3>
       <p>Aida &#xE4;r ett AI-drivet beslutsst&#xF6;d f&#xF6;r klimatber&#xE4;kning vid ombyggnation av kommunala fastigheter. Verktyget utvecklas inom Klimatneutrala Karlstad 2030, finansierat av Vinnova, Energimyndigheten och Formas inom ramen f&#xF6;r strategiska innovationsprogrammet Viable Cities.</p>
     </section>
-    <section>
-      <h3>Datak&#xE4;llor</h3>
-      <ul>
-        <li><strong>Klimatdata:</strong> Boverkets klimatdatabas, NollCO2-metoden</li>
-        <li><strong>Alternativ:</strong> Environdec EPD-databas (verifierade produktdeklarationer)</li>
-        <li><strong>Priser:</strong> AI-driven webbs&#xF6;kning mot svenska bygghandlare</li>
-        <li><strong>&#xC5;terbruk:</strong> Palats (Karlstads kommuns &#xE5;terbruksplattform)</li>
-      </ul>
-    </section>
-    <section>
-      <h3>Metod</h3>
-      <p>Aida j&#xE4;mf&#xF6;r konventionella materialval (baslinje) mot klimatoptimerade alternativ med hj&#xE4;lp av verifierade EPD:er. Ber&#xE4;kningarna avser produktskedet (A1-A3) om inget annat anges.</p>
-    </section>
-    <section>
-      <h3>Begr&#xE4;nsningar</h3>
-      <ul>
-        <li>Resultaten &#xE4;r ett underlag f&#xF6;r beslut, inte ett slutgiltigt klimatbokslut</li>
-        <li>Kostnadsuppskattningar baseras p&#xE5; webbs&#xF6;kning &#x2014; inh&#xE4;mta offerter f&#xF6;r exakta v&#xE4;rden</li>
-        <li>AI kan g&#xF6;ra fel &#x2014; kontrollera k&#xE4;llh&#xE4;nvisningar vid viktiga beslut</li>
-      </ul>
-    </section>
+    <!-- Method, sources and limits come from data/knowledge/metod.md, the same
+         file Aida's advisory answers cite, so the two cannot drift apart. -->
+    <section class="about-method" id="aboutMethod"></section>
+    <script type="application/json" id="aboutMethodSource">{{ method_md|tojson }}</script>
     <section>
       <h3>Kontakt</h3>
       <p>Henric Barkman, <a href="mailto:henric.barkman@karlstad.se" style="color:var(--kk-blue)">henric.barkman@karlstad.se</a></p>
@@ -2875,7 +2869,7 @@ function setLoading(on) {
 // live here and nowhere else, so renaming one is a one-line change; the keys are
 // what the rest of the code and the database see. 'followup' arrives in step 5.
 const MODES = ['stepwise', 'document', 'followup'];
-const MODE_LABELS = {stepwise: 'Stegvis', document: 'Arbetsblad', followup: 'Uppföljning'};
+const MODE_LABELS = {stepwise: 'Stegvis', document: 'Chatt', followup: 'Uppföljning'};
 function isDoc() { return state.mode === 'document'; }
 function isFollowup() { return state.mode === 'followup'; }
 // Both non-stepwise modes are a stacked sheet rather than a tab strip. Almost
@@ -4470,7 +4464,17 @@ function renderRecomputeAlternativesAction() {
 
 // === Helpers ===
 // About modal (Feature 5)
-function openAbout() { document.getElementById('aboutModal').style.display = 'flex'; }
+function openAbout() {
+  const box = document.getElementById('aboutMethod');
+  if (box && !box.dataset.rendered) {
+    const source = document.getElementById('aboutMethodSource');
+    const md = source ? JSON.parse(source.textContent || '""') : '';
+    // The file's own title would repeat the dialog's heading.
+    box.innerHTML = renderMd(md.replace(/^# .*\n+/, ''));
+    box.dataset.rendered = '1';
+  }
+  document.getElementById('aboutModal').style.display = 'flex';
+}
 function closeAbout() { document.getElementById('aboutModal').style.display = 'none'; }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAbout(); closeWelcome(); closeProjectMeta(); } });
 
@@ -5554,7 +5558,7 @@ function bindReportDownloads() {
   };
 }
 
-// === The sheet (Arbetsblad, orchestration-redesign §12.2) ===
+// === The sheet (the Chatt mode, orchestration-redesign §12.2) ===
 //
 // Same four section renderers as the tabs, stacked in one column instead of
 // hidden behind each other. The section list is data, so a fifth section (or the

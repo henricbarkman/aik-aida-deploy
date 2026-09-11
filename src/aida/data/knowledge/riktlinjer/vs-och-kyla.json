@@ -1,0 +1,444 @@
+{
+ "doc": "vs-och-kyla",
+ "title": "Riktlinje VS och kyla",
+ "edition": 8,
+ "date": "2026-04-15",
+ "file": "Riktlinje-VS-och-kyla-utgåva-8.txt",
+ "sections": [
+  {
+   "id": "vs-och-kyla/allmanna-krav/saker-vatteninstallation",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "SÄKER VATTENINSTALLATION"
+   ],
+   "text": "För mer information se sakervatten.se\n• Installationsarbete för rörsystem ska utföras enligt branschregler för Säker Vatteninstallation."
+  },
+  {
+   "id": "vs-och-kyla/allmanna-krav/heta-arbeten",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "HETA ARBETEN"
+   ],
+   "text": "• Installationsarbete ska utföras enligt regler för Heta arbeten."
+  },
+  {
+   "id": "vs-och-kyla/allmanna-krav/fabrikatval",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "FABRIKATVAL"
+   ],
+   "text": "• Om inte annat anges ska produkter vara av fabrikat som är vanligt förekommande i Sverige med lätt tillgängliga reservdelar samt service- /försäljningsorganisation i Sverige.\n• Om det i handling föreskrivs fabrikatsangivna produkter, får dessa bytas mot likvärdig produkt med samma kvalitet, funktion och prestanda.\n• Karlstads kommuns projektansvariga avgör likvärdigheten efter samråd med kommunens sakkunniga."
+  },
+  {
+   "id": "vs-och-kyla/allmanna-krav/overordnat-styrsystem",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "ÖVERORDNAT STYRSYSTEM"
+   ],
+   "text": "• Samtliga produkter, exempelvis pumpar ska kunna kopplas upp och larmhanteras till Karlstads kommuns överordnade styrsystem."
+  },
+  {
+   "id": "vs-och-kyla/allmanna-krav/dimensionerande-data",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA"
+   ],
+   "text": "• Inneklimatkrav enligt VVS Tekniska föreningens skrift R1.\n• Termiskt klimat.\n• Termisk klimatklass TQ2.\n• Driftutrymmen ska använda ”Rätt arbetsmiljö för montörer och driftpersonal” som vägledning vid projektering.\n• F:101 Fjärrvärmecentralen – utförande och installation.\n• F:102 Fjärrkylcentralen – utförande och installation.\n• Normbrunn 16.\nDimensionerande utetemperatur:\n• Vinter -22°C.\n• Sommar +25°C."
+  },
+  {
+   "id": "vs-och-kyla/allmanna-krav/dimensionerande-data/dimensionerande-lagsta-innetemperatur",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Dimensionerande lägsta innetemperatur"
+   ],
+   "text": "• Kontor +21°C, skolor +22°C.\n• Äldreboende och dylikt +23°C.\n• Förskolor och Bostäder +22°C.\n• Verkstadslokaler, gymnastik/idrottssalar +18°C."
+  },
+  {
+   "id": "vs-och-kyla/allmanna-krav/dimensionerande-data/dimensionerade-temperaturer-i-varmesystem",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Dimensionerade temperaturer i värmesystem"
+   ],
+   "text": "• Fjärrvärme tillopp vinter enligt ”F:101 Fjärrvärmecentralen – utförande och installation”.\n• Fjärrvärme tillopp sommar enligt ”F:101 Fjärrvärmecentralen – utförande och installation”.\n• Radiatorsystem tillopp +55°C.\n• Ventilationsvärmesystem tillopp +50°C.\n• Tappvarmvatten vid tappstället +55°C.\n• VVC retur lägst +50°C."
+  },
+  {
+   "id": "vs-och-kyla/allmanna-krav/dimensionerande-data/dimensionerade-temperaturer-i-kylsystem",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Dimensionerade temperaturer i kylsystem"
+   ],
+   "text": "• Fjärrkyla tillopp enligt ”F:102 Fjärrkylcentralen – utförande och installation”.\n• Fjärrkyla retur enligt ”F:102 Fjärrkylcentralen – utförande och installation”."
+  },
+  {
+   "id": "vs-och-kyla/allmanna-krav/dimensionerande-data/dimensionerande-tryck",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Dimensionerande tryck"
+   ],
+   "text": "• Tappvattensystem 10 bar.\n• Värmesystem 6 bar.\n• Fjärrvärme 16 bar.\n• Fjärrkyla 16 bar.\n• Köldbärarsystem 10 bar.\n• Kylmedelsystem 10 bar."
+  },
+  {
+   "id": "vs-och-kyla/allmanna-krav/dimensionerande-data/tekniskt-vatten-gransvarden",
+   "path": [
+    "ALLMÄNNA KRAV",
+    "DIMENSIONERANDE DATA",
+    "Tekniskt vatten gränsvärden"
+   ],
+   "text": "• Upplöst syre <0,1 mg/l (0,1 ppm)\n• Elektrisk konduktivitet <100 μS/cm (TDS ~ 67 ppm)\n• Operativt pH 8,0–10"
+  },
+  {
+   "id": "vs-och-kyla/tappvattensystem/systemutformning",
+   "path": [
+    "TAPPVATTENSYSTEM",
+    "SYSTEMUTFORMNING"
+   ],
+   "text": "• Vattensnål tappvattenutrustning ska användas för exempelvis handfat, duschar och pentryn.\n• I storkök och liknande ska flöden utföras efter apparaters installationsanvisningar.\n• Efter vattenmätare monteras en mjukstängande motoriserad ventil som stängs när byggnadens skalskydd aktiveras. Samordnas med styr och nattmatlagning.\n• Tappvattensystemet ska renspolas innan det tas i bruk.\n• Installationer av tappvattensystem ska vara av blyfritt material.\n• Tappvattenledningar till produktionskök förses med kontrollerbara backventiler.\n• VVC-ledningars vändpunkter ska om möjligt förses med temperaturgivare och uppkopplas till överordnat system."
+  },
+  {
+   "id": "vs-och-kyla/avloppsvattensystem/systemutformning",
+   "path": [
+    "AVLOPPSVATTENSYSTEM",
+    "SYSTEMUTFORMNING"
+   ],
+   "text": "• I alla ombyggnader ska statusinventering göras på befintliga ledningar.\n• Dräneringsledning från aggregat till golvbrunn får inte läggas tvärs över golv.\n• Vätskesystem ska renspolas innan de tas i bruk.\n• Luftarledningar till spill samt fettavskiljaravlopp på tak ska utföras enligt luftklass 4 i figur B.6.1a/b i tekniska föreningen skrift R1.\n• Excentriska avloppsstosar monteras endast efter att man fått beställarens godkännande.\n• Spillvatten ska i första hand utformas med självfall, men i de fall en LTA-station krävs ska VA-avdelningen kontaktas för dimensionering och utformning av densamma."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING"
+   ],
+   "text": "• T ute +26°C, vid 60 % RH.\n• Kondensering t1 +40°C för luftkyld kondensor.\n• Kylmedeltemperatur ut +38°C för kylmedelkylare."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/drifttemperatur",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Drifttemperatur"
+   ],
+   "text": "• Drifttemperaturer ska väljas med flytande börvärde för minimerad energianvändning."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/komfortkyla",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Komfortkyla"
+   ],
+   "text": "• Eventuellt behov av komfortkyla ska beslutas av beställaren.\n• Komfortkyla får inte installeras utan att åtgärder vidtas för att minimera tillskottsvärme.\n• Andelen frikyla ska beslutas i samråd med beställaren.\n• Olika möjligheter till frikyla, till exempel grundvatten, akvifer, uteluft med mera ska utredas och dokumenteras."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/kyl-och-frysrum",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Kyl och frysrum"
+   ],
+   "text": "• I kyl och frysrum monteras separata ändamålsenliga temperaturgivare för larmhantering i överordnat system, hög och lågtemperaturlarm med inställbara larmvärden och fördröjningar."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/koldmedier",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Köldmedier"
+   ],
+   "text": "• Köldmedier ska ha lägsta möjliga miljöpåverkan. Om kylmaskiner måste användas ska i första hand naturliga köldmedium användas.\n• Beakta köldmediemängd och gräns för årlig besiktning."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/placering-av-kylmaskin-bergvarmepump",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Placering av kylmaskin/bergvärmepump"
+   ],
+   "text": "• Placering av kylmaskiner ska göras med tanke på att köldmedium kan vara toxiska, explosiva eller avge lukter."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/atervinning-av-varme",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Återvinning av värme"
+   ],
+   "text": "• Värmeavgivning från maskiner ska kunna återvinnas."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/renspolning-av-vatskesystem",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Renspolning av vätskesystem"
+   ],
+   "text": "• Renspolning av vätskesystem ska ske innan de tas i bruk."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/temper-och-aspentemper",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Temper och Aspentemper"
+   ],
+   "text": "• Temper samt Aspentemper får inte användas."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/direkta-system",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Direkta system"
+   ],
+   "text": "• Direkta system ska där så är möjligt undvikas i syfte att minimera mängden köldmedia."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/isolering",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Isolering"
+   ],
+   "text": "• Utomhus ska isolering kläs med aluminiumplåt.\n• Isolering inomhus ska där yttre åverkan kan förväntas också beklädas med aluminiumplåt."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/aterstallning-av-sakerhetsvakter",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Återställning av säkerhetsvakter"
+   ],
+   "text": "• Manuell återställning för säkerhetsvakter såsom högtryckspressostat och frysskydd ska installeras."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/uppsamlingskarl-for-sakerhetsventil",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Uppsamlingskärl för säkerhetsventil"
+   ],
+   "text": "• Uppsamlingskärl för säkerhetsventiler vid frysskyddsmedel ska installeras."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/flodesvakt",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Flödesvakt"
+   ],
+   "text": "• Flödesvakt ska alltid finnas på kylmaskin."
+  },
+  {
+   "id": "vs-och-kyla/kylsystem/systemutformning/larmhantering",
+   "path": [
+    "KYLSYSTEM",
+    "SYSTEMUTFORMNING",
+    "Larmhantering"
+   ],
+   "text": "• Larm ifrån kylmaskin ska kopplas upp för larmhantering i överordnat system. Driftstoppslarm ska vara A-larm och signalerande till beredskapen."
+  },
+  {
+   "id": "vs-och-kyla/varmesystem/systemutformning",
+   "path": [
+    "VÄRMESYSTEM",
+    "SYSTEMUTFORMNING"
+   ],
+   "text": "Miljövänliga uppvärmningssystem\nByggnader uppvärmningssystem ska i första hand ske med ett vattenburet värmesystem, till exempel:\n• Fjärrvärme\n• Värmepump\nMindre luftvärmare, ridåvärmare med mera kan värmas upp med direktverkande elvärme efter samråd med beställaren.\nLedning för påfyllnad av värmesystem ska utföras med vattenmätare."
+  },
+  {
+   "id": "vs-och-kyla/varmesystem/systemutformning/varmepumpar",
+   "path": [
+    "VÄRMESYSTEM",
+    "SYSTEMUTFORMNING",
+    "Värmepumpar"
+   ],
+   "text": "• Värmepumpar ska vara av fabrikat NIBE eller likvärdigt.\n• Vid installation av bergvärmepump ska det alltid kompletteras med exempelvis en elpanna/elpatron. Ska dimensioneras för att hålla objektet från frysrisk.\n• En datakörning på värmepumpen ska överlämnas till beställaren innan den beställs.\n• Redundans för värme och tappvarmvatten ska beslutas i samråd med beställaren."
+  },
+  {
+   "id": "vs-och-kyla/varmesystem/systemutformning/vatskesystem",
+   "path": [
+    "VÄRMESYSTEM",
+    "SYSTEMUTFORMNING",
+    "Vätskesystem"
+   ],
+   "text": "• Vätskesystem ska renspolas och får inte innehålla spårämnen av frysskydd vid driftsättning."
+  },
+  {
+   "id": "vs-och-kyla/varmesystem/fjarrvarmeundercentraler",
+   "path": [
+    "VÄRMESYSTEM",
+    "FJÄRRVÄRMEUNDERCENTRALER"
+   ],
+   "text": "• För fjärrvärmeinstallationer gäller anvisningar från fjärrvärmeleverantör som levererar till och med växlaren."
+  },
+  {
+   "id": "vs-och-kyla/varmesystem/golvvarme",
+   "path": [
+    "VÄRMESYSTEM",
+    "GOLVVÄRME"
+   ],
+   "text": "• Luftburen golvvärme ska inte användas.\n• I skolor, trapphus, publika områden och liknande lokaler ska systemetvara utformad så att obehöriga ej kan ändra inställningarna på golvvärmen."
+  },
+  {
+   "id": "vs-och-kyla/varmesystem/luftvarmare",
+   "path": [
+    "VÄRMESYSTEM",
+    "LUFTVÄRMARE"
+   ],
+   "text": "• System för luftvärmare ska vara fryssäkrade."
+  },
+  {
+   "id": "vs-och-kyla/varmesystem/silar-och-filter",
+   "path": [
+    "VÄRMESYSTEM",
+    "SILAR OCH FILTER"
+   ],
+   "text": "• Filter och silar ska vara placerade så att eventuell luft kan evakueras vid rengöring."
+  },
+  {
+   "id": "vs-och-kyla/apparater-i-rorsystem/apparater",
+   "path": [
+    "APPARATER I RÖRSYSTEM",
+    "APPARATER"
+   ],
+   "text": "• Apparater ska kopplas med fast anslutning (ej slang) om inte apparaten kräver slang på grund av vibrationer eller dyl.\n• Pumpar i system med variabelt flöde ska vara med tryckstyrning.\n• Värme/kyl-batterier med frysrisk ska temperaturregleras (förses med pump).\n• Pumpar med kondensutfällning förses med tråg med dränledning dragen till brunn.\n• Pumpar ska vara försedda med relämodul för start/stopp och larm. Små pumpar som saknar denna möjlighet ska installeras med strömrelä.\n• Rörarmaturer ska finnas lagerförda hos svensk VVS-grossist med reservdelar."
+  },
+  {
+   "id": "vs-och-kyla/apparater-i-rorsystem/fett-och-oljeavskiljare",
+   "path": [
+    "APPARATER I RÖRSYSTEM",
+    "FETT- OCH OLJEAVSKILJARE"
+   ],
+   "text": "• Avluftning från olje-, bensin-, fettavskiljare och pumpgrop ska ske ovan yttertak.\n• Olje-, bensin- och fettavskiljare ska ha tätt lock så att besvärande lukt inte uppstår.\n• Oljeavskiljare ska förses med larmanordning.\n• Avskiljare ska om möjligt placeras utomhus i mark.\n• Fettavskiljare ska följa SS-EN 1825:1 och SS-EN 1825:2.\n• När fett- och oljeavskiljare hamnar inomhus vid nyproduktion så ska det finnas en spolblandare och golvbrunn i anslutning till denna."
+  },
+  {
+   "id": "vs-och-kyla/ror-och-rorfogar",
+   "path": [
+    "RÖR OCH RÖRFOGAR"
+   ],
+   "text": "• Dränering från läckindikatorer ska mynna på plats där man omedelbart kan upptäcka ett eventuellt läckage och där utläckande vatten inte direkt orsakar en skada."
+  },
+  {
+   "id": "vs-och-kyla/brunnar-och-rannor",
+   "path": [
+    "BRUNNAR OCH RÄNNOR"
+   ],
+   "text": "• Vid nöddusch ska det finnas golvbrunn.\n• Golvbrunn får inte placeras under fläktaggregat eller dylikt.\n• I rum med golvbrunn ska tappställe finnas.\n• I driftutrymme ska tappställe med utslagsback samt slanghylla monteras.\n• Golvbrunnar som inte nyttjas veckovis ska utföras med luktstopp.\n• Fläktrum och UC ska alltid förses med NOOD-golvbrunn.\n• Alla golvbrunnar i produktionskök utförs i rostfritt."
+  },
+  {
+   "id": "vs-och-kyla/brunnar-och-rannor/klammer",
+   "path": [
+    "BRUNNAR OCH RÄNNOR",
+    "KLAMMER"
+   ],
+   "text": "• Vid rörgenomföring i vägg eller bjälklag ska godkänd täckbricka monteras."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER"
+   ],
+   "text": "• Tappvatten- och värmesystem ska förses med avstängningsventiler i sådan omfattning att service av installationer kan ske utan att hela anläggningen berörs.\n• Före varje sanitär apparat, blandare och dylikt, alternativt badrum/WC, ska föravstängningsventiler monteras.\n• Ventilställdon ska vara försett med handmanöverdon och lägesindikering som samordnas med styrentreprenör, om separat verktyg krävs ska detta kedjas fast vid ställdonet.\n• VVS-system ska förses med injusteringsventiler i sådan omfattning att injustering av samtliga delar kan ske.\n• Injusteringsventiler ska vara försedda med mätuttag.\n• Värmegrupper förses med tillopp samt returgivare."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/expansionskarl",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "EXPANSIONSKÄRL"
+   ],
+   "text": "• Före expansionskärl ska avstängningsventil samt avtappningsventil monteras för avtappning av kärlet.\n• Expansionskärl ska förses med manometer samt en tryckgivare som levereras av styrentreprenören.\n• Mindre expansionskärl ska anslutas med löpande mutter och i demonteringsvänlig höjd.\n• Ett protokoll med inställt förtryck och drifttryck bifogas i drift- och skötseldokumenten.\n• Expansionskärl ska märkas med projekterat förtryck."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/avluftare",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "AVLUFTARE"
+   ],
+   "text": "• Automatiska undertrycksavgasare och magnetitfilter monteras på huvudledningen. Undertrycksavgasaren ska förses med summalarmsutgång.\n• Luftningar ska utföras med rörförstoringar och neddragen ledning på vägg med lättåtkomlig kulventil ”manuella klockor”.\n• Luftningar ska vara placerade så att de är åtkomliga ifrån en stege som är max 2 meter hög.\n• Automatiska klockor får inte placeras ovan undertak.\n• Före automatisk avluftare ska avstängningsventil monteras.\n• Avsättningar för möjlighet till delflödesavgasning eller annan rengöringsutrustning ska göras på returledning före cirkulationspump i UC då det inte blir någon undertrycksavgasare i anläggningen. Två avstängningsventiler DN25 med minsta avstånd på c/c 500 millimeter monteras.\n• Automatisk avluftning utförs med backventil."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/smutsfilter",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "SMUTSFILTER"
+   ],
+   "text": "• Smutsfilter med magnetitfälla ska monteras före apparater såsom växlare, värmepump och liknande.\n• Smutsfilter ska monteras servicevänligt i huvudledningar i värme- och kylsystem.\n• Smutsfilter ska förses med manometer och avtappningsledning med avstängningsventil."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/blandingskarl",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "BLANDINGSKÄRL"
+   ],
+   "text": "• Blandningskärl ska märkas med medietyp och koncentration."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/radiatorer",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "RADIATORER"
+   ],
+   "text": "• I skolor, idrottshallar, trapphus, gruppboenden/särskilda boenden och liknande lokaler ska radiatorer vara försedda med vandalsäker termostat och förstärkt upphängning. Gäller dock inte lokaler där endast lärare och personal vistas.\n• Radiatorer och konvektorer monteras med hänsyn till åtkomst för till exempel städning.\n• Radiatorer i storkök ska vara av hygien typ."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/tvattstall-och-tvattrannor",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "TVÄTTSTÄLL OCH TVÄTTRÄNNOR"
+   ],
+   "text": "• Tvättställsavlopp ansluts i vägg där så är möjligt.\n• I elevtoaletter monteras beröringsfria blandare efter samråd med beställare.\n• Vid montering av beröringsfria blandare ska de anslutas med fast (ej stickpropp och ej batteri) elanslutning."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/klosetter",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "KLOSETTER"
+   ],
+   "text": "• Vid befintliga/äldre avloppsstammar ska spolning från WC-stol vara minst 6 liter per spolning.\n• Vattenklosett utförs med dolt vattenlås.\n• Om vägghängd modell används ska modellen vara av utanpåliggande cistern.\n• Ej limmade klosetter på plastmatta."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/klosetter/utslagsbackar",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "KLOSETTER",
+    "UTSLAGSBACKAR"
+   ],
+   "text": "• Utslagsback förses med stänkskydd.\n• Utslagsback i allmänna utrymmen ska monteras på förstärkta konsoler."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/blandare-och-tappventiler",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "BLANDARE OCH TAPPVENTILER"
+   ],
+   "text": "• Köksblandare med diskmaskinsavstängning monteras endast där tillhörande apparatur ska installeras och fram till att installation sker ska ledning förses med metallpropp.\n• I skolor och idrottshallar eller andra utsatta platser ska duscharna vara elektroniskt styrda med förblandat vatten och endast tryckknapp eller rörelsevakt och duschhuvud synliga.\n• En tappvattenventil monteras för städ på kallvattnet i duschutrymmen (ej blandat vatten).\n• Vid äldreboende ska duschslangar vara dränerade (legionellasäkrade).\n• Skyddsblandare ska monteras på nöd-och ögonduschar.\n• Vid utanpåliggande rördragning ska vattenanslutning till duschblandare ske ovanifrån."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/provning",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "PROVNING"
+   ],
+   "text": "• Samtliga system ska provas och dokumenteras i provningsprotokoll.\n• Samordnad provning ska utföras.\n• Vid enskilt vatten ska alltid vattenprov genomföras innan anläggningen tas i drift."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/injustering",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "INJUSTERING"
+   ],
+   "text": "• Metod och omfattning av injustering avgörs vid projektering och anges i förfrågningsunderlag och bygghandling.\n• Injusteringsvärden anges i protokoll och på ritning.\n• Tappvattensystem i utrymmen för förskolor, LSS, demensboende etcetera ska blandare temperaturbegränsas till 38°C."
+  },
+  {
+   "id": "vs-och-kyla/ventiler-och-shuntgrupper/demontering-och-rivning",
+   "path": [
+    "VENTILER OCH SHUNTGRUPPER",
+    "DEMONTERING OCH RIVNING"
+   ],
+   "text": "• Vid demontering av tappvattenrörledningar ska stick ersättas med ett rakstycke.\n• Vid rivning av avlopp i golv ska tätning utföras på så sätt att fukt och luktsäkerhet erhålls.\n• Utred i projektet vilka rörinstallationer som ska demonteras och återanvändas. Återanvändning av material ska ske i samråd med beställaren.\n• Miljöfarligt avfall ska om möjligt återvinnas.\nKarlstads kommun, teknik- och fastighetsförvaltningen, 651 84 Karlstad. Tel: 054-540 00 00. E-post: karlstadskommun@karlstad.se Webbplats: karlstad.se"
+  }
+ ]
+}

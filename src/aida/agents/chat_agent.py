@@ -449,14 +449,23 @@ def run_chat_agent(
     overrides: dict | None = None,
     as_built: dict | None = None,
     epd_resolver=None,
+    attachments: list[dict] | None = None,
 ) -> dict:
     """Run chat with tool-use loop.
+
+    `attachments` are content blocks from aida.attachments.load_blocks. They go
+    first in the first user turn and stay there through the tool loop, so the
+    second to fifth call of a turn read them from the prompt cache instead of
+    paying for the whole PDF again.
 
     Returns dict with:
       - reply: str — assistant's final text reply
       - state_updates: dict — {project?, selections?} with changed objects
       - tool_calls: list — trace of tool invocations (for debug/UI)
     """
+    from aida.attachments import attach_to_messages, with_rule
+
+    blocks = attachments or []
     client = get_client()
     history = _sanitize_history(history or [])
 
@@ -473,7 +482,7 @@ def run_chat_agent(
     pending_actions: list[dict] = []
 
     state_block = _format_state(project, baseline, alternatives, selections)
-    system_prompt = SYSTEM_PROMPT + "\n\nNUVARANDE STATE:\n" + state_block
+    system_prompt = with_rule(SYSTEM_PROMPT, blocks) + "\n\nNUVARANDE STATE:\n" + state_block
 
     # Anthropic requires the first message to be 'user' and forbids two same-role
     # turns in a row. _sanitize_history guarantees internal alternation but not
@@ -484,7 +493,8 @@ def run_chat_agent(
         recent = recent[1:]
     if recent and recent[-1]["role"] == "user":
         recent = recent[:-1]
-    messages: list[dict] = recent + [{"role": "user", "content": message}]
+    messages: list[dict] = attach_to_messages(
+        recent + [{"role": "user", "content": message}], blocks)
 
     for _ in range(max_turns):
         response = client.messages.create(

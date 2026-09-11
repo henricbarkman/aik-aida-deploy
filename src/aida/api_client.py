@@ -61,14 +61,18 @@ def get_client() -> anthropic.Anthropic:
 
 
 # Default model for Aida's reasoning agents (OpenRouter format).
-# Opus 4.8: adaptive thinking only — budget_tokens 400s here (see call_model).
-DEFAULT_MODEL = "anthropic/claude-opus-4-8"
+# Opus 5: adaptive thinking only — budget_tokens 400s here (see call_model).
+DEFAULT_MODEL = "anthropic/claude-opus-5"
 
-# Adaptive-thinking effort levels (Opus 4.8 / Sonnet 4.6). These replace the old
-# budget_tokens scheme, which returns 400 on Opus 4.8. Prior budget -> effort:
+# Adaptive-thinking effort levels (Opus 5 / Sonnet 5). These replace the old
+# budget_tokens scheme, which returns 400 on both. Prior budget -> effort:
 #   LOW (1024) -> medium · STANDARD (5000) -> high · DEEP (10000) -> high.
-# Opus 4.8 "high" is already strong; bump the correctness steps (routing,
+# Opus 5 "high" is already strong; bump the correctness steps (routing,
 # baseline) to "max" only if matching errors resurface — "max" can overthink.
+# Do NOT reach for thinking={"type": "disabled"} to save cost on Opus 5: it
+# returns 400 at effort xhigh/max, and below that the model sometimes writes a
+# tool call into visible text instead of a tool_use block. Lower the effort
+# instead — that cuts spend without either failure mode.
 EFFORT_MEDIUM = "medium"
 EFFORT_HIGH = "high"
 
@@ -82,7 +86,10 @@ REASONING_MAX_TOKENS = 16000
 
 # Models that support adaptive thinking + effort. Anything else (the Haiku
 # classifier) degrades to no thinking rather than erroring.
-_ADAPTIVE_MODELS = {"anthropic/claude-opus-4-8", "anthropic/claude-sonnet-4-6"}
+# Must stay in sync with PRICING_MODEL in data/pricing_provider.py: that module
+# passes PRICING_EFFORT to call_model, and an id missing from this set silently
+# drops both thinking and effort instead of erroring.
+_ADAPTIVE_MODELS = {"anthropic/claude-opus-5", "anthropic/claude-sonnet-5"}
 
 
 def _thinking_request(model: str, effort: str | None) -> dict:

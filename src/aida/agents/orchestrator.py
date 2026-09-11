@@ -124,12 +124,18 @@ def classify_intent(
     message: str,
     has_project: bool,
     history: list[dict] | None = None,
+    attachment_note: str = "",
 ) -> dict:
     """Classify a user message into one intent. Returns {intent, reason}.
 
     Fails safe to flow_action: if the classifier errors or returns an unknown
     value, we defer to the existing flow rather than risk routing a real project
     edit into the advisory dead-end.
+
+    `attachment_note` names attached files (§14.4). The classifier gets names,
+    never the files: it only has to see that "vad står i ritningen?" is a
+    question about something that exists, and Haiku reading a 40-page PDF on
+    every message would cost more than the answer.
     """
     client = get_client()
     clean = _sanitize_history(history or [])
@@ -138,6 +144,8 @@ def classify_intent(
         if has_project
         else "Inget projekt finns ännu i sessionen."
     )
+    if attachment_note:
+        state_note += " " + attachment_note + "."
     # Same boundary handling as run_chat_agent. _sanitize_history guarantees
     # internal alternation but not the edges, and Anthropic rejects a leading
     # assistant turn or two user turns in a row. This was survivable while the
@@ -204,17 +212,35 @@ def answer_advisory(
     baseline: dict | None = None,
     alternatives: dict | None = None,
     selections: dict | None = None,
+    attachments: list[dict] | None = None,
 ) -> dict:
-    """Answer an advisory question without mutating state. Returns {reply, tool_calls}."""
+    """Answer an advisory question without mutating state. Returns {reply, tool_calls}.
+
+    `attachments` are content blocks from aida.attachments.load_blocks. This is
+    the branch "vad står det om ventilationen?" lands in, so it is the one that
+    most needs the file.
+    """
+    from aida.attachments import attach_to_messages, with_rule
+
+    blocks = attachments or []
     client = get_client()
     clean = _sanitize_history(history or [])
 
-    system_prompt = _ADVISORY_SYSTEM
+    system_prompt = with_rule(_ADVISORY_SYSTEM, blocks)
     if project:
         state_block = _format_state(project, baseline, alternatives, selections or {})
         system_prompt += "\n\nNUVARANDE PROJEKT-STATE:\n" + state_block
 
-    messages: list[dict] = list(clean[-8:]) + [{"role": "user", "content": message}]
+    # Same edge handling as classify_intent and run_chat_agent. With files the
+    # first turn has to be the user's, because that is where they go, and the
+    # tail must not collide with the message appended here.
+    recent = list(clean[-8:])
+    if recent and recent[0]["role"] == "assistant":
+        recent = recent[1:]
+    if recent and recent[-1]["role"] == "user":
+        recent = recent[:-1]
+    messages: list[dict] = attach_to_messages(
+        recent + [{"role": "user", "content": message}], blocks)
     tool_calls: list[dict] = []
 
     # An exception here must NOT propagate: route() would re-raise, api_route would
@@ -273,21 +299,27 @@ def route(
     baseline: dict | None = None,
     alternatives: dict | None = None,
     selections: dict | None = None,
+    attachments: list[dict] | None = None,
+    attachment_note: str = "",
 ) -> dict:
     """Classify, and answer in the same call when the intent is advisory.
+
+    The classifier gets `attachment_note` (file names), the advisory answer gets
+    `attachments` (the files). See §14.4 for why they are split that way.
 
     Returns:
       {intent: 'advisory_question', reply: str, ...}  — frontend renders + stops
       {intent: 'new_project' | 'flow_action'}         — frontend falls through to existing flow
     """
     has_project = bool(project and project.get("components"))
-    classification = classify_intent(message, has_project=has_project, history=history)
+    classification = classify_intent(message, has_project=has_project, history=history,
+                                     attachment_note=attachment_note)
     intent = classification["intent"]
 
     if intent == INTENT_ADVISORY:
         answer = answer_advisory(
             message, history=history, project=project, baseline=baseline,
-            alternatives=alternatives, selections=selections,
+            alternatives=alternatives, selections=selections, attachments=attachments,
         )
         return {
             "intent": intent,

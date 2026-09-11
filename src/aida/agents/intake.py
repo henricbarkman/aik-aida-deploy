@@ -213,7 +213,8 @@ REPAIR_INSTRUCTION = (
 )
 
 
-def _call_intake(client, messages: list[dict], timeout: float | None = None):
+def _call_intake(client, messages: list[dict], timeout: float | None = None,
+                 system: str = SYSTEM_PROMPT):
     extra = {"timeout": timeout} if timeout is not None else {}
     return call_model(
         client,
@@ -225,12 +226,12 @@ def _call_intake(client, messages: list[dict], timeout: float | None = None):
         # per-component usage_context made multi-room projects truncate at 6000.
         max_tokens=REASONING_MAX_TOKENS,
         effort=EFFORT_HIGH,
-        system=SYSTEM_PROMPT,
+        system=system,
         messages=messages,
     )
 
 
-def run_intake(description: str) -> dict:
+def run_intake(description: str, attachments: list[dict] | None = None) -> dict:
     """Extract project parameters from a natural language description.
 
     Both testers hit a hard crash here in June 2026, because the response was
@@ -238,12 +239,20 @@ def run_intake(description: str) -> dict:
     "Fel: Expecting value: line 1 column 4 (char 3)". Parsing now goes through
     extract_json_object, and a first failure buys one repair round-trip before
     we give up.
+
+    `attachments` are content blocks from aida.attachments.load_blocks, so a
+    förfrågningsunderlag can be the project description (§14.6). The repair
+    round-trip reuses `messages` and `system`, so it sees the same files.
     """
+    from aida.attachments import attach_to_messages, with_rule
+
     client = get_client()
     started_at = time.monotonic()
 
-    messages: list[dict] = [{"role": "user", "content": description}]
-    response = _call_intake(client, messages)
+    blocks = attachments or []
+    system = with_rule(SYSTEM_PROMPT, blocks)
+    messages: list[dict] = attach_to_messages([{"role": "user", "content": description}], blocks)
+    response = _call_intake(client, messages, system=system)
     text = extract_text(response)
 
     try:
@@ -268,7 +277,7 @@ def run_intake(description: str) -> dict:
         {"role": "assistant", "content": text or "(tomt svar)"},
         {"role": "user", "content": REPAIR_INSTRUCTION},
     ]
-    retry = _call_intake(client, repair_messages, timeout=budget)
+    retry = _call_intake(client, repair_messages, timeout=budget, system=system)
     retry_text = extract_text(retry)
     try:
         return fix_envelope_quantities(

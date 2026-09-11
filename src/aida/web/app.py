@@ -448,9 +448,13 @@ def api_intake():
     description = data.get('description', '')
     if not description:
         return jsonify({'error': 'Beskrivning saknas'}), 400
+    # A förfrågningsunderlag can be the project description (§14.6).
+    blocks, _note, err = _attachment_blocks(data)
+    if err:
+        return err
 
     try:
-        result = run_intake(description)
+        result = run_intake(description, attachments=blocks)
         return jsonify(result)
     except _TIMEOUT_ERRORS:
         return jsonify({'error': 'Analysen tog för lång tid. Försök igen.'}), 504
@@ -795,6 +799,9 @@ def api_route():
     message = (data.get('message') or '').strip()
     if not message:
         return jsonify({'error': 'Meddelande saknas'}), 400
+    blocks, note, err = _attachment_blocks(data)
+    if err:
+        return err
     try:
         result = route(
             message=message,
@@ -803,6 +810,8 @@ def api_route():
             baseline=data.get('baseline'),
             alternatives=data.get('alternatives'),
             selections=data.get('selections'),
+            attachments=blocks,
+            attachment_note=note,
         )
         return jsonify(result)
     except _TIMEOUT_ERRORS:
@@ -810,6 +819,60 @@ def api_route():
     except Exception as e:
         app.logger.exception("route failed")
         return step_failed(e, 'tolkningen av ditt meddelande')
+
+
+def _attachment_blocks(data):
+    """The files a turn carries, as content blocks (orchestration §14.4).
+
+    Returns (blocks, note, None), or (None, None, response) when the files
+    cannot be used. `note` names the files for the intent classifier. Every
+    model-facing endpoint calls this, so "Aida remembers the file" holds
+    whichever branch the message ends up in.
+    """
+    from aida import attachments as att
+
+    refs = data.get('attachments')
+    if not refs:
+        return [], '', None
+    if not SUPABASE_URL:
+        # No Storage without Supabase, and no inline fallback on purpose: a
+        # second path is one that only ever runs locally (§14.3).
+        return None, None, (jsonify({'error': 'Bilagor kräver ett konto.'}), 400)
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        validated = att.validate_refs(refs, getattr(request, 'user_id', None))
+        blocks = att.load_blocks(
+            validated, att.storage_fetcher(SUPABASE_URL, SUPABASE_ANON_KEY, token))
+    except att.AttachmentError as e:
+        return None, None, (jsonify({'error': e.message}), e.status)
+    return blocks, att.names_note(validated), None
+
+
+@app.route('/api/attachments/check', methods=['POST'])
+@require_auth
+@rate_limited
+def api_attachment_check():
+    """Read one file right after upload, before anyone asks about it.
+
+    A broken Excel or a 140-page PDF is then refused while the user is still
+    looking at the file, instead of three messages later as a failed answer.
+    Returns what the chat should say about it: pages, and the truncation note
+    when the text was cut. Warms the per-process cache as a side effect.
+
+    Rate limited although no model runs: it downloads and parses up to 20 MB.
+    """
+    from aida import attachments as att
+
+    if not SUPABASE_URL:
+        return jsonify({'error': 'Bilagor kräver ett konto.'}), 400
+    data = request.json or {}
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    try:
+        [ref] = att.validate_refs([data.get('attachment')], getattr(request, 'user_id', None))
+        info = att.inspect(ref, att.storage_fetcher(SUPABASE_URL, SUPABASE_ANON_KEY, token))
+    except att.AttachmentError as e:
+        return jsonify({'error': e.message}), e.status
+    return jsonify({'ok': True, 'kind': ref['kind'], **info})
 
 
 @app.route('/api/chat', methods=['POST'])
@@ -838,6 +901,9 @@ def api_chat():
     from aida.agents.chat_agent import run_chat_agent
 
     data = request.json or {}
+    blocks, _note, err = _attachment_blocks(data)
+    if err:
+        return err
     try:
         result = run_chat_agent(
             message=data.get('message', ''),
@@ -849,6 +915,7 @@ def api_chat():
             overrides=data.get('overrides'),
             as_built=data.get('as_built'),
             epd_resolver=resolve_epd,
+            attachments=blocks,
         )
         return jsonify(result)
     except _TIMEOUT_ERRORS:
@@ -1362,6 +1429,10 @@ def create_analysis():
         # ride in until intake has run, and following up a project that was
         # never calculated in Aida is a normal case, not an exception.
         'as_built_data': data.get('as_built_data'),
+        # The attached files' metadata (§14.3); the files themselves are in
+        # Storage. Own column for the same reason as the two above: a file
+        # usually arrives before intake, while project_data is still null.
+        'attachments_data': data.get('attachments_data'),
         # Which building this analysis is about, and roughly when the work is
         # planned. Both optional. They exist so analyses stop being isolated
         # events: two analyses on the same school can be related, and the set
@@ -1415,7 +1486,7 @@ def update_analysis(analysis_id):
     update = {}
     for key in ('name', 'status', 'project_data', 'baseline_data',
                 'alternatives_data', 'selections_data', 'report_markdown',
-                'conversation_data', 'as_built_data'):
+                'conversation_data', 'as_built_data', 'attachments_data'):
         if key in data:
             update[key] = data[key]
     # Kept apart from the loop above because '' has to become NULL rather than
@@ -1437,11 +1508,18 @@ def update_analysis(analysis_id):
 @app.route('/api/analyses/<analysis_id>', methods=['DELETE'])
 @require_supabase_auth
 def delete_analysis(analysis_id):
+    from aida import attachments as att
+
     token = request.headers.get('Authorization', '').replace('Bearer ', '')
     params = {
         'id': f'eq.{analysis_id}',
         'user_id': f'eq.{request.user_id}',
     }
+    # Files first: once the row is gone nothing points at them any more, and a
+    # bucket full of files nobody can see is worse than a row that lingers.
+    # A failure here is logged inside and does not stop the delete (§14.3).
+    att.delete_analysis_files(SUPABASE_URL, SUPABASE_ANON_KEY, token,
+                              request.user_id, analysis_id)
     result = supabase_request('DELETE', 'analyses', token=token, params=params)
     if not result:
         return jsonify({'error': 'Ej hittad'}), 404
@@ -1597,6 +1675,32 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .chat-input button { width: 40px; height: 40px; border-radius: 50%; background: var(--kk-charcoal); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; flex-shrink: 0; }
 .chat-input button:hover:not(:disabled) { background: var(--kk-dark-red); }
 .chat-input button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Attachments (orchestration §14). The paperclip is an outline pill like the
+   top bar's secondary controls: it opens a picker, it does not send. */
+.chat-input .attach-btn { width: 36px; height: 36px; background: white; color: var(--kk-gray-600); border: 1px solid var(--kk-gray-300); }
+.chat-input .attach-btn:hover:not(:disabled) { background: var(--kk-gold-light); color: var(--kk-text); border-color: var(--kk-gold); }
+.chat-input button:focus-visible, .att-chip button:focus-visible { outline: 2px solid var(--kk-charcoal); outline-offset: 2px; }
+.att-tray { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px 0; background: white; border-top: 1px solid var(--kk-gray-200); }
+.att-tray:empty { display: none; }
+.att-tray:not(:empty) + .chat-input { border-top: none; }
+.att-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 28px; padding: 3px 3px 3px 9px; border: 1px solid var(--kk-gray-200); border-radius: 999px; background: var(--kk-gray-50); font-size: 12px; line-height: 1.3; color: var(--kk-text); }
+.att-chip svg { flex-shrink: 0; color: var(--kk-gray-500); }
+.att-chip .att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
+.att-chip .att-meta { color: var(--kk-gray-500); white-space: nowrap; }
+.att-chip button { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: none; background: transparent; color: var(--kk-gray-500); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; line-height: 1; padding: 0; }
+.att-chip button:hover { background: var(--kk-gray-200); color: var(--kk-text); }
+.att-chip.uploading { border-style: dashed; border-color: var(--kk-gray-300); }
+.att-chip.failed { border-color: var(--kk-dark-red); background: #FDF1F1; color: var(--kk-dark-red); }
+.att-chip.failed svg, .att-chip.failed .att-meta, .att-chip.failed button { color: var(--kk-dark-red); }
+.att-chip.failed .att-meta { white-space: normal; }
+.msg-atts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.msg-atts .att-chip { background: rgba(255,255,255,0.75); border-color: var(--kk-gold); padding-right: 9px; }
+.msg-atts .att-chip.removed .att-name { text-decoration: line-through; color: var(--kk-gray-500); }
+/* The one moment: files held over the chat turn the whole panel into the drop target. */
+.chat-container.dropping { position: relative; background: var(--kk-gold-light); outline: 2px dashed var(--kk-charcoal); outline-offset: -8px; }
+.chat-container.dropping > * { opacity: 0.25; }
+.chat-container.dropping::after { content: 'Släpp filerna här'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 500; color: var(--kk-text); pointer-events: none; }
 .chat-disclaimer { text-align: center; font-size: 11px; color: var(--kk-gray-500); padding: 6px 0 12px; }
 
 /* === Results panel (mockup: tabs + white bg) === */
@@ -2119,7 +2223,10 @@ select.cell-input { cursor: pointer; }
         <span class="confirm-bar-text" id="confirmBarText"></span>
         <button class="btn-confirm-sticky" id="confirmBarBtn" onclick="confirmStep()"></button>
       </div>
+      <div class="att-tray" id="attTray" aria-live="polite"></div>
       <div class="chat-input">
+        {% if has_supabase %}<button id="attachBtn" class="attach-btn" type="button" onclick="document.getElementById('attachInput').click()" aria-label="Bifoga filer" title="Bifoga PDF, bild, Word eller Excel"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+        <input id="attachInput" type="file" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx,.csv,.txt" onchange="uploadAttachments(this.files); this.value=''">{% endif %}
         <input id="userInput" type="text" placeholder="Skriv ditt meddelande..." onkeydown="if(event.key==='Enter')sendMessage()">
         <button id="sendBtn" onclick="sendMessage()" aria-label="Skicka">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -2303,6 +2410,10 @@ let state = {
   // why an override survives every rerun and why lifting one shows Aida's number
   // again without recomputing anything. Rides in project_data beside `mode`.
   overrides: {},
+  // Orchestration §14: files attached to this analysis, [{id, name, mime, size,
+  // path, added_at, pages}]. The files are in Storage; this is what points at
+  // them. Every turn sends all of them (attachmentRefs) until one is removed.
+  attachments: [],
   // Orchestration §12.6: what was actually installed, keyed by component id.
   //   as_built.c1 = {installed_name, quantity, unit, epd, match_quality, ...}
   // Its own Supabase column rather than a ride in project_data: an analysis
@@ -2605,14 +2716,18 @@ function forgetLlmContext() {
   _saveConversation();
 }
 
-function addMsg(text, cls, role) {
+function addMsg(text, cls, role, attachments) {
   const entry = role ? {text, cls, role} : {text, cls};
+  // Which files went with this message, for the transcript only: llmHistory()
+  // sends text, and the files reach the model through attachmentRefs().
+  if (attachments && attachments.length) entry.attachments = attachments;
   state.conversation.push(entry);
   _saveConversation();
   const d = document.createElement('div');
   d.className = 'msg ' + cls;
   if (cls === 'bot' || cls === 'system') { d.innerHTML = renderMd(text); }
   else { d.textContent = text; }
+  if (entry.attachments) d.appendChild(msgAttachmentsEl(entry.attachments));
   document.getElementById('messages').appendChild(d);
   d.scrollIntoView({behavior:'smooth'});
   return entry;
@@ -2976,18 +3091,317 @@ function buildCorrectionContext(text) {
   return ctx;
 }
 
+// === Attachments (orchestration-redesign §14) ===
+// The browser uploads straight to Supabase Storage, because Vercel caps a
+// request at 4.5 MB; the server only ever sees a path. Every file on the
+// analysis rides along with every turn until the user removes it, which is
+// what "Aida remembers the file" means.
+const ATTACH_BUCKET = 'aida-attachments';
+const ATTACH_MAX_FILES = 10;
+const ATTACH_MAX_BYTES = 20 * 1024 * 1024;
+const ATTACH_TYPES = {
+  pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+  webp: 'image/webp', gif: 'image/gif',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  csv: 'text/csv', txt: 'text/plain',
+};
+const ATTACH_OLD = {xls: '.xlsx', doc: '.docx'};
+// The model scales images past this edge down anyway, so doing it here loses
+// nothing it would have seen, and keeps a phone photo under the API's 5 MB.
+const ATTACH_IMAGE_EDGE = 1568;
+const ATT_ICON_DOC = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+const ATT_ICON_IMG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+
+let _pendingAttachmentIds = [];  // added since the last message went out
+let _uploadsInFlight = [];       // awaited before a message goes out
+const _uploading = new Map();    // key -> file name, shown as "Laddar upp…"
+let _failedUploads = [];         // {key, name, error}, shown until dismissed
+let _ensuringRow = null;
+
+function attachmentRefs() {
+  return (state.attachments || []).map(a => ({path: a.path, name: a.name}));
+}
+
+function _attExt(name) {
+  const i = String(name).lastIndexOf('.');
+  return i === -1 ? '' : String(name).slice(i + 1).toLowerCase();
+}
+
+// The storage key: ASCII, starts with a letter or digit, keeps its extension.
+// Must satisfy _PATH_RE in attachments.py; test_attachments_ui.js checks the two
+// against each other. The name the user sees is kept separately and untouched.
+function _attSafeName(name) {
+  const ext = _attExt(name).replace(/[^a-z0-9]/g, '').slice(0, 10);
+  const raw = String(name);
+  const dot = raw.lastIndexOf('.');
+  let stem = (dot === -1 ? raw : raw.slice(0, dot)).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9._-]+/g, '_').replace(/\.{2,}/g, '.').replace(/^[^A-Za-z0-9]+/, '').slice(0, 100).replace(/[._-]+$/, '');
+  // The server refuses any path containing '..', so runs of dots collapse.
+  // A name in another script has no letters left after this; the extension
+  // still decides how the server reads the file, so it must survive.
+  if (!stem) stem = 'fil';
+  return ext ? stem + '.' + ext : stem;
+}
+
+function _attSize(n) {
+  if (n < 1024 * 1024) return Math.max(1, Math.round(n / 1024)) + ' kB';
+  return (n / 1024 / 1024).toFixed(1).replace('.', ',') + ' MB';
+}
+
+// null when the file may be uploaded, otherwise the sentence that says why not.
+function attachmentCheck(file) {
+  const ext = _attExt(file.name);
+  if (ATTACH_OLD[ext]) return 'Filtypen .' + ext + ' stöds inte. Spara som ' + ATTACH_OLD[ext] + ' och bifoga igen.';
+  if (!ATTACH_TYPES[ext]) return 'Filtypen ' + (ext ? '.' + ext : '(ingen)') + ' stöds inte. Bifoga PDF, bild, Word (.docx), Excel (.xlsx), CSV eller text.';
+  if (file.size === 0) return 'Filen är tom.';
+  if (file.size > ATTACH_MAX_BYTES) return 'Filen är ' + _attSize(file.size) + '. Största storlek är 20 MB.';
+  return null;
+}
+
+async function _scaleImage(file) {
+  const ext = _attExt(file.name);
+  // GIF may be animated and is rarely a photo; leave it alone.
+  if (['png', 'jpg', 'jpeg', 'webp'].indexOf(ext) === -1 || typeof createImageBitmap !== 'function') return file;
+  let bmp;
+  try { bmp = await createImageBitmap(file); } catch (e) { return file; }
+  const edge = Math.max(bmp.width, bmp.height);
+  if (edge <= ATTACH_IMAGE_EDGE && file.size <= 4 * 1024 * 1024) { if (bmp.close) bmp.close(); return file; }
+  const k = Math.min(1, ATTACH_IMAGE_EDGE / edge);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * k);
+  canvas.height = Math.round(bmp.height * k);
+  canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  if (bmp.close) bmp.close();
+  // PNG stays PNG: a drawing with transparency would turn black as JPEG.
+  const png = ext === 'png';
+  const blob = await new Promise(r => canvas.toBlob(r, png ? 'image/png' : 'image/jpeg', 0.88));
+  if (!blob) return file;
+  return new File([blob], png ? file.name : file.name.replace(/\.[^.]+$/, '') + '.jpg', {type: blob.type});
+}
+
+// The path carries the analysis id, so the row has to exist before the first
+// upload. Shared, so three files dropped at once create one row and not three.
+async function _ensureAnalysisRow() {
+  if (currentAnalysisId) return currentAnalysisId;
+  if (!_ensuringRow) {
+    _ensuringRow = (async () => {
+      for (let i = 0; i < 4 && !currentAnalysisId; i++) {
+        await autoSave();
+        if (!currentAnalysisId) await new Promise(r => setTimeout(r, 600));
+      }
+      return currentAnalysisId;
+    })().finally(() => { _ensuringRow = null; });
+  }
+  return _ensuringRow;
+}
+
+function uploadAttachments(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  if (!HAS_SUPABASE || !supabaseClient || !currentUser) {
+    addMsg('Logga in för att bifoga filer.', 'system');
+    return;
+  }
+  files.forEach(file => {
+    const p = _uploadOne(file);
+    _uploadsInFlight.push(p);
+    p.finally(() => { _uploadsInFlight = _uploadsInFlight.filter(x => x !== p); });
+  });
+}
+
+async function _uploadOne(original) {
+  const key = 'u' + Math.random().toString(36).slice(2);
+  const fail = (error) => {
+    _uploading.delete(key);
+    _failedUploads.push({key, name: original.name, error});
+    renderAttachmentTray();
+  };
+  const problem = attachmentCheck(original);
+  if (problem) return fail(problem);
+  if ((state.attachments || []).length + _uploading.size >= ATTACH_MAX_FILES) {
+    return fail('Högst ' + ATTACH_MAX_FILES + ' filer per analys. Ta bort någon först.');
+  }
+  _uploading.set(key, original.name);
+  renderAttachmentTray();
+  const bucket = supabaseClient.storage.from(ATTACH_BUCKET);
+  try {
+    const aid = await _ensureAnalysisRow();
+    if (!aid) return fail('Analysen gick inte att spara, så filen har ingenstans att ligga. Försök igen.');
+    const file = await _scaleImage(original);
+    const ext = _attExt(file.name);
+    const id = crypto.randomUUID();
+    const path = currentUser.id + '/' + aid + '/' + id + '-' + _attSafeName(file.name);
+    const up = await bucket.upload(path, file, {contentType: ATTACH_TYPES[ext], upsert: false});
+    if (up.error) return fail('Uppladdningen misslyckades: ' + (up.error.message || 'okänt fel') + '.');
+    // Read it once now, so a broken or oversized file is refused while the user
+    // is still looking at it and not three messages later.
+    const r = await authFetch('/api/attachments/check', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({attachment: {path, name: file.name}})});
+    const d = await r.json();
+    if (d.error) {
+      await bucket.remove([path]);
+      const prefix = file.name + ': ';
+      return fail(d.error.indexOf(prefix) === 0 ? d.error.slice(prefix.length) : d.error);
+    }
+    // Switched project while this was uploading: it belongs to the analysis the
+    // user left, which is not loaded, so it goes rather than lingers unseen.
+    if (currentAnalysisId !== aid) { await bucket.remove([path]); _uploading.delete(key); renderAttachmentTray(); return; }
+    state.attachments = (state.attachments || []).concat([{
+      id, name: file.name, mime: ATTACH_TYPES[ext], size: file.size, path,
+      added_at: new Date().toISOString(), pages: d.pages || null,
+    }]);
+    _pendingAttachmentIds.push(id);
+    _uploading.delete(key);
+    renderAttachmentTray();
+    if (d.note) {
+      const kept = d.note.replace(/^\[Avkortat:\s*/, '').replace(/\]$/, '');
+      addMsg('Aida läser bara början av ' + esc(file.name) + ' eftersom den är lång: ' + esc(kept), 'system');
+    }
+    scheduleAutoSave();
+  } catch (e) {
+    console.error('Attachment upload failed:', e);
+    fail('Uppladdningen misslyckades. Kontrollera nätverket och försök igen.');
+  }
+}
+
+async function removeAttachment(id) {
+  const a = (state.attachments || []).find(x => x.id === id);
+  if (!a) return;
+  state.attachments = state.attachments.filter(x => x.id !== id);
+  _pendingAttachmentIds = _pendingAttachmentIds.filter(x => x !== id);
+  renderAttachmentTray();
+  document.querySelectorAll('.msg-atts .att-chip[data-att-id="' + id + '"]').forEach(_markChipRemoved);
+  scheduleAutoSave();
+  try {
+    const res = await supabaseClient.storage.from(ATTACH_BUCKET).remove([a.path]);
+    if (res && res.error) console.error('Attachment delete failed:', res.error);
+  } catch (e) { console.error('Attachment delete failed:', e); }
+}
+
+function dismissFailedUpload(key) {
+  _failedUploads = _failedUploads.filter(f => f.key !== key);
+  renderAttachmentTray();
+}
+
+function _attChip(opts) {
+  const chip = document.createElement('span');
+  chip.className = 'att-chip' + (opts.cls ? ' ' + opts.cls : '');
+  if (opts.id) chip.dataset.attId = opts.id;
+  chip.innerHTML = /^image\//.test(opts.mime || '') ? ATT_ICON_IMG : ATT_ICON_DOC;
+  const name = document.createElement('span');
+  name.className = 'att-name';
+  name.textContent = opts.name;
+  name.title = opts.name;
+  chip.appendChild(name);
+  if (opts.meta) {
+    const meta = document.createElement('span');
+    meta.className = 'att-meta';
+    meta.textContent = opts.meta;
+    chip.appendChild(meta);
+  }
+  if (opts.onRemove) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '×';
+    btn.setAttribute('aria-label', opts.removeLabel);
+    btn.title = opts.removeLabel;
+    btn.onclick = opts.onRemove;
+    chip.appendChild(btn);
+  }
+  return chip;
+}
+
+function _attMeta(a) {
+  let meta = _attSize(a.size || 0);
+  if (a.pages) meta += ', ' + a.pages + (a.pages === 1 ? ' sida' : ' sidor');
+  return meta;
+}
+
+function renderAttachmentTray() {
+  const tray = document.getElementById('attTray');
+  if (!tray) return;
+  tray.innerHTML = '';
+  (state.attachments || []).forEach(a => tray.appendChild(_attChip({
+    name: a.name, mime: a.mime, meta: _attMeta(a),
+    removeLabel: 'Ta bort ' + a.name, onRemove: () => removeAttachment(a.id)})));
+  _uploading.forEach(name => tray.appendChild(_attChip({name, meta: 'Laddar upp…', cls: 'uploading'})));
+  _failedUploads.forEach(f => tray.appendChild(_attChip({
+    name: f.name, meta: f.error, cls: 'failed',
+    removeLabel: 'Stäng', onRemove: () => dismissFailedUpload(f.key)})));
+}
+
+function _markChipRemoved(chip) {
+  chip.classList.add('removed');
+  let meta = chip.querySelector('.att-meta');
+  if (!meta) { meta = document.createElement('span'); meta.className = 'att-meta'; chip.appendChild(meta); }
+  meta.textContent = 'borttagen';
+}
+
+// The files a message carried, drawn in its bubble. A file removed since then
+// stays listed, struck through: the transcript records what was sent.
+function msgAttachmentsEl(list) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-atts';
+  const live = new Set((state.attachments || []).map(a => a.id));
+  list.forEach(a => {
+    const chip = _attChip({id: a.id, name: a.name, mime: a.mime});
+    if (!live.has(a.id)) _markChipRemoved(chip);
+    wrap.appendChild(chip);
+  });
+  return wrap;
+}
+
+function setupAttachmentInputs() {
+  if (!HAS_SUPABASE) return;
+  const panel = document.querySelector('.chat-container');
+  const input = document.getElementById('userInput');
+  if (!panel || !input) return;
+  const hasFiles = e => !!(e.dataTransfer && Array.from(e.dataTransfer.types || []).indexOf('Files') !== -1);
+  let depth = 0;
+  panel.addEventListener('dragenter', e => { if (!hasFiles(e)) return; e.preventDefault(); depth++; panel.classList.add('dropping'); });
+  panel.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  panel.addEventListener('dragleave', e => { if (!hasFiles(e)) return; depth = Math.max(0, depth - 1); if (!depth) panel.classList.remove('dropping'); });
+  panel.addEventListener('drop', e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); depth = 0; panel.classList.remove('dropping');
+    uploadAttachments(e.dataTransfer.files);
+  });
+  // A file dropped beside the panel would otherwise replace the whole app with it.
+  window.addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault(); });
+  window.addEventListener('drop', e => { if (hasFiles(e)) e.preventDefault(); });
+  input.addEventListener('paste', e => {
+    const files = e.clipboardData && e.clipboardData.files;
+    if (files && files.length) { e.preventDefault(); uploadAttachments(files); }
+  });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupAttachmentInputs);
+else setupAttachmentInputs();
+
 async function sendMessage() {
   const input = document.getElementById('userInput');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
+  if (!input.value.trim() && !_pendingAttachmentIds.length && !_uploadsInFlight.length) return;
   // Same gesture window as confirmStep: a chat message can kick off a rerun
-  // that takes just as long as a first run.
+  // that takes just as long as a first run. Before any await, or the browser
+  // no longer counts it as the click that asked.
   maybeAskForNotifications();
+  // A file still uploading belongs to this message, not the next one.
+  if (_uploadsInFlight.length) {
+    setLoading(true);
+    await Promise.allSettled(_uploadsInFlight);
+    setLoading(false);
+  }
+  let text = input.value.trim();
+  const sentFiles = (state.attachments || []).filter(a => _pendingAttachmentIds.indexOf(a.id) !== -1)
+    .map(a => ({id: a.id, name: a.name, mime: a.mime}));
+  if (!text && !sentFiles.length) return;
+  if (!text) text = 'Bifogat: ' + sentFiles.map(a => a.name).join(', ');
+  _pendingAttachmentIds = [];
+  input.value = '';
   // Keep the entry: whether this message becomes a turn the model remembers
   // depends on which branch below handles it (advisory and chat do, intake and
   // "kör vidare" do not — same split the in-memory chatHistory had).
-  const userEntry = addMsg(text, 'user');
+  const userEntry = addMsg(text, 'user', undefined, sentFiles);
   setLoading(true);
 
   // Detect "advance to next step" intent at confirmation gates
@@ -3117,7 +3531,7 @@ async function runIntake(desc) {
   addMsg('Analyserar projektbeskrivning...', 'system');
   setProgressStep('planering');
   try {
-    const r = await authFetch('/api/intake', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({description: desc})});
+    const r = await authFetch('/api/intake', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({description: desc, attachments: attachmentRefs()})});
     const d = await r.json();
     if (d.error) { addMsg('Fel: ' + d.error, 'system'); setLoading(false); return; }
 
@@ -3599,6 +4013,7 @@ async function routeMessage(text) {
     baseline: state.baseline || null,
     alternatives: state.alternatives || null,
     selections: (state.selections && Object.keys(state.selections).length) ? state.selections : null,
+    attachments: attachmentRefs(),
   };
   const r = await authFetch('/api/route', {method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(body)});
@@ -3629,6 +4044,7 @@ async function runChat(text, userEntry) {
       // material change made in the chat drops a stale manual figure exactly
       // as the same change made in a cell does.
       overrides: state.overrides,
+      attachments: attachmentRefs(),
     };
     const r = await authFetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(body)});
@@ -5657,6 +6073,9 @@ async function autoSave() {
     // intake has run, and following up a job Aida never calculated is a normal
     // case, not an edge one.
     as_built_data: Object.keys(state.as_built || {}).length ? state.as_built : null,
+    // Own column (§14.3), and null when the last file is removed so the row
+    // stops pointing at files that are gone.
+    attachments_data: (state.attachments && state.attachments.length) ? state.attachments : null,
     property_ref: state.propertyRef || null,
     // The month input gives 'YYYY-MM'; the column is a DATE, so anchor it to the
     // first of the month. We only ever show the month back, so the day is a
@@ -5949,8 +6368,13 @@ async function loadAnalysis(id) {
     // one project's numbers under another project's name.
     state.as_built = data.as_built_data || {};
     state.followup = null;
+    // Before restoreUI, which draws the transcript's file chips against this list.
+    state.attachments = Array.isArray(data.attachments_data) ? data.attachments_data : [];
+    _pendingAttachmentIds = [];
+    _failedUploads = [];
     document.getElementById('projectName').textContent = data.name || 'Nytt projekt';
     restoreUI();
+    renderAttachmentTray();
     await loadAnalysesList();
   } catch(e) { console.error('Failed to load analysis:', e); }
 }
@@ -5989,6 +6413,7 @@ function restoreUI() {
       d.className = 'msg ' + m.cls;
       if (m.cls === 'bot' || m.cls === 'system') { d.innerHTML = renderMd(m.text); }
       else { d.textContent = m.text; }
+      if (Array.isArray(m.attachments) && m.attachments.length) d.appendChild(msgAttachmentsEl(m.attachments));
       // Restore confirm buttons for current step only
       if (m.confirm && (
         (state.step === 'intake_done' && m.confirm.btnLabel.includes('baslinje')) ||
@@ -6050,6 +6475,11 @@ function createNewProject() {
   state.followup = null;
   state.propertyRef = '';
   state.plannedStart = '';
+  // The previous project keeps its files; this one starts with none.
+  state.attachments = [];
+  _pendingAttachmentIds = [];
+  _failedUploads = [];
+  renderAttachmentTray();
   document.getElementById('projectName').textContent = 'Nytt projekt';
   ['projekt','baslinje','alternativ','rapport'].forEach(t => {
     const el = document.getElementById('tab-' + t); if (el) el.disabled = true;

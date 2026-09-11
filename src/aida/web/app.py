@@ -592,194 +592,43 @@ def api_report_docx():
     markdown = data.get('markdown', '')
     if not markdown:
         return jsonify({'error': 'Markdown saknas'}), 400
+    return _docx_response(markdown, 'Aida_rapport', 'Word-exporten')
+
+
+@app.route('/api/sheet/docx', methods=['POST'])
+@require_auth
+def api_sheet_docx():
+    """The open sheet in Chatt as a Word document (§13.8), written from the sheet
+    and from the calculation as the browser shows it, overrides included."""
+    from aida.sheet_export import sheet_markdown
+
+    data = request.json or {}
+    if not isinstance(data.get('sheet'), dict):
+        return jsonify({'error': 'Bladet saknas'}), 400
+    try:
+        markdown = sheet_markdown(data['sheet'], data.get('state'))
+    except Exception as e:
+        return step_failed(e, 'Word-exporten av bladet')
+    return _docx_response(markdown, 'Aida_blad', 'Word-exporten av bladet')
+
+
+def _docx_response(markdown: str, stem: str, step: str):
+    """One converter for the report and the sheet, so both leave Aida alike."""
+    from datetime import date
 
     try:
-        import io
-        import re
-        from datetime import date
-
-        from docx import Document
-        from docx.enum.table import WD_TABLE_ALIGNMENT
-        from docx.enum.text import WD_ALIGN_PARAGRAPH
-        from docx.shared import Cm, Pt, RGBColor
-
-        BRAND_BLUE = RGBColor(0x4A, 0x90, 0xD9)
-        GRAY_66 = RGBColor(0x66, 0x66, 0x66)
-        GRAY_99 = RGBColor(0x99, 0x99, 0x99)
-        HEADER_BG = "4A90D9"
-
-        doc = Document()
-
-        # Page margins
-        for section in doc.sections:
-            section.top_margin = Cm(2.5)
-            section.bottom_margin = Cm(2)
-            section.left_margin = Cm(2.5)
-            section.right_margin = Cm(2.5)
-
-        # Base style
-        style = doc.styles['Normal']
-        style.font.name = 'Calibri'
-        style.font.size = Pt(11)
-        style.paragraph_format.space_after = Pt(6)
-
-        # Heading styles
-        for level in range(1, 4):
-            h_style = doc.styles[f'Heading {level}']
-            h_style.font.color.rgb = RGBColor(0x2C, 0x3E, 0x50)
-
-        # Aida branding header
-        header_p = doc.add_paragraph()
-        header_p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-        run = header_p.add_run('Aida')
-        run.bold = True
-        run.font.size = Pt(10)
-        run.font.color.rgb = BRAND_BLUE
-        run = header_p.add_run('  |  Klimatberäkning av ombyggnad')
-        run.font.size = Pt(10)
-        run.font.color.rgb = GRAY_66
-
-        active_table = None
-        table_is_first_row = False
-
-        def _add_rich_runs(paragraph, text):
-            """Parse inline markdown (bold, italic) into runs on a paragraph."""
-            # Split on bold (**text**) and italic (*text*) markers
-            parts = re.split(r'(\*\*[^*]+?\*\*|\*[^*]+?\*)', text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    r = paragraph.add_run(part[2:-2])
-                    r.bold = True
-                elif part.startswith('*') and part.endswith('*') and len(part) > 2:
-                    r = paragraph.add_run(part[1:-1])
-                    r.italic = True
-                else:
-                    paragraph.add_run(part)
-
-        def _add_rich_paragraph(text, style_name=None):
-            """Add paragraph with bold/italic markdown spans preserved."""
-            p = doc.add_paragraph(style=style_name)
-            _add_rich_runs(p, text)
-            return p
-
-        def _style_header_cell(cell):
-            """Apply white-on-blue header styling to a table cell."""
-            from docx.oxml.ns import qn
-            shading = cell._element.find(qn('w:tcPr'))
-            if shading is None:
-                tc_pr = cell._element.makeelement(qn('w:tcPr'), {})
-                cell._element.insert(0, tc_pr)
-            else:
-                tc_pr = shading
-            shading_el = tc_pr.makeelement(qn('w:shd'), {
-                qn('w:val'): 'clear',
-                qn('w:color'): 'auto',
-                qn('w:fill'): HEADER_BG,
-            })
-            tc_pr.append(shading_el)
-            for paragraph in cell.paragraphs:
-                for r in paragraph.runs:
-                    r.bold = True
-                    r.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-                    r.font.size = Pt(10)
-
-        for line in markdown.split('\n'):
-            stripped = line.strip()
-
-            if stripped.startswith('#### '):
-                active_table = None
-                p = doc.add_paragraph()
-                run = p.add_run(stripped[5:])
-                run.bold = True
-                run.font.size = Pt(11)
-            elif stripped.startswith('### '):
-                active_table = None
-                doc.add_heading(stripped[4:], level=3)
-            elif stripped.startswith('## '):
-                active_table = None
-                doc.add_heading(stripped[3:], level=2)
-            elif stripped.startswith('# '):
-                active_table = None
-                doc.add_heading(stripped[2:], level=1)
-            elif stripped.startswith('- ') or stripped.startswith('* '):
-                active_table = None
-                _add_rich_paragraph(stripped[2:], style_name='List Bullet')
-            elif re.match(r'^\d+\.\s', stripped):
-                active_table = None
-                text = re.sub(r'^\d+\.\s', '', stripped)
-                _add_rich_paragraph(text, style_name='List Number')
-            elif stripped.startswith('|') and '|' in stripped[1:]:
-                # Split on unescaped pipes only. A "|" inside a cell is written
-                # as "\|" by report.cell(), because a row that splits into the
-                # wrong number of cells used to be dropped without a word - and
-                # the rows most likely to contain a pipe are the appendix rows
-                # that disclose a figure is not Aida's.
-                cells = [
-                    c.strip().replace('\\|', '|')
-                    for c in re.split(r'(?<!\\)\|', stripped)[1:-1]
-                ]
-                # Skip separator rows (|---|---|)
-                if cells and all(set(c) <= {'-', ':', ' '} for c in cells):
-                    continue
-                if cells:
-                    if active_table is None:
-                        active_table = doc.add_table(rows=0, cols=len(cells))
-                        active_table.style = 'Table Grid'
-                        active_table.alignment = WD_TABLE_ALIGNMENT.CENTER
-                        table_is_first_row = True
-                    # Fit rather than drop. A row we cannot place is still a row
-                    # the reader was meant to see, so a mismatch loses at most
-                    # the layout, never the disclosure.
-                    ncols = len(active_table.columns)
-                    if len(cells) > ncols:
-                        cells = cells[:ncols - 1] + [' '.join(cells[ncols - 1:])]
-                    elif len(cells) < ncols:
-                        cells = cells + [''] * (ncols - len(cells))
-                    if len(cells) == ncols:
-                        row = active_table.add_row()
-                        for i, cell_text in enumerate(cells):
-                            cell_text = re.sub(r'\*\*(.+?)\*\*', r'\1', cell_text)
-                            row.cells[i].text = cell_text
-                            # Smaller font in table cells
-                            for paragraph in row.cells[i].paragraphs:
-                                for r in paragraph.runs:
-                                    r.font.size = Pt(10)
-                            if table_is_first_row:
-                                _style_header_cell(row.cells[i])
-                        table_is_first_row = False
-            elif stripped == '':
-                active_table = None
-            elif stripped.startswith('---') or stripped.startswith('***'):
-                # Horizontal rule -- skip
-                active_table = None
-            else:
-                active_table = None
-                _add_rich_paragraph(stripped)
-
-        # Footer with disclaimer
-        doc.add_paragraph()
-        footer_p = doc.add_paragraph()
-        footer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = footer_p.add_run('Genererad av Aida | AI-stödd klimatanalys för ombyggnadsprojekt')
-        run.font.size = Pt(8)
-        run.font.color.rgb = GRAY_99
-
-        buf = io.BytesIO()
-        doc.save(buf)
-        buf.seek(0)
-
-        today = date.today().strftime('%Y-%m-%d')
-        filename = f'Aida_rapport_{today}.docx'
-
-        return Response(
-            buf.getvalue(),
-            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            headers={'Content-Disposition': f'attachment; filename={filename}'},
-        )
+        from aida.docx_export import markdown_to_docx
+        body = markdown_to_docx(markdown)
     except ImportError:
         return jsonify({'error': 'python-docx är inte installerat på servern'}), 500
     except Exception as e:
-        return step_failed(e, 'Word-exporten')
+        return step_failed(e, step)
+    filename = f"{stem}_{date.today().strftime('%Y-%m-%d')}.docx"
+    return Response(
+        body,
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        headers={'Content-Disposition': f'attachment; filename={filename}'},
+    )
 
 
 @app.route('/api/route', methods=['POST'])
@@ -6302,8 +6151,41 @@ function openSheetHtml(sheet, st) {
       + esc(sheetDraft.value) + '</textarea>'
       + '<div class="note-actions"><button type="button" class="btn" onclick="saveNote()">Spara</button> '
       + '<button type="button" class="btn btn-secondary" onclick="cancelSheetEdit()">Avbryt</button></div>'
-    : '<button class="btn btn-secondary" onclick="startNote()">Lägg till anteckning</button>') + '</div>';
+    : '<button class="btn btn-secondary" onclick="startNote()">Lägg till anteckning</button>'
+      + (blocks.some(b => b.type !== 'suggestion')
+        ? ' <button type="button" class="btn btn-secondary" onclick="downloadSheetDocx(this)">Ladda ner som Word</button>'
+        : '')) + '</div>';
   return html + '</div>';
+}
+
+// The sheet as a Word document (§13.8). The server writes it from the sheet and
+// from the calculation as it is shown here, overrides laid on, so the document
+// says what the screen says. A suggestion Aida has not had accepted stays out.
+async function downloadSheetDocx(btn) {
+  if (!state.sheet) return;
+  const st = effectiveState(state);
+  btn.disabled = true;
+  btn.textContent = 'Skapar dokument...';
+  try {
+    const r = await authFetch('/api/sheet/docx', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({sheet: state.sheet, state: {project: st.project, baseline: st.baseline,
+        alternatives: st.alternatives, selections: st.selections, reportMarkdown: st.reportMarkdown}})});
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      addMsg('Word-dokumentet gick inte att skapa: ' + esc(d.error || ('fel ' + r.status)), 'system');
+      return;
+    }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Aida_blad_' + new Date().toISOString().slice(0, 10) + '.docx';
+    a.click();
+  } catch (e) {
+    addMsg('Word-dokumentet gick inte att skapa: ' + esc(e.message), 'system');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Ladda ner som Word';
+  }
 }
 
 function startNote() {

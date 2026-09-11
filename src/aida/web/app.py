@@ -1984,8 +1984,16 @@ html { scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent; }
    a superscript number, explained under its block. Those notes are a sequence,
    which is the one reason anything here is numbered. Estimates reuse the badge
    the tables already use for Est., so one mark means one thing across Aida. */
-.open-sheet { max-width: 72ch; }
+/* Text keeps a reading measure. The calculation's sections do not: their tables
+   need the width they have in Stegvis, and they sit on the same 12px edge. A
+   section is set off like one on the Stegvis sheet, by space and a hairline, and
+   so are the sections still waiting after the sheet. */
+.open-sheet { padding: 0 12px; }
+.open-sheet > .sheet-block:not(.sheet-block-model), .open-sheet > .sheet-add, .open-sheet > .sheet-empty { max-width: 72ch; }
 .sheet-block + .sheet-block { margin-top: 22px; }
+.sheet-block-model > .sheet { padding: 0; }
+.sheet-block + .sheet-block-model, .sheet-block-model + .sheet-block, .open-sheet + .sheet {
+  margin-top: 32px; padding-top: 28px; border-top: 1px solid var(--kk-gray-200); }
 .sheet-text { font-size: 13.5px; line-height: 1.6; color: var(--kk-charcoal); }
 .sheet-text h1, .sheet-text h2, .sheet-text h3 { font-size: 14px; font-weight: 600; margin: 14px 0 6px; }
 .sheet-text > :first-child { margin-top: 0; }
@@ -5959,7 +5967,10 @@ function sectionsForMode() {
 // the click starts minutes of work. The sheet needs the same: it is not redrawn
 // until the run returns, so a second click would start a second pipeline against
 // the same analysis. The redraw discards this disabled state, which is correct.
+// A run started while Aida answers would put its section on a sheet her reply is
+// about to replace, so it waits like every other change to the sheet (§13.5).
 function sheetAction(btn, fn) {
+  if (_sheetBusy()) return;
   btn.disabled = true;
   btn.style.opacity = '0.5';
   maybeAskForNotifications();
@@ -6016,15 +6027,46 @@ let sheetDraft = null;
 // The sheet Aida sends back was read from the one sent with the question. A note
 // written while she was answering is not in it, so it is carried over, with a new
 // id if one of her blocks took the old one.
+// A section of the calculation placed here in the meantime is carried over too,
+// where it stood rather than last, and never twice. What is carried over gets a
+// new id, since one minted here can repeat one she minted in the same turn, and
+// a section is placed after what preceded it by that new id.
 function mergeSheet(incoming, local) {
   const sheet = {title: incoming.title || '', seq: incoming.seq || 0, blocks: incoming.blocks.slice()};
   const kept = new Set(sheet.blocks.filter(b => b.author === 'user').map(b => b.id));
-  ((local && local.blocks) || []).forEach(b => {
+  const placed = new Map(sheet.blocks.filter(b => b.type === 'model').map(b => [(b.content || {}).section, b.id]));
+  const renamed = new Map();
+  const mine = (local && local.blocks) || [];
+  mine.forEach((b, i) => {
+    if (b.type === 'model') {
+      const section = (b.content || {}).section;
+      if (placed.has(section)) { renamed.set(b, placed.get(section)); return; }
+      sheet.seq = Math.max(sheet.seq, maxBlockId(sheet)) + 1;
+      const before = mine.slice(0, i).map(p => renamed.has(p) ? {id: renamed.get(p)} : p);
+      sheet.blocks.splice(_placeAfter(sheet, before), 0, Object.assign({}, b, {id: 'b' + sheet.seq}));
+      renamed.set(b, 'b' + sheet.seq);
+      return;
+    }
     if (b.author !== 'user' || kept.has(b.id)) return;
     sheet.seq = Math.max(sheet.seq, maxBlockId(sheet)) + 1;
     sheet.blocks.push(Object.assign({}, b, {id: 'b' + sheet.seq}));
+    renamed.set(b, 'b' + sheet.seq);
   });
   return sheet;
+}
+
+// Right after the nearest of `before` that Aida's sheet has, past any suggestion
+// for it; at the end when there is none.
+function _placeAfter(sheet, before) {
+  for (let k = before.length - 1; k >= 0; k--) {
+    const at = sheet.blocks.findIndex(s => s.id === before[k].id);
+    if (at < 0) continue;
+    let pos = at + 1;
+    while (pos < sheet.blocks.length && sheet.blocks[pos].type === 'suggestion'
+           && (sheet.blocks[pos].content || {}).target === before[k].id) pos++;
+    return pos;
+  }
+  return sheet.blocks.length;
 }
 
 function _claimsById(block) {
@@ -6100,8 +6142,9 @@ function blockBodyHtml(block) {
   return body + claimNotesHtml(byId, numbering);
 }
 
-function sheetBlockHtml(block) {
+function sheetBlockHtml(block, st) {
   if (block.type === 'suggestion') return suggestionHtml(block);
+  if (block.type === 'model') return modelBlockHtml(block, st);
   const editing = !!sheetDraft && sheetDraft.id === block.id && SHEET_ID_RE.test(String(block.id))
     && ['text', 'table', 'note'].includes(block.type);
   const body = editing ? blockEditorHtml(block) : blockBodyHtml(block);
@@ -6110,6 +6153,43 @@ function sheetBlockHtml(block) {
     ? '<div class="sheet-block-who sheet-block-edited">Ändrad av dig</div>' : '';
   return '<div class="sheet-block sheet-block-' + block.type + '" id="blk-' + esc(block.id) + '">'
     + (editing ? '' : blockActionsHtml(block)) + edited + body + '</div>';
+}
+
+// A section of the calculation, drawn from AnalysisState by the same renderer
+// as in Stegvis (§13.6). The block only holds its place on the sheet. It has no
+// buttons: it changes when the calculation does, and it would come straight
+// back if removed. A section that has lost its content, as alternatives do on a
+// full baseline rerun, shows what it is waiting for, with the button to get it.
+function modelBlockHtml(block, st) {
+  const sec = SHEET_SECTIONS.find(s => s.key === (block.content || {}).section);
+  if (!sec || !st) return '';
+  return '<div class="sheet-block sheet-block-model" id="blk-' + esc(block.id) + '">' + sheetHtml(st, [sec]) + '</div>';
+}
+
+// Each section with content stands once on the sheet. It is put last when it
+// first has content and stays there, so what Aida writes after it follows it.
+// An analysis from before the sheet gets its sections the same way, in
+// SHEET_SECTIONS order. They are derived on every load and saved with the next
+// change, never merely because the analysis was opened.
+function withModelBlocks(sheet, st) {
+  const base = (sheet && Array.isArray(sheet.blocks)) ? sheet : emptySheet();
+  const placed = new Set(base.blocks.filter(b => b.type === 'model').map(b => (b.content || {}).section));
+  const missing = SHEET_SECTIONS.filter(sec => sec.has(st) && !placed.has(sec.key));
+  if (!missing.length) return base;
+  const out = {title: base.title || '', seq: Math.max(base.seq || 0, maxBlockId(base)), blocks: base.blocks.slice()};
+  missing.forEach(sec => {
+    out.seq += 1;
+    out.blocks.push({id: 'b' + out.seq, type: 'model', author: 'aida', user_edited: false,
+                     content: {section: sec.key}, claims: [], at: new Date().toISOString()});
+  });
+  return out;
+}
+
+// The sections not yet on the sheet, shown after it as they are in Stegvis, so
+// the next step's button is there once a project exists.
+function sectionsLeft(sheet) {
+  const placed = new Set(((sheet && sheet.blocks) || []).filter(b => b.type === 'model').map(b => (b.content || {}).section));
+  return SHEET_SECTIONS.filter(sec => !placed.has(sec.key));
 }
 
 // Plain words, not icons: the label says what happens. A quote is the source's
@@ -6209,14 +6289,14 @@ function _figuresAt(text, figure) {
   return found;
 }
 
-function openSheetHtml(sheet) {
+function openSheetHtml(sheet, st) {
   const blocks = (sheet && Array.isArray(sheet.blocks)) ? sheet.blocks : [];
   let html = '<div class="open-sheet">';
   if (!blocks.length) {
     html += '<div class="sheet-empty"><p>Bladet är tomt. Ställ en fråga i chatten, så skriver Aida svaret här, '
       + 'med källa för varje tal eller en märkt uppskattning. Du kan också skriva egna anteckningar.</p></div>';
   }
-  html += blocks.map(b => sheetBlockHtml(b)).join('');
+  html += blocks.map(b => sheetBlockHtml(b, st)).join('');
   html += '<div class="sheet-add">' + (sheetDraft && sheetDraft.id === 'new'
     ? '<textarea class="note-input" rows="3" placeholder="Skriv en anteckning" oninput="sheetDraft.value = this.value">'
       + esc(sheetDraft.value) + '</textarea>'
@@ -6382,15 +6462,16 @@ function addNote(text) {
 
 function renderSheet() {
   const st = effectiveState(state);
-  // Chatt is the open sheet (§13.6). Until step 5 turns them into model blocks, a
-  // project's sections follow the free blocks, so an analysis worked in Chatt
-  // before the sheet existed still shows its figures.
-  // Aida's reply redraws the sheet. An open editor keeps its text through
+  // Chatt is the open sheet (§13.6): the calculation's sections that have content
+  // are model blocks on it, and the ones still waiting follow it once a project
+  // exists. Aida's reply redraws the sheet. An open editor keeps its text through
   // sheetDraft, and the caret comes back to it too.
+  if (isDoc()) state.sheet = withModelBlocks(state.sheet, st);
   const active = document.activeElement;
   const typing = !!sheetDraft && !!active && typeof active.closest === 'function' && !!active.closest('.open-sheet');
+  const left = isDoc() ? sectionsLeft(state.sheet) : [];
   document.getElementById('resultContent').innerHTML = isDoc()
-    ? openSheetHtml(state.sheet) + (st.project ? sheetHtml(st, SHEET_SECTIONS) : '')
+    ? openSheetHtml(state.sheet, st) + (st.project && left.length ? sheetHtml(st, left) : '')
     : sheetHtml(st, sectionsForMode());
   if (typing) {
     const field = document.querySelector('.open-sheet textarea, .open-sheet .sheet-cell-input');

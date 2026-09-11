@@ -34,10 +34,15 @@ from aida import claims as claims_mod
 from aida import knowledge
 
 # A suggestion is Aida's change to a block the user has edited, waiting beside
-# it for the user to accept or decline (§13.5).
-BLOCK_TYPES = ("text", "table", "quote", "note", "suggestion")
+# it for the user to accept or decline (§13.5). A model block is one of the
+# calculation's sections (§13.6), drawn from AnalysisState by the same renderer
+# as in Stegvis: the sheet only holds its place.
+BLOCK_TYPES = ("text", "table", "quote", "note", "suggestion", "model")
 # Notes are the user's. Aida answers in text, tables and quotes.
 AIDA_TYPES = ("text", "table", "quote")
+# The browser places a model block when its section first has content, in this order.
+MODEL_SECTIONS = {"projekt": "Projektinformation", "baslinje": "Baslinje",
+                  "alternativ": "Jämförelse per komponent", "rapport": "Rapport"}
 
 MAX_BLOCKS = 80
 TITLE_MAX = 160
@@ -230,6 +235,12 @@ def _suggest(sheet: dict, index: int, block: dict, content: dict, resolved: list
             f"Användaren godtar eller avböjer det."), True, {"sheet"}
 
 
+def _model_refusal(block: dict) -> str:
+    title = MODEL_SECTIONS.get(block["content"].get("section"), "beräkningen")
+    return (f"{block['id']} är sektionen {title} ur beräkningen. Den ritas ur projektets siffror och ändras "
+            f"genom att räkna om eller ändra projektet, inte med blockverktygen. Skriv ett eget block efter den.")
+
+
 def update_block(inp, sheet: dict) -> tuple[str, bool, set]:
     inp = inp if isinstance(inp, dict) else {}
     bid = inp.get("id")
@@ -245,6 +256,8 @@ def update_block(inp, sheet: dict) -> tuple[str, bool, set]:
     if block["type"] == "note":
         return _rejected([f"{bid} är användarens anteckning, och den ändrar inte Aida. "
                           f"Lägg ett eget block efter den i stället."])
+    if block["type"] == "model":
+        return _rejected([_model_refusal(block)])
     content = inp["content"] if "content" in inp else block["content"]
     # Claims left out keep the block's own. Resolved claims go back through
     # resolve unchanged, since normalize_claim drops the computed keys.
@@ -264,6 +277,8 @@ def remove_block(inp, sheet: dict) -> tuple[str, bool, set]:
     index, block = _find(sheet, bid)
     if block is None:
         return _rejected([f"Blocket {bid!r} finns inte."])
+    if block["type"] == "model":
+        return _rejected([_model_refusal(block)])
     if _users(block):
         return _rejected([f"{bid} har användaren skrivit eller ändrat, och det tar inte Aida bort."])
     del sheet["blocks"][index]
@@ -316,7 +331,8 @@ Användaren har ett blad bredvid chatten, och i det här läget hör svaret hemm
 - Ett tal med enhet som står direkt i texten avvisas, liksom en tabellcell med bara ett tal. Rätta det verktyget pekar ut och försök igen.
 - Citat läggs som quote med avsnittets id ur search_knowledge, och är hela meningar ordagrant.
 - Anteckningar är användarens, och dem rör du inte. Ett block användaren har ändrat skriver du inte heller över: update_block på det blir ett förslag bredvid, som användaren godtar eller avböjer. Ett tal användaren själv skrivit in blir ett påstående med basis user.
-- Rätta ett eget block med update_block i stället för att lägga en ny version bredvid."""
+- Rätta ett eget block med update_block i stället för att lägga en ny version bredvid.
+- Ett modellblock är en sektion ur beräkningen, till exempel baslinjen, och ritas ur projektets siffror. Du skriver inte i det och tar inte bort det. Vill du kommentera det, lägg ett eget block efter det med after."""
 
 
 def _summary(btype: str, content: dict) -> str:
@@ -325,6 +341,8 @@ def _summary(btype: str, content: dict) -> str:
         return f"tabell med kolumnerna {columns}, {len(content.get('rows', []))} rader"
     if btype == "quote":
         return f"citat ur {content.get('label', '')}"
+    if btype == "model":
+        return f"sektionen {MODEL_SECTIONS.get(content.get('section'), '')} ur beräkningen, med projektets siffror"
     what = " ".join(content.get("markdown", "").split())
     return what if len(what) <= 200 else what[:200] + " …"
 
@@ -370,6 +388,9 @@ def _clean_content(btype: str, raw: dict) -> dict:
         rows = [[_text(c, CELL_MAX) for c in row[:len(columns)]] + [""] * max(0, len(columns) - len(row))
                 for row in (raw.get("rows") or [])[:MAX_ROWS] if isinstance(row, list)]
         return {"columns": columns, "rows": rows}
+    if btype == "model":
+        section = raw.get("section")
+        return {"section": section if isinstance(section, str) and section in MODEL_SECTIONS else ""}
     sid = raw.get("section") if isinstance(raw.get("section"), str) else ""
     found = knowledge.section(sid)
     return {"text": _text(raw.get("text"), QUOTE_MAX), "section": sid,
@@ -407,6 +428,8 @@ def normalize_sheet(raw) -> dict:
         return empty_sheet()
     blocks: list[dict] = []
     seen: set[str] = set()
+    # Each section of the calculation stands once on a sheet (§13.6).
+    placed: set[str] = set()
     for b in raw.get("blocks") if isinstance(raw.get("blocks"), list) else []:
         if len(blocks) >= MAX_BLOCKS:
             break
@@ -421,12 +444,17 @@ def normalize_sheet(raw) -> dict:
         kind = content.get("type") if btype == "suggestion" else btype
         if btype == "suggestion" and kind not in AIDA_TYPES:
             continue
+        if btype == "model":
+            section = content.get("section")
+            if not isinstance(section, str) or section not in MODEL_SECTIONS or section in placed:
+                continue
+            placed.add(section)
         resolved, _ = _resolved(b.get("claims") if kind in ("text", "table") else [])
         blocks.append({
             "id": bid, "type": btype,
-            "author": "aida" if btype == "suggestion" else (
+            "author": "aida" if btype in ("suggestion", "model") else (
                 "user" if b.get("author") == "user" or btype == "note" else "aida"),
-            "user_edited": btype != "suggestion" and b.get("user_edited") is True,
+            "user_edited": btype not in ("suggestion", "model") and b.get("user_edited") is True,
             "content": _clean_content(btype, content),
             "claims": resolved,
             "at": _text(b.get("at"), 40),
@@ -512,7 +540,8 @@ SHEET_TOOLS = [
         "description": (
             "Ändra ett block. Aidas eget block ändras direkt, och utelämnade fält behåller sitt värde. På ett "
             "block användaren har ändrat blir ändringen ett förslag bredvid, som användaren godtar eller "
-            "avböjer; ett nytt förslag ersätter det förra. Anteckningar går inte att ändra."
+            "avböjer; ett nytt förslag ersätter det förra. Anteckningar och beräkningens sektioner "
+            "(modellblock) går inte att ändra."
         ),
         "input_schema": {
             "type": "object",
@@ -526,7 +555,8 @@ SHEET_TOOLS = [
     },
     {
         "name": "remove_block",
-        "description": "Ta bort ett block Aida skrivit, eller ett av hennes förslag. Användarens block går inte att ta bort.",
+        "description": ("Ta bort ett block Aida skrivit, eller ett av hennes förslag. Användarens block och "
+                        "beräkningens sektioner (modellblock) går inte att ta bort."),
         "input_schema": {
             "type": "object",
             "properties": {"id": {"type": "string"}},

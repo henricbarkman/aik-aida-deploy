@@ -50,6 +50,48 @@ BOVERKET_TO_AIDA: dict[str, str] = {
 }
 
 
+# Sanity bound on a kg -> functional-unit conversion, as a multiple of the
+# category's EPD typvärde for the target unit. Chosen from the catalog, not
+# from taste: the widest spread any (category, unit) bucket shows between its
+# typvärde and its own maximum is 15.5x (el per lm), then 13.0x (hiss per st),
+# 12.9x (golv keramik per kg), 10.6x (fasadskikt per m2); every other bucket
+# sits below 5x (measured 2026-09-14 over 1428 rows). Twenty therefore clears
+# every genuine product the catalog holds, while the failure it exists to
+# catch (a density read as an areal weight, a thickness assumed for a product
+# sold by the piece, a wrong material density) is off by 50x to 1000x. A
+# value above the bound is not a surprising product, it is a wrong unit.
+_CONVERSION_SANITY_FACTOR = 20
+
+
+def _conversion_is_implausible(
+    comp_key: str, co2e_per_unit: float, unit: str, product_name: str,
+) -> bool:
+    """True when a converted per-unit value exceeds the category typvärde by
+    more than _CONVERSION_SANITY_FACTOR. Logs why, so the fallback is visible.
+
+    Returns False when no flat typvärde exists for (category, unit): the
+    subcategorized categories (sanitet, belysning, vitvaror) have no
+    meaningful category-wide figure, and a guard with no yardstick must stay
+    open rather than guess.
+    """
+    from aida.data.epd_baseline_medians import get_baseline_typvärde
+
+    typ = get_baseline_typvärde(comp_key, _normalize_unit(unit))
+    if not typ:
+        return False
+    bound = typ["baseline_co2e_per_unit"] * _CONVERSION_SANITY_FACTOR
+    if co2e_per_unit <= bound:
+        return False
+    logger.warning(
+        "Unit conversion rejected for %r (%s): %.2f kg CO2e/%s is %.0fx the "
+        "%s typvärde %.2f (bound %dx); keeping the kg figure instead",
+        product_name, comp_key, co2e_per_unit, unit,
+        co2e_per_unit / typ["baseline_co2e_per_unit"], comp_key,
+        typ["baseline_co2e_per_unit"], _CONVERSION_SANITY_FACTOR,
+    )
+    return True
+
+
 def _match_boverket_category(boverket_cat: str) -> str | None:
     """Match a Boverket category name to an Aida component key."""
     cat_lower = boverket_cat.lower().strip()
@@ -283,6 +325,13 @@ class ClimateProvider:
         )
 
         if new_unit != "kg":
+            # A converted figure that dwarfs everything the catalog has seen
+            # for this category is a unit error, not a product. Keep the kg
+            # figure: downstream already handles a unit mismatch honestly,
+            # whereas a silently accepted 3 000 kg CO2e/m2 floor becomes the
+            # baseline and makes every alternative look miraculous.
+            if _conversion_is_implausible(comp_key, co2e_converted, new_unit, result.name):
+                return result
             return ClimateResult(
                 name=result.name,
                 co2e_per_unit=co2e_converted,
@@ -565,6 +614,8 @@ _SWEDISH_TO_ENGLISH: dict[str, list[str]] = {
     "golvmatta": ["vinyl flooring", "floor covering", "carpet"],
     "plastgolv": ["vinyl flooring", "pvc floor covering"],
     "plastmatta": ["vinyl flooring", "pvc floor covering"],
+    "textilmatta": ["carpet", "textile floor covering"],
+    "heltäckningsmatta": ["carpet", "textile floor covering"],
     "vinylgolv": ["vinyl flooring"],
     "linoleum": ["linoleum flooring"],
     "parkett": ["parquet flooring", "wood floor"],
@@ -594,6 +645,7 @@ _SWEDISH_TO_ENGLISH: dict[str, list[str]] = {
     # search to the right English term so a future EPD is found, and so the
     # raw Swedish name is not matched against unrelated bilingual EPD names).
     "tvättmaskin": ["washing machine"],
+    "värmepump": ["heat pump"],
     "diskmaskin": ["dishwasher"],
     "torktumlare": ["tumble dryer"],
     # Other

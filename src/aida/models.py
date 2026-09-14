@@ -220,6 +220,11 @@ class Alternative:
     # A GHG figure sits on a different basis than the rest of the table, so it
     # is labelled everywhere it appears.
     gwp_basis: str = ""
+    # Clickable deep link to the listing, for reuse rows. The source string
+    # ("[Palats] palats.app/listing/<id>") is an identifier the model copies and
+    # the id regex reads, not a URL anyone can open. "" for everything else and
+    # for analyses saved before 2026-09-14.
+    url: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)

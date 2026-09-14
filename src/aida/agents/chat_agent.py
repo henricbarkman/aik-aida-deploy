@@ -117,6 +117,7 @@ TOOLS = [
                         "golv", "innervägg", "yttervägg", "betongvägg", "tak",
                         "fönster", "dörr", "isolering", "belysning", "ventilation",
                         "hiss", "kylanläggning", "sanitet", "vitvaror", "storköksutrustning",
+                        "fast_inredning",
                     ],
                 },
             },
@@ -147,6 +148,7 @@ TOOLS = [
                         "golv", "innervägg", "yttervägg", "betongvägg", "tak",
                         "fönster", "dörr", "isolering", "belysning", "ventilation",
                         "hiss", "kylanläggning", "sanitet", "vitvaror", "storköksutrustning",
+                        "fast_inredning",
                     ],
                 },
                 "quantity_source": {

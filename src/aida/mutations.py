@@ -25,6 +25,7 @@ from __future__ import annotations
 
 from aida import followup as followup_mod
 from aida import overrides as overrides_mod
+from aida.data.climate_data import canonical_category
 
 
 def _find_component(project, component_id):
@@ -43,6 +44,40 @@ def _find_component_alternatives(alternatives, component_id):
         if c.get("component_id") == component_id:
             return c
     return None
+
+
+def _rescale_picks(chosen: dict, picks: list, factor: float) -> None:
+    """Scale a multi-pick selection to a new need, keeping whole units.
+
+    Each part keeps its per-unit figures and its share of the need, rounded to
+    whole units, and the last part takes the rest so the parts still add up to
+    the new need. Scaling every part's figures by `factor` would give the same
+    totals but leave fractional window counts on screen. Mirrors
+    allocatePicks/combinedSelection in the web UI.
+    """
+    old_need = sum(max(0.0, float(p.get("quantity") or 0)) for p in picks)
+    new_need = max(0, round(old_need * factor))
+    left = new_need
+    for idx, p in enumerate(picks):
+        old_q = max(0.0, float(p.get("quantity") or 0))
+        per_co2e = (p.get("co2e_kg") or 0) / old_q if old_q else 0
+        per_cost = (p.get("cost_sek") or 0) / old_q if old_q else 0
+        if idx == len(picks) - 1:
+            q = left
+        else:
+            q = min(max(0, round(old_q * factor)), max(0, left - (len(picks) - 1 - idx)))
+        left -= q
+        p["quantity"] = q
+        p["co2e_kg"] = per_co2e * q
+        p["cost_sek"] = per_cost * q
+    chosen["co2e_kg"] = sum(p["co2e_kg"] for p in picks)
+    unpriced = any(not (p["cost_sek"] > 0) and p["quantity"] > 0 for p in picks)
+    chosen["cost_sek"] = 0 if unpriced else sum(p["cost_sek"] for p in picks)
+    chosen["name"] = " + ".join(f"{p.get('name', '')} × {p['quantity']}" for p in picks)
+    if all(p.get("available_quantity") is not None for p in picks):
+        chosen["available_quantity"] = sum(
+            min(int(p["available_quantity"]), p["quantity"]) for p in picks
+        )
 
 
 def _scale_component_values(cid: str, factor: float, baseline, alternatives, selections) -> set[str]:
@@ -81,7 +116,10 @@ def _scale_component_values(cid: str, factor: float, baseline, alternatives, sel
         sel["baseline_co2e_kg"] = sel.get("baseline_co2e_kg", 0) * factor
         sel["baseline_cost_sek"] = sel.get("baseline_cost_sek", 0) * factor
         chosen = sel.get("selected_alternative") or {}
-        if chosen:
+        picks = chosen.get("picks") if isinstance(chosen, dict) else None
+        if isinstance(picks, list) and len(picks) > 1:
+            _rescale_picks(chosen, picks, factor)
+        elif chosen:
             chosen["co2e_kg"] = chosen.get("co2e_kg", 0) * factor
             chosen["cost_sek"] = chosen.get("cost_sek", 0) * factor
         touched.add("selections")
@@ -99,10 +137,16 @@ def _apply_update_component(inp, project, baseline, alternatives, selections, pe
     old_quantity = target.get("quantity")
     for key in ("name", "quantity", "unit", "category"):
         if key in inp and inp[key] is not None:
-            target[key] = inp[key]
-            changed[key] = inp[key]
+            value = canonical_category(inp[key]) if key == "category" else inp[key]
+            target[key] = value
+            changed[key] = value
     if not changed:
         return f"Ingen ändring angiven för {cid}.", False, set()
+
+    # A quantity someone typed is no longer Aida's estimate. Without this the
+    # badge next to an edited cell went on saying "Aida uppskattat".
+    if "quantity" in changed and old_quantity != target["quantity"]:
+        target["quantity_source"] = "user_specified"
 
     # If material identity changed (name/category), prior usage_context may no
     # longer match — better to clear it than carry stale functional requirements
@@ -191,7 +235,7 @@ def _apply_add_component(inp, project, baseline, alternatives, selections, pendi
         "name": name,
         "quantity": quantity,
         "unit": unit,
-        "category": inp.get("category") or "",
+        "category": canonical_category(inp.get("category")),
         # Component.__post_init__ normalises anything unexpected to "estimated",
         # so a wrong guess here degrades to the honest label rather than a lie.
         "quantity_source": source if source in ("user_specified", "estimated") else "estimated",

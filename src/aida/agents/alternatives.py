@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -59,7 +60,20 @@ _NORDIC_QUOTA = 5
 # Heterogeneous categories whose candidates are capped and filtered PER
 # subcategory (a toilet, a tap and a basin live in "sanitet" but are not
 # interchangeable alternatives). Mirrors epd_baseline_medians.
-_SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror"}
+_SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror", "fast_inredning"}
+
+# Smallest share of a component's need a Palats listing must cover to be shown
+# as a reuse alternative. A single door against a need of 70 (coverage 0.014)
+# was rendered as a full-quantity row, so the table said "70 återbrukade
+# dörrar" about a listing that could supply one. The figures are still
+# computed for the full need (Henric 2026-08-15: stock turns over before
+# procurement), which is exactly why a find that covers almost none of it is
+# misleading rather than merely optimistic. Starting point 0.2; below it the
+# listing is dropped from the table and reported in the log and, when nothing
+# else is shown, in an info row that carries the ratio. Unknown quantities
+# (Palats reports 0 when unstated, or the project counts in m2 and the listing
+# in articles) are never hidden: no data is not the same as no coverage.
+MIN_REUSE_COVERAGE = 0.2
 
 # Cheap, fast model for the retrieval router (same as the orchestrator's
 # intent classifier). Routing is a short structured-classification task.
@@ -74,39 +88,42 @@ Hjälpa förvaltare och byggledare att hitta renoveringslösningar som kraftigt 
 
 Du får:
 1. En komponent med baslinjevärde (Boverket Typical, konventionellt standardmaterial)
-2. En lista med FAKTISKA EPD:er (Environmental Product Declarations) från Environdec-databasen, med verifierade GWP-värden
+2. En lista med FAKTISKA EPD:er (Environmental Product Declarations) från Environdec-databasen, med verifierade GWP-värden. Rader märkta [EPD].
+3. Ibland också en lista med ÅTERBRUKSANNONSER från Palats, Karlstads kommuns interna marknadsplats för begagnat byggmaterial. Rader märkta [Palats återbruk]. De är redan filtrerade på produkttyp och lagersaldo innan du får dem.
 
 Din uppgift:
-1. Analysera EPD-listan och välj de 2-4 mest relevanta alternativen med lägre klimatpåverkan
-2. Beräkna total CO2e baserat på EPD-värdet × antal enheter
-3. Resonera om varför alternativet är bättre — beskriv BÅDE klimatvinsten och hur det uppfyller praktiska behov
+1. Rangordna EPD:er och Palats-annonser TILLSAMMANS i en lista. Återbruk och klimatoptimerat nyinköp är likvärdiga alternativ som ska vägas mot varandra på matchning, klimat, pris och praktiska behov.
+2. Välj de 2-4 mest relevanta EPD-alternativen, och ta med VARJE Palats-annons i listan om den inte är uppenbart fel produkt för komponenten.
+3. Beräkna total CO2e baserat på EPD-värdet × antal enheter. För Palats-annonser: använd de CO2e- och prissiffror som står på raden, räkna inte om dem.
+4. Resonera om varför varje alternativ är bättre eller sämre — beskriv BÅDE klimatvinsten och hur det uppfyller praktiska behov. Det gäller återbruk lika mycket som nyinköp: säg vad annonsen är, hur den passar komponenten, vad täckningen och priset betyder i praktiken och vad förvaltaren behöver kontrollera (skick, mått, antal) innan den kan räknas in.
 
 PRINCIPER FÖR ALTERNATIV:
 - Användaren optimerar TOTALEN över hela projektet, inte per komponent. En komponent kan välja ett dyrare eller högre CO2e-alternativ om totalen blir bättre tack vare stora vinster på andra komponenter. Filtrera därför INTE bort alternativ enbart för att deras CO2e råkar vara högre än baslinjen — visa relevanta valmöjligheter med tydlig +/- jämförelse i reasoning. Rangordna gärna med lägst CO2e först så användaren ser besparingen, men inkludera även likvärdiga eller marginellt högre alternativ när de är funktionellt relevanta.
 - Uttryckta behov är oförhandlingsbara — inget alternativ som inte uppfyller dem.
 - Resonera om hur alternativen möter behov: både uttryckta och antagna (ljudmiljö, inomhusklimat, underhåll, estetik, arbetsmiljö vid installation).
 - Presentera spridning i pris — det är användarens beslut att väga ekonomi mot klimat.
-- Var innovativ — föreslå kombinationer som löser flera behov samtidigt.
+- Var innovativ — föreslå kombinationer som löser flera behov samtidigt, till exempel återbruk för en del av behovet och nyinköp för resten när annonsen inte täcker allt.
 - Förklara installationsaspekter som påverkar totalkostnaden (enklare montering kan kompensera dyrare material).
 
 TEKNISKA REGLER:
-- VÄLJ BARA alternativ från EPD-listan du får. Fabricera INGA egna alternativ.
-- Om ingen EPD i listan passar komponenten, returnera en tom array [].
+- VÄLJ BARA alternativ från listorna du får. Fabricera INGA egna alternativ, varken EPD:er eller återbruksannonser.
+- Om ingen rad i någon lista passar komponenten, returnera en tom array [].
 - Använd GWP-värdena från EPD-listan — de är GWP-fossil A1-A3 (samma metod som Boverket-baslinjen), verifierade och direkt jämförbara.
 - Om ett omräknat värde visas (efter →), använd det omräknade värdet för beräkningar.
-- Ange EPD-registreringsnummer i source-fältet.
+- Ange EPD-registreringsnummer i source-fältet för EPD-alternativ.
 - Använd fältet "Tillgänglighet", inte "Geo", för att bedöma om en förvaltare kan köpa produkten. Geo är deklarationens giltighetsområde, inte var varan finns: Ahlsell AB deklarerar GLO.
 - Är klimatskillnaden liten mellan två alternativ, välj det med "nordisk leverantör". Är skillnaden stor, välj det bästa ändå och nämn i reasoning att leverantören är utländsk.
-- Minst ett av dina alternativ ska ha "nordisk leverantör" om listan innehåller något sådant.
+- Minst ett av dina EPD-alternativ ska ha "nordisk leverantör" om listan innehåller något sådant.
 - Om EPD-värdet är i en annan enhet (kg) än projektets enhet (m2, st), gör en rimlig omräkning och notera det.
-- co2e_kg MÅSTE vara > 0 — alla byggmaterial har klimatpåverkan. Returnera aldrig 0.
+- co2e_kg MÅSTE vara > 0 — alla byggmaterial har klimatpåverkan, även återbruk (transport och renovering). Returnera aldrig 0.
 - Föreslå KOMPLETTA system, inte enskilda komponenter.
-- Föreslå INTE återbruksprodukter — dessa hanteras separat via Palats marknadsplats.
-- alternative_type ska ALLTID vara "climate_optimized" (aldrig "reuse").
+- alternative_type är "climate_optimized" för EPD-rader och "reuse" för Palats-rader. Aldrig "reuse" på en EPD, aldrig "climate_optimized" på en annons.
+- source för en Palats-rad ska vara exakt "[Palats] palats.app/listing/<id>" med id från raden, så annonsen går att slå upp.
 
 PRISER:
 - Alla priser avser installerat pris (material + arbete) i SEK exklusive moms.
 - Sätt cost_sek till 0 om du inte vet — priser hämtas automatiskt via webbsökning efteråt.
+- Palats-priser är annonspriser för begagnat, inte installerat pris. Säg det i reasoning när det påverkar jämförelsen.
 
 Svara med giltig JSON-array:
 [
@@ -117,6 +134,14 @@ Svara med giltig JSON-array:
     "source": "[EPD] Environdec <registreringsnummer>",
     "reasoning": "Varför detta alternativ är bättre (klimat + praktiska behov)",
     "alternative_type": "climate_optimized"
+  },
+  {
+    "name": "Annonsens titel (Palats återbruk, Plats)",
+    "co2e_kg": <CO2e från raden>,
+    "cost_sek": <pris från raden>,
+    "source": "[Palats] palats.app/listing/<id>",
+    "reasoning": "Vad annonsen är, hur den passar, vad täckning och pris betyder, vad som ska kontrolleras",
+    "alternative_type": "reuse"
   }
 ]"""
 
@@ -557,6 +582,18 @@ def _validate_alternatives(
             )
             continue
 
+        # Reuse rows are built from a Palats listing with a deterministic CO2e
+        # and the listing's own asking price, and the coverage gate in
+        # _palats_candidates has already judged them. Until 2026-09-14 they
+        # were appended AFTER this validator ran and so never passed through
+        # it; now that the model ranks them in the same call as the EPDs they
+        # arrive here, and the checks below (complete-system name filter,
+        # market-price plausibility) are about new products and would only
+        # add wrong notes to a second-hand listing.
+        if alt.alternative_type == "reuse":
+            valid.append(alt)
+            continue
+
         # B) Filter component-only products (membranes, vapor barriers etc.)
         if _is_component_only(alt.name):
             logger.info(
@@ -703,33 +740,80 @@ def _effective_baseline_co2e(
     return rerouted
 
 
-def _add_palats_reuse(
-    alternatives: list[Alternative],
+def _reuse_coverage(available: int | None, need: float, units_match: bool) -> float | None:
+    """Share of the component need a listing's stock covers, or None when the
+    ratio cannot be formed: mismatched units (articles against m2), no need
+    quantity, or a listing quantity Palats did not state (it reports 0).
+    """
+    if not units_match:
+        return None
+    if not need or need <= 0:
+        return None
+    if not available or available <= 0:
+        return None
+    return available / need
+
+
+def _coverage_label(available: int, need: float, coverage: float) -> str:
+    """'3 av 30 (10 %)', or 'hela behovet' once the stock covers it."""
+    if coverage >= 1:
+        return f"{available} av {int(need)} (hela behovet)"
+    return f"{available} av {int(need)} ({coverage * 100:.0f} %)"
+
+
+# Cap on Palats listings shown per component. Five, as before the unified
+# prompt: enough to show a choice, few enough that the section stays a handful
+# of lines next to an EPD list of up to 80.
+_MAX_PALATS_PER_COMPONENT = 5
+
+# Reasoning used ONLY when the ranking call itself failed and the reuse rows
+# are appended without the model having seen them. Factual and short: the
+# detail string (price, coverage, location, link) is appended after it, so
+# the row still carries every number the table needs. Not the pre-2026-09-14
+# climate paragraph, which Johanna read as boilerplate on every reuse row.
+_FALLBACK_REUSE_REASONING = (
+    "Återbruksannons på Palats som matchar komponenten. Analysen kunde inte "
+    "rangordna den mot nyinköpsalternativen den här gången, så siffrorna "
+    "nedan är annonsens egna utan bedömning av skick eller passform."
+)
+
+
+def _palats_candidates(
     component_name: str,
     quantity: float,
     project_unit: str,
     palats_listings: list[dict],
-) -> None:
-    """Add matching Palats reuse listings as alternatives (in-place).
+    category: str | None = None,
+) -> tuple[list[tuple], Alternative | None]:
+    """The Palats listings a component may be offered, and an info row if none.
 
-    Palats listings get minimal CO2e (transport/refurbishment only) and
-    actual marketplace prices.
+    Shared by the unified ranking prompt (the normal path since 2026-09-14)
+    and the deterministic fallback. Three filters, in order:
 
-    Pricing logic:
-    - If project counts in "st" (fönster, dörr), Palats price * quantity
-      gives a directly comparable total.
-    - If project counts in "m2" (golv, vägg), we can't calculate total
-      (unknown coverage per article). Show per-article price instead.
+    1. Category match, on the ROUTED category when the caller has one, so the
+       reuse list and the EPD list for a component describe the same
+       material.
+    2. Strict subcategory: when the component name names a subcategory
+       ("Toalettstol" -> toalett), listings from other subcategories are
+       dropped, not shown. A washbasin is not an alternative to a toilet.
+    3. Coverage gate (MIN_REUSE_COVERAGE), before the cap of five so a listing
+       that covers the need is not crowded out by five that cover a sliver.
+
+    Returns ``(shown, info)``: ``shown`` is a list of ``(listing, coverage)``
+    pairs (coverage None when the ratio cannot be formed), capped; ``info`` is
+    an info-type Alternative explaining why nothing is shown, or None. Every
+    listing dropped on the way is logged with the reason.
     """
     from aida.data.palats_client import (
-        _DEFAULT_REUSE_CO2E,
-        REUSE_CO2E_PER_UNIT,
+        PalatsListing,
         component_subcategory,
         search_listings_for_component,
     )
 
-    matched = search_listings_for_component(component_name, palats_listings)
-    category = normalize_component_name(component_name)
+    category = category or normalize_component_name(component_name)
+    matched = search_listings_for_component(
+        component_name, palats_listings, category=category or None,
+    )
     target_subcat = component_subcategory(component_name, category) if category else ""
 
     # Strict subcategory filter: when the user asked for a specific subcategory
@@ -760,7 +844,12 @@ def _add_palats_reuse(
             count_label = "1 produkt" if one else f"{len(matched)} produkter"
             mismatch = "men den matchar inte" if one else "men ingen av dem matchar"
             hidden = "så den visas inte" if one else "så de visas inte"
-            alternatives.append(Alternative(
+            logger.info(
+                "Palats: %d listings in %s but none in subcategory %r for %r; "
+                "info row instead of reuse (%s)",
+                len(matched), category, target_subcat, component_name, other_label,
+            )
+            return [], Alternative(
                 name=f"{component_name}: inget på Palats just nu",
                 co2e_kg=0,
                 cost_sek=0,
@@ -772,89 +861,282 @@ def _add_palats_reuse(
                     "annonser publicerats, eller sök bredare manuellt på palats.app."
                 ),
                 alternative_type="info",
-            ))
-            return
+            )
         matched = subcat_matches
 
     if not matched:
-        return
+        return [], None
 
-    existing_names = {a.name.lower() for a in alternatives}
-    co2e_per_unit = REUSE_CO2E_PER_UNIT.get(category, _DEFAULT_REUSE_CO2E)
     units_match = project_unit.lower() in ("st", "styck", "stk")
 
-    for listing in matched[:5]:  # Cap at 5 reuse listings per component
+    # Coverage gate, applied before the cap so a listing that covers the need
+    # is not crowded out by five that cover a sliver of it. Each hidden find
+    # is logged with its ratio; the ratio also reaches the table for every
+    # shown find, so the threshold can be audited from the output alone.
+    shown: list[tuple[PalatsListing, float | None]] = []
+    hidden_finds: list[tuple[PalatsListing, float]] = []
+    for listing in matched:
+        coverage = _reuse_coverage(listing.quantity, quantity, units_match)
+        if coverage is not None and coverage < MIN_REUSE_COVERAGE:
+            hidden_finds.append((listing, coverage))
+        else:
+            shown.append((listing, coverage))
+    for listing, coverage in hidden_finds:
+        logger.info(
+            "Palats-fynd dolt för %r: %s täcker %s, under tröskeln %.0f %%",
+            component_name, listing.title,
+            _coverage_label(listing.quantity, quantity, coverage),
+            MIN_REUSE_COVERAGE * 100,
+        )
+    if not shown:
+        # Everything the category holds covers too little of the need. Say
+        # so with the numbers, in the same info form as the subcategory miss
+        # above, rather than showing nothing and looking like an empty search.
+        ratios = "; ".join(
+            f"{listing.title}: {_coverage_label(listing.quantity, quantity, coverage)}"
+            for listing, coverage in hidden_finds
+        )
+        one = len(hidden_finds) == 1
+        count_label = "1 annons" if one else f"{len(hidden_finds)} annonser"
+        return [], Alternative(
+            name=f"{component_name}: för lite på Palats just nu",
+            co2e_kg=0,
+            cost_sek=0,
+            source="[Palats] palats.app",
+            reasoning=(
+                f"Palats har {count_label} som matchar {component_name.lower()}, "
+                f"men lagret täcker under {MIN_REUSE_COVERAGE * 100:.0f} % av "
+                f"behovet på {int(quantity)} {project_unit} ({ratios}), så "
+                "återbruk visas inte som alternativ här. Kolla tillbaka när nya "
+                "annonser publicerats, eller sök bredare manuellt på palats.app."
+            ),
+            alternative_type="info",
+        )
+
+    # Dedupe on title: Palats carries the same washbasin under a dozen
+    # identical titles, and the model cannot tell twelve rows called
+    # "Porslinstvättställ" apart, nor can the table. Keep the first of each.
+    seen_titles: set[str] = set()
+    unique: list[tuple[PalatsListing, float | None]] = []
+    for listing, coverage in shown:
+        key = listing.title.lower()
+        if key in seen_titles:
+            continue
+        seen_titles.add(key)
+        unique.append((listing, coverage))
+    if len(unique) < len(shown):
+        logger.info(
+            "Palats: %d duplicate-title listings collapsed for %r",
+            len(shown) - len(unique), component_name,
+        )
+    if len(unique) > _MAX_PALATS_PER_COMPONENT:
+        logger.info(
+            "Palats: %d matching listings for %r, showing the first %d",
+            len(unique), component_name, _MAX_PALATS_PER_COMPONENT,
+        )
+    return unique[:_MAX_PALATS_PER_COMPONENT], None
+
+
+def _reuse_figures(
+    listing, coverage: float | None, quantity: float, project_unit: str, category: str,
+) -> tuple[float, float, str, bool]:
+    """(total_co2e, total_cost, detail, cost_is_per_article) for a listing.
+
+    The numbers the table needs, computed once and used both in the prompt
+    (so the model reasons about the same figures the row will carry) and in
+    the Alternative built from the model's answer.
+
+    Pricing logic:
+    - If project counts in "st" (fönster, dörr), Palats price * quantity
+      gives a directly comparable total.
+    - If project counts in "m2" (golv, vägg), we can't calculate total
+      (unknown coverage per article). Show per-article price instead.
+    """
+    from aida.data.palats_client import _DEFAULT_REUSE_CO2E, REUSE_CO2E_PER_UNIT
+
+    co2e_per_unit = REUSE_CO2E_PER_UNIT.get(category, _DEFAULT_REUSE_CO2E)
+    units_match = project_unit.lower() in ("st", "styck", "stk")
+    total_co2e = co2e_per_unit * quantity
+
+    if units_match and listing.price > 0:
+        # Units match (both "st") — total is directly comparable.
+        #
+        # The total covers the FULL component quantity even when fewer are
+        # in stock, and so does total_co2e above. That is deliberate: Aida
+        # plans early, and stock turns over long before procurement
+        # (Henric, 2026-08-15). What was wrong was saying nothing about it.
+        # Live check 2026-08-14: 30 windows needed, best listing had 3, and
+        # the row read "9 600 kr" with no hint that 27 were assumed.
+        total_cost = listing.price * quantity
+        price_note = f"Pris: {listing.price:.0f} SEK/st × {int(quantity)} = {int(total_cost)} SEK"
+        if coverage is not None and coverage < 1:
+            price_note += (
+                f" | OBS: täckning {_coverage_label(listing.quantity, quantity, coverage)}"
+                " finns i lager just nu."
+                " Pris och klimatnytta räknas på hela behovet, alltså som om"
+                " resten går att få tag på begagnat. Kontrollera tillgången"
+                " innan siffran används i ett beslutsunderlag."
+            )
+        elif coverage is not None:
+            price_note += f" | Täckning: {_coverage_label(listing.quantity, quantity, coverage)}"
+        else:
+            price_note += " | Täckning: okänd (antal ej angivet i annonsen)"
+        cost_is_estimate = False
+    elif listing.price > 0:
+        # Units don't match — show per-article price only
+        total_cost = listing.price
+        price_note = (
+            f"Pris: {listing.price:.0f} SEK/st ({listing.quantity} tillgängliga)"
+            " — yta per artikel okänd | Täckning: okänd (antal per "
+            f"{project_unit} saknas)"
+        )
+        cost_is_estimate = True
+    else:
+        total_cost = 0
+        price_note = f"{listing.quantity} tillgängliga"
+        if coverage is not None:
+            price_note += f" | Täckning: {_coverage_label(listing.quantity, quantity, coverage)}"
+        else:
+            price_note += " | Täckning: okänd"
+        cost_is_estimate = False
+
+    location_note = f"Plats: {listing.location}" if listing.location else ""
+    url_note = f"Se annons: {listing.url}" if listing.url else ""
+    detail = " | ".join(p for p in [price_note, location_note, url_note] if p)
+    return round(total_co2e, 1), round(total_cost), detail, cost_is_estimate
+
+
+def _reuse_alternative(
+    listing, coverage: float | None, quantity: float, project_unit: str,
+    category: str, reasoning: str,
+) -> Alternative:
+    """Build the table row for a Palats listing.
+
+    ``reasoning`` is the model's own text from the unified ranking (or the
+    fallback sentence when the call failed). The factual detail string is
+    appended after it either way: the price arithmetic, the coverage ratio
+    and the link are facts about the listing, not something the model is
+    asked to reproduce.
+    """
+    total_co2e, total_cost, detail, cost_is_estimate = _reuse_figures(
+        listing, coverage, quantity, project_unit, category,
+    )
+    text = reasoning.strip()
+    if detail:
+        text = f"{text} {detail}" if text else detail
+    if cost_is_estimate:
+        text += " OBS: Priset avser en artikel, inte totalbehovet."
+    if listing.description:
+        desc_preview = listing.description[:150]
+        if len(listing.description) > 150:
+            desc_preview += "..."
+        text += f" Beskrivning: {desc_preview}"
+
+    # The listing number is part of the name. Sola alone has 22 listings titled
+    # "Porslinstvättställ" and 18 "Träfönster" at one location, and the table,
+    # selection intent and multi-pick all identify a row by name: without the
+    # number two such listings were one row to them and could not be combined.
+    # The id is stable across reruns, so the name is too. Mark with * when cost
+    # is per-article, not total.
+    where = f"Palats återbruk, {listing.location}" if listing.location else "Palats återbruk"
+    display_name = f"{listing.title} ({where}, annons {listing.id})" if listing.id else f"{listing.title} ({where})"
+    if cost_is_estimate:
+        display_name += " *"
+
+    return Alternative(
+        name=display_name,
+        co2e_kg=total_co2e,
+        cost_sek=total_cost,
+        source=f"[Palats] palats.app/listing/{listing.id}",
+        reasoning=text,
+        alternative_type="reuse",
+        available_quantity=listing.quantity,
+        price_basis="listing" if listing.price > 0 else "",
+        url=listing.url or "",
+    )
+
+
+def _format_palats_list(
+    candidates: list[tuple], quantity: float, project_unit: str, category: str,
+) -> str:
+    """The [Palats återbruk] rows of the unified prompt.
+
+    One line per listing with the same figures the table will carry (CO2e for
+    the full need, price arithmetic, coverage, location, subcategory, id), so
+    the model ranks the row it will actually be shown next to the EPDs.
+    """
+    lines = []
+    for listing, coverage in candidates:
+        total_co2e, _total_cost, detail, _per_article = _reuse_figures(
+            listing, coverage, quantity, project_unit, category,
+        )
+        sub = f" | Subkategori: {listing.subcategory}" if listing.subcategory else ""
+        lines.append(
+            f"- [Palats återbruk] {listing.title} | id: {listing.id} | "
+            f"Uppskattad CO2e: {total_co2e} kg totalt för {quantity} {project_unit} "
+            f"(transport och renovering, ingen nytillverkning) | {detail}{sub}"
+        )
+    return "\n".join(lines)
+
+
+_LISTING_ID_RE = re.compile(r"listing/([A-Za-z0-9_-]+)")
+
+
+def _match_palats_candidate(item: dict, candidates: list[tuple]):
+    """Which candidate a model-written reuse row refers to, or None.
+
+    By listing id from the source field first (the prompt asks for it
+    verbatim), then by title containment, the same tolerance
+    match_epd_by_name gives EPD names.
+    """
+    source = str(item.get("source", "") or "")
+    m = _LISTING_ID_RE.search(source)
+    if m:
+        for listing, coverage in candidates:
+            if str(listing.id) == m.group(1):
+                return listing, coverage
+    name = _match_key(str(item.get("name", "") or ""))
+    if name:
+        for listing, coverage in candidates:
+            title = _match_key(listing.title)
+            if title and (title in name or name in title):
+                return listing, coverage
+    return None
+
+
+def _add_palats_reuse(
+    alternatives: list[Alternative],
+    component_name: str,
+    quantity: float,
+    project_unit: str,
+    palats_listings: list[dict],
+    category: str | None = None,
+) -> None:
+    """Deterministic fallback: append matching Palats listings (in-place).
+
+    Until 2026-09-14 this was THE reuse path, run after the EPD ranking call
+    and with a fixed paragraph as reasoning. Now the ranking prompt sees the
+    same candidates (see _find_alternatives_with_epds) and writes the
+    reasoning itself; this function remains for the case where that call
+    failed outright, so a Palats find is never lost to an API error on the
+    EPD side. Same candidates, same figures, factual fallback sentence.
+    """
+    category = category or normalize_component_name(component_name)
+    shown, info = _palats_candidates(
+        component_name, quantity, project_unit, palats_listings, category,
+    )
+    if info is not None:
+        alternatives.append(info)
+        return
+    existing_names = {a.name.lower() for a in alternatives}
+    for listing, coverage in shown:
         if listing.title.lower() in existing_names:
             continue
-
-        total_co2e = co2e_per_unit * quantity
-
-        if units_match and listing.price > 0:
-            # Units match (both "st") — total is directly comparable.
-            #
-            # The total covers the FULL component quantity even when fewer are
-            # in stock, and so does total_co2e above. That is deliberate: Aida
-            # plans early, and stock turns over long before procurement
-            # (Henric, 2026-08-15). What was wrong was saying nothing about it.
-            # Live check 2026-08-14: 30 windows needed, best listing had 3, and
-            # the row read "9 600 kr" with no hint that 27 were assumed.
-            total_cost = listing.price * quantity
-            price_note = f"Pris: {listing.price:.0f} SEK/st × {int(quantity)} = {int(total_cost)} SEK"
-            if listing.quantity < quantity:
-                price_note += (
-                    f" | OBS: {listing.quantity} av {int(quantity)} finns i lager just nu."
-                    " Pris och klimatnytta räknas på hela behovet, alltså som om"
-                    " resten går att få tag på begagnat. Kontrollera tillgången"
-                    " innan siffran används i ett beslutsunderlag."
-                )
-            cost_is_estimate = False
-        elif listing.price > 0:
-            # Units don't match — show per-article price only
-            total_cost = listing.price
-            price_note = f"Pris: {listing.price:.0f} SEK/st ({listing.quantity} tillgängliga) — yta per artikel okänd"
-            cost_is_estimate = True
-        else:
-            total_cost = 0
-            price_note = f"{listing.quantity} tillgängliga"
-            cost_is_estimate = False
-
-        location_note = f"Plats: {listing.location}" if listing.location else ""
-        url_note = f"Se annons: {listing.url}" if listing.url else ""
-        detail_parts = [p for p in [price_note, location_note, url_note] if p]
-        detail_str = " | ".join(detail_parts)
-
-        reasoning = (
-            "Återbruk via Palats (Karlstads kommuns interna marknadsplats) "
-            "eliminerar nästan all tillverkningsrelaterad klimatpåverkan. "
-            "Kvarvarande CO2e kommer främst från transport och eventuell renovering."
-        )
-        if detail_str:
-            reasoning += f" {detail_str}"
-        if cost_is_estimate:
-            reasoning += " OBS: Priset avser en artikel, inte totalbehovet."
-        if listing.description:
-            desc_preview = listing.description[:150]
-            if len(listing.description) > 150:
-                desc_preview += "..."
-            reasoning += f" Beskrivning: {desc_preview}"
-
-        # Mark name with * when cost is per-article, not total
-        display_name = f"{listing.title} (Palats återbruk, {listing.location})" if listing.location else f"{listing.title} (Palats återbruk)"
-        if cost_is_estimate:
-            display_name += " *"
-
-        alternatives.append(Alternative(
-            name=display_name,
-            co2e_kg=round(total_co2e, 1),
-            cost_sek=round(total_cost),
-            source=f"[Palats] palats.app/listing/{listing.id}",
-            reasoning=reasoning,
-            alternative_type="reuse",
-            available_quantity=listing.quantity,
-            price_basis="listing" if listing.price > 0 else "",
+        alternatives.append(_reuse_alternative(
+            listing, coverage, quantity, project_unit, category,
+            _FALLBACK_REUSE_REASONING,
         ))
         existing_names.add(listing.title.lower())
-
 
 def _route_components(
     project: Project,
@@ -964,10 +1246,12 @@ def find_alternatives(
     Strategy:
     1. Load pre-categorized EPD data from Environdec
     2. Fetch available reuse listings from Palats marketplace
-    3. For each component, give the LLM the relevant EPDs + baseline
-    4. LLM reasons about best alternatives
-    5. Supplement with Palats reuse listings (live)
-    6. Fall back to hardcoded reuse data if no Palats results
+    3. For each component, gather the relevant EPDs AND the matching Palats
+       listings (routed category, strict subcategory, coverage gate, cap 5)
+    4. One LLM call ranks both sources together and writes the reasoning for
+       every row, reuse included
+    5. If that call fails, the Palats rows are appended deterministically so
+       an EPD-side error never hides a reuse find
     """
     from aida.data import palats_client
     from aida.data.palats_client import fetch_listings
@@ -1021,10 +1305,27 @@ def find_alternatives(
         # category cap), and the LLM picks the apt ones from the balanced set.
         # Precise per-component subcategory retrieval is Fas 2 (semantic).
 
+        # Palats candidates are gathered BEFORE the ranking call so the model
+        # sees reuse and new purchase side by side and ranks both. The
+        # deterministic post-injection this replaced (2026-09-14) produced
+        # Johanna's four April symptoms: Palats-only lists, unranked mixing,
+        # and a fixed paragraph as "reasoning" on every reuse row. The routed
+        # category goes along so the reuse search looks in the same material
+        # bucket as the EPD search.
+        palats_candidates: list[tuple] = []
+        palats_info: Alternative | None = None
+        if has_palats:
+            palats_candidates, palats_info = _palats_candidates(
+                proj_comp.name, proj_comp.quantity, proj_comp.unit,
+                palats_listings, comp_key,
+            )
+
         alternatives = _find_alternatives_with_epds(
             proj_comp, bl_comp, epds_for_category, user_feedback,
             needs_analysis=project.needs_analysis,
             effective_baseline_co2e=eff_baseline_co2e,
+            palats_candidates=palats_candidates,
+            category=comp_key,
         )
 
         # Validate data quality: filter zero CO2, component-only parts, flag prices
@@ -1033,12 +1334,11 @@ def find_alternatives(
             category=comp_key,
         )
 
-        # Add live Palats reuse listings
-        if has_palats:
-            _add_palats_reuse(
-                alternatives, proj_comp.name, proj_comp.quantity,
-                proj_comp.unit, palats_listings,
-            )
+        # Palats had listings in the category but none of the asked-for type,
+        # or none covering enough of the need: say so, in the same row form
+        # as before, instead of leaving the reuse side silent.
+        if palats_info is not None:
+            alternatives.append(palats_info)
 
         # Show Palats status: connection error vs no matches for this category
         palats_reuse_count = sum(
@@ -1296,8 +1596,10 @@ def _find_alternatives_with_epds(
     user_feedback: str | None = None,
     needs_analysis: NeedsAnalysis | None = None,
     effective_baseline_co2e: float | None = None,
+    palats_candidates: list[tuple] | None = None,
+    category: str | None = None,
 ) -> list[Alternative]:
-    """Use LLM to select best alternatives from EPD data.
+    """Use LLM to rank EPD alternatives and Palats reuse listings together.
 
     ``effective_baseline_co2e`` is the baseline reference after any
     routed-category reroute (see _effective_baseline_co2e). When a component was
@@ -1305,8 +1607,26 @@ def _find_alternatives_with_epds(
     savings against the rerouted baseline — otherwise its "−45% CO2e" reasoning
     is computed against the wrong (stale) material and the report text
     contradicts the actual savings math.
+
+    ``palats_candidates`` are ``(listing, coverage)`` pairs from
+    _palats_candidates. They go into the same prompt as the EPDs, tagged
+    [Palats återbruk], and the model ranks both sources in one list and
+    writes the reasoning for the reuse rows too. The figures on a reuse row
+    (CO2e from REUSE_CO2E_PER_UNIT, the listing's own price) are computed
+    here, not taken from the model. If the call fails, the candidates are
+    still appended through the deterministic fallback so an EPD-side API
+    error never hides a reuse find.
     """
     client = get_client()
+    palats_candidates = palats_candidates or []
+    category = category or normalize_component_name(proj_comp.name)
+
+    if not epds and not palats_candidates:
+        # Nothing to rank. The old prompt still made the call here and asked
+        # the model to return [], which cost a request per empty category.
+        logger.info("No EPDs and no Palats candidates for %s; skipping ranking call",
+                    proj_comp.name)
+        return []
 
     # Baseline the LLM reasons against: the rerouted value when it differs from
     # the stored one, else the stored baseline.
@@ -1332,7 +1652,7 @@ Antal: {proj_comp.quantity} {proj_comp.unit}
 Baslinje CO2e: {baseline_for_prompt} kg ({baseline_label})
 Baslinje kostnad: {bl_comp.cost_sek} SEK
 
-Föreslå 2-4 relevanta alternativ från EPD-listan nedan. Inkludera hela spannet av CO2e-värden — användaren optimerar totalen över hela projektet, inte per komponent, så ett alternativ som ligger något över baslinjen kan vara värt att visa om det möter behoven bättre. Rangordna med lägst CO2e först. I reasoning: ange explicit hur alternativet jämför mot baslinjen (t.ex. "−45% CO2e" eller "+12% CO2e — men kortare leveranskedja och tystare drift").
+Föreslå alternativ ur listorna nedan: 2-4 EPD-alternativ, plus varje Palats-annons som passar komponenten. Rangordna dem TILLSAMMANS i en lista. Inkludera hela spannet av CO2e-värden — användaren optimerar totalen över hela projektet, inte per komponent, så ett alternativ som ligger något över baslinjen kan vara värt att visa om det möter behoven bättre. Rangordna med lägst CO2e först. I reasoning: ange explicit hur alternativet jämför mot baslinjen (t.ex. "−45% CO2e" eller "+12% CO2e — men kortare leveranskedja och tystare drift").
 """
 
     # Project-level needs (user-approved) — overarching framing for the whole
@@ -1370,7 +1690,19 @@ Se till att minst ett alternativ har "nordisk leverantör", om listan innehålle
 """
     else:
         prompt += """
-Inga EPD:er tillgängliga för denna kategori. Returnera en tom array [].
+Inga EPD:er tillgängliga för denna kategori. Föreslå inga nyinköp; rangordna bara återbruksannonserna nedan.
+"""
+
+    if palats_candidates:
+        prompt += f"""
+ÅTERBRUKSANNONSER PÅ PALATS FÖR DENNA KATEGORI ({len(palats_candidates)} st, redan filtrerade på produkttyp och lagersaldo):
+{_format_palats_list(palats_candidates, proj_comp.quantity, proj_comp.unit, category)}
+
+Ta med varje annons ovan i din rankade lista, med alternative_type "reuse" och source "[Palats] palats.app/listing/<id>". Använd CO2e- och prissiffrorna från raden. Skriv ett eget resonemang per annons: vad den är, hur den passar komponenten och behoven, vad täckningen betyder i praktiken, och vad som ska kontrolleras innan den räknas in. Utelämna en annons bara om den är uppenbart fel produkt för komponenten, och säg då varför i reasoning på ett av de andra alternativen.
+"""
+    elif epds:
+        prompt += """
+Inga återbruksannonser på Palats matchar denna komponent just nu, så listan består bara av nyinköp.
 """
 
     if user_feedback:
@@ -1397,13 +1729,40 @@ Inga EPD:er tillgängliga för denna kategori. Returnera en tom array [].
             data = [data]
 
         results = []
+        used_candidates: set[str] = set()
         for item in data:
-            # Skip any LLM-fabricated reuse — reuse only comes from Palats
-            if item.get("alternative_type") == "reuse":
-                logger.info("Filtered LLM-fabricated reuse '%s'", item.get("name"))
+            if not isinstance(item, dict):
+                logger.info("Skipping non-object item in alternatives: %r", item)
+                continue
+            source = str(item.get("source", "") or "")
+            is_reuse = (
+                item.get("alternative_type") == "reuse"
+                or "[palats]" in source.lower()
+            )
+            if is_reuse:
+                # A reuse row is only ever a Palats candidate the prompt showed.
+                # Its figures are ours (REUSE_CO2E_PER_UNIT and the listing
+                # price), its reasoning is the model's. Anything that does not
+                # map back to a candidate is fabricated and dropped, logged.
+                hit = _match_palats_candidate(item, palats_candidates)
+                if hit is None:
+                    logger.warning(
+                        "Dropped reuse row %r for %s: matches no Palats candidate "
+                        "(source=%r)", item.get("name"), proj_comp.name, source,
+                    )
+                    continue
+                listing, coverage = hit
+                if str(listing.id) in used_candidates:
+                    logger.info("Duplicate reuse row for listing %s; keeping the first",
+                                listing.id)
+                    continue
+                used_candidates.add(str(listing.id))
+                results.append(_reuse_alternative(
+                    listing, coverage, proj_comp.quantity, proj_comp.unit,
+                    category, str(item.get("reasoning", "") or ""),
+                ))
                 continue
 
-            source = item.get("source", "")
             # Tag source based on whether it references an EPD
             if not source.startswith("["):
                 if "epd" in source.lower() or "environdec" in source.lower():
@@ -1432,9 +1791,42 @@ Inga EPD:er tillgängliga för denna kategori. Returnera en tom array [].
                 gwp_basis=gwp_basis,
             ))
 
+        # Candidates the model left out. The prompt asks for every one of
+        # them, so an omission is either a judgement it was told to voice on
+        # another row or a lapse. Either way the listing exists on Palats and
+        # Johanna's April complaint was exactly a toilet that did not appear,
+        # so the row is appended with the factual fallback text and the
+        # omission is logged with the listing named. Data on the floor must
+        # say so.
+        for listing, coverage in palats_candidates:
+            if str(listing.id) in used_candidates:
+                continue
+            logger.warning(
+                "Ranking omitted Palats listing %s (%r) for %s; appending with "
+                "fallback reasoning", listing.id, listing.title, proj_comp.name,
+            )
+            results.append(_reuse_alternative(
+                listing, coverage, proj_comp.quantity, proj_comp.unit,
+                category, _FALLBACK_REUSE_REASONING,
+            ))
+
         return results
     except Exception:
         logger.warning("Failed to parse alternatives for %s", proj_comp.name, exc_info=True)
+        if palats_candidates:
+            # The EPD side failed; the reuse side is deterministic and must not
+            # go down with it. Same rows, fallback reasoning, logged.
+            logger.warning(
+                "Ranking call failed for %s; appending %d Palats listings via fallback",
+                proj_comp.name, len(palats_candidates),
+            )
+            return [
+                _reuse_alternative(
+                    listing, coverage, proj_comp.quantity, proj_comp.unit,
+                    category, _FALLBACK_REUSE_REASONING,
+                )
+                for listing, coverage in palats_candidates
+            ]
         return []
 
 

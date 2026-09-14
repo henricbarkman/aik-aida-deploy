@@ -17,6 +17,7 @@ from aida.api_client import (
     get_client,
     remaining_budget,
 )
+from aida.data.climate_data import canonical_category
 from aida.llm_json import ModelOutputError, extract_json_object
 from aida.models import Project
 
@@ -56,10 +57,12 @@ Regler:
 - Komponent-id ska vara c1, c2, c3 etc
 - Gissa rimlig quantity om den inte anges (baserat på area och byggnadstyp)
 - Unit ska vara m2, st, eller lm (löpmeter)
-- Category ska vara en av: golv, kakel, innervägg, yttervägg, fasadskikt, betongvägg, tak, fönster, dörr, isolering, belysning, ventilation, hiss, kylanläggning, sanitet, vitvaror, storköksutrustning, vvs, farg, el, radiator
+- Category ska vara en av: golv, kakel, innervägg, yttervägg, fasadskikt, betongvägg, tak, fönster, dörr, isolering, belysning, ventilation, hiss, kylanläggning, sanitet, vitvaror, storköksutrustning, vvs, farg, el, radiator, fast_inredning
   - kakel: kaklad/klinkad yta (våtrumsvägg, -golv, kakel/klinker). Välj kakel framför golv/innervägg när ytan är keramisk.
   - fasadskikt vs yttervägg: välj `fasadskikt` när bara byggnadens yttre beklädnad byts eller renoveras (fasadpanel, träfasad, fasadskivor). Välj `yttervägg` när hela väggkonstruktionen byggs eller byts, alltså inklusive stomme och isolering. Vid tvekan i en ombyggnad: `fasadskikt`, eftersom en renovering oftast rör skiktet och inte hela väggen. Ren ommålning av befintlig panel är `farg`.
   - vvs: rör, stambyte, avlopp. farg: målning/ommålning. el: elkabel/elinstallation. radiator: radiator/värmeelement.
+  - fast_inredning: inredning som är fast monterad i byggnaden, alltså köksskåp, köksluckor, bänkskivor, diskbänkar, spegelskåp och badrumsskåp. Namnge komponenten efter vad den är ("Köksluckor", "Spegelskåp"), inte bara "Inredning". Lös inredning (möbler, kontorsstolar, lösa hyllor och förvaringsskåp) ingår inte i baslinjen: ta inte med den som komponent, och nämner användaren den, skriv i needs_analysis.assumptions att den lämnats utanför.
+  - Installationer: tar beskrivningen upp dem, ta med var och en som egen komponent i sin kategori (ventilation för kanaler, don och aggregat; vvs; el; radiator; belysning; kylanläggning; hiss), även när resten av beskrivningen handlar om ytskikt.
 - Om area inte anges, uppskatta baserat på byggnadstyp och komponenter
 - Svara på svenska
 
@@ -163,6 +166,19 @@ def _is_envelope(component: dict) -> bool:
     return any(token in name for token in _ENVELOPE_NAME_TOKENS)
 
 
+def canonicalize_categories(data: dict) -> dict:
+    """Rewrite each component's category to its canonical key (fonster -> fönster).
+
+    Runs before anything reads the field, so the stored analysis carries the
+    spelling every exact lookup downstream expects (the facade guard above,
+    the EPD category sets), not only resolve_category.
+    """
+    for component in data.get("components") or []:
+        if component.get("category"):
+            component["category"] = canonical_category(component["category"])
+    return data
+
+
 def fix_envelope_quantities(data: dict) -> dict:
     """Replace a facade quantity that is just the floor area repeated.
 
@@ -256,7 +272,9 @@ def run_intake(description: str, attachments: list[dict] | None = None) -> dict:
     text = extract_text(response)
 
     try:
-        return fix_envelope_quantities(extract_json_object(text, what="projektbeskrivningen"))
+        return fix_envelope_quantities(
+            canonicalize_categories(extract_json_object(text, what="projektbeskrivningen"))
+        )
     except ModelOutputError as first:
         logger.warning(
             "Intake parse failed (%s). stop_reason=%s raw=%r",
@@ -281,7 +299,7 @@ def run_intake(description: str, attachments: list[dict] | None = None) -> dict:
     retry_text = extract_text(retry)
     try:
         return fix_envelope_quantities(
-            extract_json_object(retry_text, what="projektbeskrivningen")
+            canonicalize_categories(extract_json_object(retry_text, what="projektbeskrivningen"))
         )
     except ModelOutputError as second:
         logger.error(

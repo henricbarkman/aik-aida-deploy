@@ -67,7 +67,29 @@ _MIN_SAMPLES_OVERRIDE: dict[tuple[str, str], int] = {
 # (toalett, handfat, blandare...), reusing the Palats subcategory taxonomy.
 # Each (category, subcategory, unit) gets its own typvärde; items that don't
 # classify into a subcategory get no typvärde (stay LLM-uppskattning).
-_SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror"}
+_SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror", "fast_inredning"}
+
+# Subcategorized categories whose typvärde is published per piece only. Fixed
+# interior is specified and bought per piece (a front, a cabinet), so a st value
+# is the one a component can use without a mass assumption. The kg rows are a
+# different population as well as a different unit: measured 2026-09-14,
+# badrumsinredning/kg was 9 of 12 rows Dahl Sverige AB (0.75, over the dominance
+# ceiling), where badrumsinredning/st spreads over five makers. The kg and m2 rows
+# stay in the catalog and are still offered as alternatives.
+_ST_ONLY_CATEGORIES = {"fast_inredning"}
+
+# Keys that clear the sample floor but are not published, each with its reason.
+# Only for a key that would be NEW; the keys already published while dominated
+# are recorded in test_typvarde_dominans.KNOWN_DOMINANCE instead.
+#
+# badrumsinredning/st, 2026-09-14: 8 rows, 5 of them Sonas bathrooms (0.62) --
+# one product family in five sizes. Whether a typvärde that is mostly one
+# supplier's line may be published at all is a decision Henric has open (golv/st,
+# Kingspan), and a new key should not pre-empt it. A bathroom-cabinet component
+# gets an LLM estimate until more makers declare one, or until that is decided.
+_WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
+    ("fast_inredning", "badrumsinredning", "st"): "Sonas bathrooms 5 av 8 rader",
+}
 
 # Categories where a subtype is PREFERRED but the category aggregate is still a
 # legitimate answer. Different from _SUBCATEGORIZED_CATEGORIES above: there, a
@@ -91,6 +113,90 @@ _SUBTYPE_PREFERRED_CATEGORIES = {"golv"}
 # Still excluded wholesale: no subcategory taxonomy defined, too heterogeneous
 # to aggregate meaningfully.
 _HETEROGENEOUS_CATEGORIES = {"storköksutrustning"}
+
+# Geographic scope of the published typvärde.
+#
+# The 2026-05-29 spec asked for a hard filter, `geo in (SE, NORD, EU)`. Two
+# measurements say that cannot be the default, and both are about what `geo`
+# IS: the region the declaration's electricity mix and transport scenarios were
+# modelled for, not where the product is sold (nordic_supply.py has the long
+# form; build_epd_alternatives.py removed geo from the catalog ordering on
+# 2026-09-06 for the same reason).
+#
+#   - Swedish wholesalers declare GLO. Ahlsell AB, 9 GLO rows of 18. Dahl
+#     Sverige AB, 23 of 41. A hard filter drops those and keeps a Turkish tile
+#     declared RER.
+#   - On the 1428-row catalog, 2026-09-14: a hard filter deletes 20 of the 47
+#     published keys outright. kakel/m2 39 -> 0, golv/keramik/m2 45 -> 0,
+#     ventilation/st 29 -> 0, because whole product families declare GLO.
+#
+# So the scope is a preference with a floor, the same shape as the subtype
+# fallback above. The European bucket is published when it clears the sample
+# floor on its own; the full bucket otherwise; and the payload says which
+# (`geo_scope`), with both counts, so the report can state what the number
+# rests on instead of implying a Swedish context it does not have.
+#
+# Codes as the two hubs actually write them. RER is ILCD "Europe"; NORD and
+# SCAND are Environdec's Nordic regions; EPD Norge writes ISO countries. The
+# EEA/EFTA states and the UK are one market for a Swedish buyer, and Norway is
+# where the second registry lives, so they are in.
+EUROPE_GEO_CODES: frozenset[str] = frozenset({
+    "RER", "EU", "EUR", "EU-27", "EU-28", "NORD", "SCAND",
+    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR",
+    "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK",
+    "SI", "ES", "SE",
+    "NO", "IS", "LI", "CH", "GB", "UK",
+})
+GEO_SCOPE_EUROPE = "europa"
+GEO_SCOPE_GLOBAL = "global"
+DEFAULT_GEO_SCOPE: frozenset[str] | None = EUROPE_GEO_CODES
+
+# The European bucket must clear THIS on its own before it replaces the full
+# bucket, not just the category floor. With the category floor (5) alone, six
+# European el/lm rows replaced twenty global ones and seven European tak/kg rows
+# replaced twenty-two: a narrower sample traded for a thinner one, which is the
+# fragility the 2026-05-29 spec set out to remove. 15 is the lower end of the
+# robust size that spec proposed.
+_MIN_SAMPLES_GEO_SCOPE = 15
+
+
+def _scope_floor(min_required: int) -> int:
+    """Rows the European bucket needs before it is preferred over the full one."""
+    return max(min_required, _MIN_SAMPLES_GEO_SCOPE)
+
+
+# A European bucket where one supplier holds this share or more is that
+# supplier's product line, not a category value, so the full bucket is used.
+# Same ceiling as test_typvarde_dominans. With the scope on, fasadskikt/m2 was
+# 65% Saint-Gobain Sweden (Weber renders) among its 49 European rows; the full
+# bucket of 55 stays under 0.6.
+_SCOPE_DOMINANCE_CEILING = 0.6
+
+
+def _top_owner_share(rows: Rows) -> float:
+    """Largest single owner's share, owners grouped on their first word
+    (lowercased), so "Saint-Gobain Sweden AB" and "Saint-Gobain Finland Oy"
+    count as one supplier."""
+    if not rows:
+        return 0.0
+    counts: dict[str, int] = {}
+    for _, e in rows:
+        words = (e.get("owner") or "?").lower().split()
+        k = words[0] if words else "?"
+        counts[k] = counts.get(k, 0) + 1
+    return max(counts.values()) / len(rows)
+
+
+def _scope_codes_for(cat: str, scope_codes: frozenset[str] | None) -> frozenset[str] | None:
+    """The geo scope a category's keys are published with.
+
+    Subtype-preferred categories (golv) stay scope-free. Their category key and
+    their subtype keys must rest on the same population: with the scope on,
+    golv/m2 published from 36 European rows at 8.64 while vinyl (15.5) and trä
+    (9.07) stayed global for lack of 15 European rows each, so the category sat
+    below both of its own subtypes (test_baseline_material, 2026-09-14).
+    """
+    return None if cat in _SUBTYPE_PREFERRED_CATEGORIES else scope_codes
 
 
 def _load_epd_data() -> list[dict]:
@@ -129,20 +235,23 @@ def _epd_subcategory(cat: str, e: dict) -> str:
     return ""
 
 
-def _compute_typvärden() -> dict[tuple[str, str, str], dict]:
-    """Compute upper-half median GWP per (category, subcategory, unit).
+Rows = list[tuple[float, dict]]
+
+
+def _group_rows(epds: list[dict]) -> dict[tuple[str, str, str], Rows]:
+    """(category, subcategory, unit) -> [(gwp, row), ...].
+
+    The one grouping every reader of the catalog shares. The row travels with
+    its value so a caller can read geo or owner for exactly the population a
+    median is built from: test_typvarde_dominans regroups through this
+    function for that reason, so its owner counts cannot drift from the
+    published sample by re-implementing the rules below.
 
     For most categories subcategory is "" (flat aggregate). For the
     heterogeneous-but-subcategorized ones (sanitet, belysning, vitvaror) the
-    median is computed per subcategory; rows that don't classify are skipped.
-
-    Each entry has: baseline_co2e_per_unit, sample_size, full_median, min, max.
+    key is per subcategory; rows that don't classify are skipped.
     """
-    epds = _load_epd_data()
-    if not epds:
-        return {}
-
-    grouped: dict[tuple[str, str, str], list[float]] = {}
+    grouped: dict[tuple[str, str, str], Rows] = {}
     for e in epds:
         cat = e.get("category", "")
         unit = e.get("unit", "")
@@ -186,6 +295,8 @@ def _compute_typvärden() -> dict[tuple[str, str, str], dict]:
             # 1660), so only keep st and kg.
             if unit not in ("st", "kg"):
                 continue
+            if cat in _ST_ONLY_CATEGORIES and unit != "st":
+                continue
             sub = _epd_subcategory(cat, e)
             if not sub:
                 continue  # unclassified item in a heterogeneous category
@@ -197,18 +308,68 @@ def _compute_typvärden() -> dict[tuple[str, str, str], dict]:
             # mean of exactly the floors nobody could name.
             sub = _epd_subcategory(cat, e)
             if sub:
-                grouped.setdefault((cat, sub, unit), []).append(float(gwp))
+                grouped.setdefault((cat, sub, unit), []).append((float(gwp), e))
             sub = ""
         else:
             sub = ""
-        grouped.setdefault((cat, sub, unit), []).append(float(gwp))
+        grouped.setdefault((cat, sub, unit), []).append((float(gwp), e))
+    return grouped
+
+
+def _in_scope(row: dict, scope_codes: frozenset[str]) -> bool:
+    return (row.get("geo") or "").strip() in scope_codes
+
+
+def _select_scope(
+    rows: Rows, min_required: int, scope_codes: frozenset[str] | None,
+    scope_floor: int | None = None,
+) -> tuple[Rows | None, str]:
+    """The population a key is published from, and its label.
+
+    The scoped bucket when it clears the floor by itself; the full bucket when
+    it does not; None when even the full bucket is thin. The label is a fact
+    about which population was used, never about which was asked for, for the
+    same reason `level` exists: a fallback that reads as the thing it fell back
+    from is the claim this module is here not to make.
+    """
+    if scope_codes is not None:
+        scoped = [r for r in rows if _in_scope(r[1], scope_codes)]
+        if (len(scoped) >= (min_required if scope_floor is None else scope_floor)
+                and _top_owner_share(scoped) < _SCOPE_DOMINANCE_CEILING):
+            return scoped, GEO_SCOPE_EUROPE
+    if len(rows) >= min_required:
+        return rows, GEO_SCOPE_GLOBAL
+    return None, GEO_SCOPE_GLOBAL
+
+
+def _compute_typvärden(
+    scope_codes: frozenset[str] | None = DEFAULT_GEO_SCOPE,
+) -> dict[tuple[str, str, str], dict]:
+    """Compute upper-half median GWP per (category, subcategory, unit).
+
+    `scope_codes` is the geographic preference (see EUROPE_GEO_CODES); None
+    publishes every key from its full bucket, which is what this function did
+    before 2026-09-14 and what the payload then labels "global".
+
+    Each entry has: baseline_co2e_per_unit, sample_size, full_median, min, max,
+    subcategory, level, geo_scope, sample_size_global, sample_size_europe,
+    min_samples.
+    """
+    epds = _load_epd_data()
+    if not epds:
+        return {}
 
     result: dict[tuple[str, str, str], dict] = {}
-    for key, values in grouped.items():
+    for key, rows in _group_rows(epds).items():
+        if key in _WITHHELD_KEYS:
+            continue
         cat, sub, _unit = key
         min_required = _MIN_SAMPLES_OVERRIDE.get((cat, sub), _MIN_SAMPLES)
-        if len(values) < min_required:
+        used, scope = _select_scope(rows, min_required, _scope_codes_for(cat, scope_codes),
+                                    _scope_floor(min_required))
+        if used is None:
             continue
+        values = [gwp for gwp, _ in used]
         result[key] = {
             "baseline_co2e_per_unit": round(_upper_half_median(values), 2),
             "sample_size": len(values),
@@ -221,6 +382,15 @@ def _compute_typvärden() -> dict[tuple[str, str, str], dict]:
             # from a non-empty subcategory, because a subtype request that fell
             # back to the category must not read as a subtype answer.
             "level": "subtype" if sub else "category",
+            # "europa" | "global" — which population the number came from,
+            # same argument as `level`. The two counts let the report say
+            # "16 europeiska av 20" or "bara 3 europeiska, alla 39 används"
+            # instead of a bare n that hides which of the two it is.
+            "geo_scope": scope,
+            "sample_size_global": len(rows),
+            "sample_size_europe": sum(1 for _, e in rows if _in_scope(e, EUROPE_GEO_CODES)),
+            "min_samples": min_required,
+            "min_samples_europe": _scope_floor(min_required),
         }
     return result
 
@@ -332,13 +502,22 @@ def list_available_categories() -> list[tuple[str, str, str, int]]:
 
 
 def main():
-    """CLI: print the typvärde table for inspection."""
-    print(f"{'Kategori':<18} {'Subkat':<14} {'Unit':<5} {'n':>3} "
-          f"{'min':>8} {'med':>8} {'typvärde':>10} {'max':>8}")
-    print("-" * 84)
-    for (cat, sub, unit), data in sorted(_compute_typvärden().items()):
+    """CLI: print the typvärde table for inspection.
+
+    `--no-geo` prints the pre-scope table (every key from its full bucket), so
+    the two can be diffed: that diff is the documented before/after the
+    2026-05-29 spec asks for.
+    """
+    import sys
+    scope = None if "--no-geo" in sys.argv[1:] else DEFAULT_GEO_SCOPE
+    print(f"{'Kategori':<18} {'Subkat':<14} {'Unit':<5} {'n':>3} {'nEU':>4} {'nAll':>5} "
+          f"{'scope':<7} {'min':>8} {'med':>8} {'typvärde':>10} {'max':>8}")
+    print("-" * 104)
+    for (cat, sub, unit), data in sorted(_compute_typvärden(scope).items()):
         print(
             f"{cat:<18} {sub:<14} {unit:<5} {data['sample_size']:>3} "
+            f"{data['sample_size_europe']:>4} {data['sample_size_global']:>5} "
+            f"{data['geo_scope']:<7} "
             f"{data['min']:>8.2f} {data['full_median']:>8.2f} "
             f"{data['baseline_co2e_per_unit']:>10.2f} {data['max']:>8.2f}"
         )

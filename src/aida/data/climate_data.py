@@ -24,7 +24,45 @@ REASONING = {
 # list to words that can only ever mean one thing.
 _PRIORITY_TOKENS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("farg", ("fasadfärg", "fasadmålning")),
+    # "armatur" is a lighting word in belysning below, but Swedish plumbing
+    # uses it too: a "blandararmatur" is a tap. Belysning is checked before
+    # sanitet, so without these the bare stem would price a mixer as a lamp.
+    ("sanitet", ("blandararmatur", "sanitetsarmatur", "tvättställsarmatur",
+                 "duscharmatur")),
+    # Same trap the other way round: "tak" is checked before belysning, so a
+    # "taklampa" landed in tak and got a roof typvärde per m2.
+    ("belysning", ("taklampa", "takarmatur", "takbelysning")),
+    # Fast inredning, added 2026-09-14 (Notion 3d6b0484). Every token names a
+    # cabinet, front or worktop that is mounted to the building. They sit here
+    # because the table below would misread them: "tvättställsskåp" contains
+    # sanitet's "tvättställ", and "spegelskåp med belysning" belysning's word.
+    # Loose furniture (förvaringsskåp, garderob, hyllor) is deliberately absent:
+    # whether loose interior belongs in the baseline is still an open question.
+    ("fast_inredning", ("spegelskåp", "tvättställsskåp", "badrumsskåp",
+                        "badrumsinredning", "köksskåp", "kökslucka", "köksluckor",
+                        "kökslåd", "köksinredning", "bänkskåp", "överskåp",
+                        "underskåp", "bänkskiv", "fast inredning",
+                        "fast_inredning")),
 )
+
+
+# Sanitary fixtures a cabinet is often named together with. Found in review of
+# the fast_inredning change: "Tvättställ med underskåp" is a washbasin that has
+# a cabinet, not a cabinet, and before the change it got sanitet/handfat.
+_FIXTURE_WORDS = ("tvättställ", "handfat", "toalett", "wc", "dusch", "badkar",
+                  "urinal", "blandare", "kran")
+
+
+def fixture_named_besides_cabinet(text: str, cabinet_tokens) -> bool:
+    """True when `text` still names a sanitary fixture once the fixed-interior
+    words are removed. "Tvättställsskåp" is then a cabinet (nothing is left),
+    "Tvättställ med underskåp" a washbasin (the fixture word remains).
+    Shared with palats_client so a listing and a component read the same way.
+    """
+    rest = text.lower()
+    for t in sorted(cabinet_tokens, key=len, reverse=True):
+        rest = rest.replace(t, " ")
+    return any(w in rest for w in _FIXTURE_WORDS)
 
 
 def normalize_component_name(name: str) -> str:
@@ -33,6 +71,8 @@ def normalize_component_name(name: str) -> str:
 
     for key, tokens in _PRIORITY_TOKENS:
         if any(t in name_lower for t in tokens):
+            if key == "fast_inredning" and fixture_named_besides_cabinet(name_lower, tokens):
+                continue
             return key
 
     mappings = {
@@ -42,8 +82,14 @@ def normalize_component_name(name: str) -> str:
         # so it gets a ceramic typvärde, not the vinyl/linoleum-dominated golv one.
         "kakel": ["kakel", "klinker", "keramik", "kakelplatt", "väggkakel",
                   "kakla", "ceramic tile"],
+        # "matta" covers plastmatta, textilmatta and heltäckningsmatta by
+        # substring; the compounds are listed anyway so the intent is legible.
+        # Which floor a matta is (vinyl vs textil typvärde) is decided one
+        # level down, by subtype_from_material in epd_baseline_medians.
         "golv": ["golv", "floor", "golvbeläggning", "vinylgolv",
-                 "laminat", "parkett", "trägolv", "golvmaterial"],
+                 "laminat", "parkett", "trägolv", "golvmaterial",
+                 "matta", "mattor", "plastmatta", "textilmatta",
+                 "heltäckningsmatta"],
         # Paint moved out to the dedicated "farg" category 2026-06-17 (it has its
         # own EPDs and a wrong unit basis vs gypsum). "ytskikt" stays here since
         # an unqualified surface layer on an interior wall is usually board, not paint.
@@ -85,16 +131,34 @@ def normalize_component_name(name: str) -> str:
                       "cellulosa", "eps"],
         "storköksutrustning": ["storköksutrustning", "storkök", "diskmaskin",
                                "diskutrustning", "industrial kitchen"],
+        # Heat pumps live here, not in radiator: a heat pump is a refrigeration
+        # machine (compressor, refrigerant) and the catalog's three heat-pump
+        # EPDs sit in kylanläggning, whose st typvärde is literally a
+        # geothermal heat pump. A radiator is the emitter on the other end.
         "kylanläggning": ["kylanläggning", "kyl", "kylsystem", "refriger",
-                          "cooling", "kylutrustning"],
-        "belysning": ["belysning", "ljus", "lighting", "lampor", "armaturer"],
+                          "cooling", "kylutrustning", "värmepump", "heat pump",
+                          "bergvärme"],
+        # Stem "armatur", not "armaturer": matching is substring, so the
+        # plural never matched "LED-armatur". Plumbing armaturer are caught
+        # by _PRIORITY_TOKENS above before this row is reached.
+        "belysning": ["belysning", "ljus", "lighting", "lampor", "armatur",
+                      "led-armatur"],
         "ventilation": ["ventilation", "ventilationskanal", "fläkt",
                         "stålkanal"],
-        "dörr": ["dörr", "dörrar", "door", "innerdörr"],
+        # Door subtypes (inner/ytter/brand/skjut) are one category here; the
+        # split is made in palats_client.SUBCATEGORY_KEYWORDS["dörr"], the
+        # same taxonomy the reuse search uses. "ytterport" has no "dörr" in it
+        # and fell through to "" (LLM estimate). Bare "port" stays out: it is
+        # inside transport, rapport and export.
+        "dörr": ["dörr", "dörrar", "door", "innerdörr", "ytterdörr",
+                 "branddörr", "entrédörr", "ytterport", "entréport"],
         "hiss": ["hiss", "elevator", "personhiss"],
         "sanitet": ["sanitet", "toalett", "wc", "handfat", "tvättställ",
                     "dusch", "badkar", "urinal", "blandare", "toilet",
                     "washbasin", "shower"],
+        # After sanitet, not in the priority tokens: a "diskbänksblandare" is a
+        # tap and must reach sanitet's "blandare" first.
+        "fast_inredning": ["diskbänk", "diskho"],
         "vitvaror": ["vitvaror", "tvättmaskin", "torktumlare", "torkskåp",
                      "spis", "häll", "ugn", "mikrovåg", "köksfläkt",
                      "cooker hood", "washing machine"],
@@ -131,8 +195,29 @@ VALID_CATEGORIES = {
     "kakel", "golv", "innervägg", "yttervägg", "fasadskikt", "stomme",
     "betongvägg", "fönster", "tak", "isolering", "storköksutrustning",
     "kylanläggning", "belysning", "ventilation", "dörr", "hiss", "sanitet",
-    "vitvaror", "vvs", "farg", "el", "radiator",
+    "vitvaror", "vvs", "farg", "el", "radiator", "fast_inredning",
 }
+
+_FOLD = str.maketrans("åäö", "aao")
+
+# ASCII-folded spelling -> canonical key. Opus 5 writes declared categories
+# without diacritics ("fonster", "dorr", "storkoksutrustning") in real intake
+# runs, measured 2026-09-14. An exact set lookup rejected those, so the declared
+# category was silently dropped and the component fell back to name guessing.
+_FOLDED_CATEGORIES = {c.translate(_FOLD): c for c in VALID_CATEGORIES}
+
+
+def canonical_category(raw: str | None) -> str:
+    """Canonical key for a declared category, accepting the folded spelling.
+
+    "fonster" -> "fönster", "Färg" -> "farg". Anything that is not a valid key
+    in either spelling comes back stripped and lowercased but otherwise as
+    given, so resolve_category can still reject it and fall back to the name.
+    """
+    cat = (raw or "").strip().lower()
+    if cat in VALID_CATEGORIES:
+        return cat
+    return _FOLDED_CATEGORIES.get(cat.translate(_FOLD), cat)
 
 
 def resolve_category(name: str, declared_category: str = "") -> str:
@@ -145,7 +230,7 @@ def resolve_category(name: str, declared_category: str = "") -> str:
     innervägg from its name "Väggytskikt". Falls back to name-based
     normalization when the declared category is missing or unknown.
     """
-    cat = (declared_category or "").strip().lower()
+    cat = canonical_category(declared_category)
     if cat in VALID_CATEGORIES:
         return cat
     return normalize_component_name(name)

@@ -43,6 +43,14 @@ GWP_LULUC_NAMES = {"gwp-luluc", "land use and land use change"}
 # substring of nothing else, but the datahub writes "Global Warming Potential
 # (GWP-GHG)" and matching the exact token keeps it away from the other four.
 GWP_GHG_NAMES = {"(gwp-ghg)"}
+# Pre-A2 declarations carry ONE indicator with no fossil/biogenic split. EPD
+# Norge has 2 066 of them (measured 2026-09-14; the other 10 513 use the four
+# names above). It is a total, not a fossil figure: Kebony's roofing declares
+# -738 kg CO2e/m3 under it, which is biogenic uptake. Recorded as GWP-total so
+# the builder can see the row and refuse it on the right grounds, rather than
+# reading fossil=None and total=None and dropping it without a word. Matched
+# on the full lowercased string so it cannot collide with the split names.
+GWP_BARE_TOTAL_NAMES = {"global warming potential (gwp)"}
 
 # EN 15804+A2: total = fossil + biogenic + luluc. Real declarations round, so
 # accept the larger of 1 kg CO2e and 5% of the total before calling it broken.
@@ -129,9 +137,33 @@ class EPDDetail:
 
 
 class EnvirondecClient:
-    def __init__(self, base_url: str = DATA_HUB_URL):
+    # What a subclass changes to point the same protocol at another soda4LCA
+    # hub (see epd_norge_client). `registry` is the label the catalog carries
+    # in `source_registry`; the rest is where the index lives and how fast the
+    # hub may be asked.
+    registry = "environdec"
+    datastock = ENVIRONDATA_STOCK
+    index_path = INDEX_PATH
+    index_page_sleep = 0.5
+
+    def __init__(self, base_url: str = DATA_HUB_URL, request_interval: float = 0.0):
         self.base_url = base_url
+        self.request_interval = request_interval
+        # None, not 0.0: time.monotonic() has no defined zero, so a 0.0
+        # sentinel would read as "just requested" on a fresh process.
+        self._last_request_at: float | None = None
         self._index: list[EPDSummary] | None = None
+
+    def _throttle(self) -> None:
+        """Space requests `request_interval` seconds apart. No-op at 0."""
+        if self.request_interval <= 0:
+            return
+        now = time.monotonic()
+        if self._last_request_at is not None:
+            wait = self.request_interval - (now - self._last_request_at)
+            if wait > 0:
+                time.sleep(wait)
+        self._last_request_at = time.monotonic()
 
     def fetch_index(self, use_cached: bool = True) -> list[EPDSummary]:
         """Fetch the full EPD index. Uses local JSON cache if available."""
@@ -139,8 +171,8 @@ class EnvirondecClient:
             return self._index
 
         # Try local cache first
-        if use_cached and INDEX_PATH.exists():
-            age_days = (time.time() - INDEX_PATH.stat().st_mtime) / 86400
+        if use_cached and self.index_path.exists():
+            age_days = (time.time() - self.index_path.stat().st_mtime) / 86400
             if age_days < 30:
                 self._index = self._load_index_file()
                 if self._index:
@@ -266,6 +298,7 @@ class EnvirondecClient:
             params["version"] = version
 
         try:
+            self._throttle()
             resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
             resp.raise_for_status()
         except requests.RequestException as e:
@@ -359,9 +392,10 @@ class EnvirondecClient:
         self._last_fetch_complete = False
 
         while True:
-            url = (f"{self.base_url}/datastocks/{ENVIRONDATA_STOCK}"
+            url = (f"{self.base_url}/datastocks/{self.datastock}"
                    f"/processes?format=json&pageSize={INDEX_PAGE_SIZE}&startIndex={start}")
             try:
+                self._throttle()
                 resp = requests.get(url, timeout=REQUEST_TIMEOUT)
                 resp.raise_for_status()
             except requests.RequestException as e:
@@ -390,14 +424,14 @@ class EnvirondecClient:
                 self._last_fetch_complete = True
                 break
             start += INDEX_PAGE_SIZE
-            time.sleep(0.5)
+            time.sleep(self.index_page_sleep)
 
         return all_epds
 
     def _load_index_file(self) -> list[EPDSummary]:
         """Load index from local JSON cache."""
         try:
-            with open(INDEX_PATH) as f:
+            with open(self.index_path) as f:
                 data = json.load(f)
             return [EPDSummary(
                 name=item.get("name", ""),
@@ -424,11 +458,11 @@ class EnvirondecClient:
             for e in index
         ]
         try:
-            INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with open(INDEX_PATH, "w") as f:
+            self.index_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.index_path, "w") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-            logger.info("Saved Environdec index: %d entries, %.1f MB",
-                        len(data), INDEX_PATH.stat().st_size / 1024 / 1024)
+            logger.info("Saved %s index: %d entries, %.1f MB", self.registry,
+                        len(data), self.index_path.stat().st_size / 1024 / 1024)
         except OSError as e:
             logger.warning("Failed to save Environdec index: %s", e)
 
@@ -470,6 +504,7 @@ class EnvirondecClient:
         gwp_biogenic = None
         gwp_luluc = None
         gwp_ghg = None
+        bare_total = None
         modules: dict[str, float] = {}
 
         for result in data.get("LCIAResults", {}).get("LCIAResult", []):
@@ -482,6 +517,7 @@ class EnvirondecClient:
             is_biogenic = "biogenic" in indicator_name
             is_luluc = any(n in indicator_name for n in GWP_LULUC_NAMES)
             is_ghg = any(n in indicator_name for n in GWP_GHG_NAMES)
+            is_bare = indicator_name.strip() in GWP_BARE_TOTAL_NAMES
 
             anies = result.get("other", {}).get("anies", [])
             for a in anies:
@@ -505,9 +541,17 @@ class EnvirondecClient:
                         gwp_luluc = value
                     elif is_ghg:
                         gwp_ghg = value
+                    elif is_bare:
+                        bare_total = value
 
                 if is_fossil and module:
                     modules[module] = value
+
+        # A declaration that carries both a split GWP-total and the bare form
+        # keeps the split one; the bare value only fills an otherwise empty
+        # total, which is the only case it exists for.
+        if gwp_total is None and bare_total is not None:
+            gwp_total = bare_total
 
         return EPDDetail(
             name=name,
@@ -654,6 +698,9 @@ _HINT_KEYWORDS: dict[str, set[str]] = {
                  "refrigerator", "fridge", "freezer", "oven", "stove",
                  "hob", "microwave", "hand dryer", "towel dryer",
                  "household appliance", "domestic appliance"},
+    "fast_inredning": {"kitchen cabinet", "kitchen front", "kitchen door",
+                       "cabinet door", "bathroom cabinet", "mirror cabinet",
+                       "vanity", "worktop", "countertop", "kitchen sink"},
 }
 
 
@@ -688,6 +735,12 @@ _NEGATIVE_TERMS: dict[str, set[str]] = {
                  "connection", "fitting", "switch valve", "spare part"},
     "storköksutrustning": {"valve", "ventil", "hose", "slang", "coupling",
                            "koppling", "connection", "fitting", "spare part"},
+    # Fixed interior is cabinets and worktops, which is exactly the vocabulary
+    # of office furniture. Loose interior is outside the baseline for now. Only
+    # words a fixed-interior name does not also carry ("shelf" and "storage"
+    # do: a mirror cabinet with shelf is still a mirror cabinet).
+    "fast_inredning": {"locker", "wardrobe", "desk", "chair", "office", "filing",
+                       "möbler"},
 }
 
 

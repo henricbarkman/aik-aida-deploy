@@ -1899,6 +1899,13 @@ html { scrollbar-width: thin; scrollbar-color: #d4d4d4 transparent; }
 .cell-input.saving { border-color: var(--kk-gold); background: var(--kk-cream); }
 td.cell-num .cell-input { text-align: right; }
 select.cell-input { cursor: pointer; }
+.alt-qty-line { font-size: 12px; color: var(--kk-gray-500); margin-top: 2px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.alt-qty .cell-input { width: 72px; margin: 0; text-align: right; color: var(--kk-charcoal); border-color: var(--kk-gray-200); background: white; }
+.pick-toggle { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; margin-right: 8px; font-size: 11px; font-weight: 400; color: var(--kk-gray-500); cursor: pointer; }
+.pick-share { font-size: 11px; font-weight: 400; color: var(--kk-gray-500); white-space: nowrap; }
+.pick-qty { width: 56px; font: inherit; text-align: right; border: 1px solid var(--kk-gray-200); border-radius: 4px; padding: 1px 4px; }
+.pick-qty:focus { outline: none; border-color: var(--kk-dark-red); }
+a.palats-link { color: inherit; text-decoration: underline; }
 .cell-remove { background: none; border: none; color: var(--kk-gray-500); cursor: pointer; font-size: 15px; line-height: 1; padding: 4px 6px; border-radius: 4px; font-family: inherit; }
 .cell-remove:hover:not(:disabled) { color: var(--kk-dark-red); background: var(--kk-gray-100); }
 .cell-remove:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -3674,9 +3681,15 @@ function normAltName(name) {
 
 // Record a choice as intent. Called wherever a selection is written, so the two
 // never drift apart.
-function rememberIntent(cid, componentName, altName) {
+function rememberIntent(cid, componentName, altName, picks) {
   _ensureIntent();
-  state.selectionIntent[cid] = {componentName: componentName, altName: altName};
+  const intent = {componentName: componentName, altName: altName};
+  // A combination is remembered as its parts, each with the quantity the user
+  // gave it, so a rerun that returns the same listings rebuilds the same split.
+  if (Array.isArray(picks) && picks.length > 1) {
+    intent.picks = picks.map(p => ({altName: p.name, quantity: p.quantity}));
+  }
+  state.selectionIntent[cid] = intent;
 }
 
 // Adopt intent for any selection that has none — loaded analyses saved before
@@ -3687,8 +3700,29 @@ function backfillIntent() {
     if (state.selectionIntent[cid]) return;
     const sel = state.selections[cid];
     if (sel && sel.selected_alternative) {
-      rememberIntent(cid, sel.name, sel.selected_alternative.name);
+      rememberIntent(cid, sel.name, sel.selected_alternative.name, sel.selected_alternative.picks);
     }
+  });
+}
+
+// The chat agent writes the selections bag wholesale, and what it wrote is the
+// user's latest choice. backfillIntent only fills gaps, so an agent choice that
+// replaced a combination left the old picks as intent and the next rerun rebuilt
+// the combination over it. Overwrite intent wherever the written choice differs.
+// A cid absent from the bag is left alone: the client sent that bag, so absence
+// means an intent still waiting for its alternative, not a removal.
+function adoptAgentSelections() {
+  _ensureIntent();
+  Object.keys(state.selections || {}).forEach(cid => {
+    const sel = state.selections[cid];
+    if (!sel || !sel.selected_alternative) return;
+    const intent = state.selectionIntent[cid];
+    const picks = sel.selected_alternative.picks;
+    const pickCount = Array.isArray(picks) && picks.length > 1 ? picks.length : 0;
+    const same = intent
+      && normAltName(intent.altName) === normAltName(sel.selected_alternative.name)
+      && (intent.picks ? intent.picks.length : 0) === pickCount;
+    if (!same) rememberIntent(cid, sel.name, sel.selected_alternative.name, picks);
   });
 }
 
@@ -3702,8 +3736,19 @@ function dropIntent(removedCids) {
 // no longer on offer. Always reads the CURRENT numbers: a rerun can change kg
 // and price, and carrying the old object forward would leave a stale figure in
 // the summary and in the report — a quieter bug than the one being fixed.
-function bindIntent(comp, altName) {
+function bindIntent(comp, altName, pickIntent, need) {
   if (!comp) return null;
+  if (Array.isArray(pickIntent) && pickIntent.length > 1) {
+    // Every part has to still be on offer. Rebinding half a combination would
+    // put a split the user never made into the report.
+    const names = pickIntent.map(p => p.altName);
+    const found = names.every(n => (comp.alternatives || []).some(a => normAltName(a.name) === normAltName(n)));
+    if (!found) return null;
+    const total = (need > 0) ? need : pickIntent.reduce((s, p) => s + (Number(p.quantity) || 0), 0);
+    const requested = {};
+    pickIntent.slice(0, -1).forEach(p => { requested[normAltName(p.altName)] = Number(p.quantity); });
+    return combinedSelection(comp, allocatePicks(comp, names, total, requested), total);
+  }
   if (altName === 'Baslinje') {
     return {id: comp.component_id, name: comp.component_name,
       selected_alternative: {name: 'Baslinje', co2e_kg: comp.baseline_co2e_kg,
@@ -3763,7 +3808,8 @@ function reconcileSelections(cids) {
       delete state.selectionIntent[cid];
       state.selectionIntent[key] = intent;
     }
-    const bound = bindIntent(comp, intent.altName);
+    const pcNeed = ((state.project && state.project.components) || []).find(p => p.id === comp.component_id);
+    const bound = bindIntent(comp, intent.altName, intent.picks, pcNeed ? Number(pcNeed.quantity) : 0);
     if (bound) {
       state.selections[key] = bound;
       kept.push(comp.component_name);
@@ -4326,8 +4372,8 @@ function applyAgentStateUpdates(updates) {
   if (updates.selections) {
     state.selections = updates.selections;
     // The agent writes the bag wholesale; adopt it as intent so a later rerun
-    // can carry it (increment 3).
-    backfillIntent();
+    // carries the agent's choice, not an older one (increment 3).
+    adoptAgentSelections();
     touched = true;
   }
   // Presence, not truthiness. The guard that actually carries the emptiness sits
@@ -4548,10 +4594,26 @@ function estimatedBadge(c) {
     + 'för avläst ur den. Det står också i klimatredovisningen.">Uppskattad</span>';
 }
 
-function formatSource(source) {
+// The Palats source string is an identifier ("palats.app/listing/39999"), and
+// until 2026-09-14 it was shown as if it were an address. Typed into a browser
+// it redirects to palats.io and 404s; the link in "Visa mer" went to a login
+// page. Show the listing number, and link it when the row carries a real URL.
+// Only palats.app links are rendered: analyses round-trip through user-editable
+// rows, and an href is the one place an injected value would do more than
+// display wrongly.
+function palatsSourceLabel(source, url) {
+  const m = /listing\/([A-Za-z0-9_-]+)/.exec(source || '');
+  const label = m ? 'annons #' + m[1] : String(source || '').replace('[Palats] ', '');
+  if (typeof url === 'string' && /^https:\/\/palats\.app\//.test(url)) {
+    return '<a class="palats-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(label) + ' ↗</a>';
+  }
+  return esc(label);
+}
+
+function formatSource(source, url) {
   if (!source) return '';
   if (source.startsWith('[EPD]')) return '<span class="source-badge source-verified">EPD</span>' + esc(source.replace('[EPD] ', ''));
-  if (source.startsWith('[Palats]')) return '<span class="source-badge source-verified">Palats</span>' + esc(source.replace('[Palats] ', ''));
+  if (source.startsWith('[Palats]')) return '<span class="source-badge source-verified">Palats</span>' + palatsSourceLabel(source, url);
   if (source.includes('Boverket')) return '<span class="source-badge source-verified">BVK</span>' + esc(source);
   // EPD-typvärde: median of upper-half EPDs by GWP per category — better
   // than Uppskattning, less precise than a single verified EPD. Approximates
@@ -5367,9 +5429,20 @@ function alternativHtml(st, cfg) {
   const projComps = (st.project && st.project.components) || [];
   data.components.forEach(comp => {
     const pc = projComps.find(p => p.id === comp.component_id);
-    const qtyLabel = pc ? esc(pc.quantity) + ' ' + esc(pc.unit) + ' ' + quantitySourceBadge(pc.quantity_source) : '';
+    // The quantity every figure in the card is multiplied by, editable where it
+    // is read (Johanna, April: "Aida bestämmer antal utan att visa hur", and
+    // "man kanske själv vill kunna anpassa antalet"). Same cell and same
+    // update_component mutation as the project table, so the card scales
+    // instead of rerunning.
+    const qtyLabel = pc
+      ? '<span class="alt-qty">' + cellInput(pc.id, 'quantity', pc.quantity, 'Antal för ' + pc.name, 'number') + '</span> '
+        + esc(pc.unit) + ' ' + quantitySourceBadge(pc.quantity_source)
+      : '';
     const usageBlock = (pc && pc.usage_context) ? '<div class="usage-context"><span class="usage-context-label">Användning</span>' + esc(pc.usage_context) + '</div>' : '';
-    const header = '<h3>' + esc(comp.component_name) + '</h3>' + (qtyLabel ? '<div style="font-size:12px;color:var(--kk-gray-500);margin-top:2px">Antal: ' + qtyLabel + '</div>' : '') + usageBlock;
+    const header = '<h3>' + esc(comp.component_name) + '</h3>' + (qtyLabel ? '<div class="alt-qty-line">Antal: ' + qtyLabel + '</div>' : '') + usageBlock;
+    const curSel = st.selections[comp.component_id];
+    const curPicks = (curSel && curSel.selected_alternative && Array.isArray(curSel.selected_alternative.picks))
+      ? curSel.selected_alternative.picks : [];
     html += '<div class="comp-card"><div class="comp-card-header">' + header + '</div>';
     html += '<table class="comp-table"><thead><tr><th style="width:32px"></th><th>Typ</th><th>Material</th><th>K\u00e4lla</th><th style="text-align:right">CO\u2082e (kg)</th><th style="text-align:right">Kostnad</th><th style="text-align:right" title="Merkostnad delat med sparade kilo CO\u2082e. L\u00e4gst v\u00e4rde \u00f6verst.">kr/sparat kg</th><th></th></tr></thead><tbody>';
     const blSel = st.selections[comp.component_id] && st.selections[comp.component_id].selected_alternative.name === 'Baslinje';
@@ -5408,7 +5481,9 @@ function alternativHtml(st, cfg) {
         return;
       }
       const saving = comp.baseline_co2e_kg > 0 ? Math.round((1 - alt.co2e_kg / comp.baseline_co2e_kg) * 100) : 0;
-      const isSel = st.selections[comp.component_id] && st.selections[comp.component_id].selected_alternative.name === alt.name;
+      const pickIdx = curPicks.findIndex(p => normAltName(p.name) === normAltName(alt.name));
+      const isSel = pickIdx >= 0 || (st.selections[comp.component_id] && st.selections[comp.component_id].selected_alternative.name === alt.name);
+      const pickable = canCombine(alt, pc);
       // Decompose total for reuse alternatives where units match (no trailing *).
       // Lets the user see e.g. "45 st \u00d7 320 kr = 14 400 kr" inline rather than
       // hidden in Visa mer \u2014 answers Johanna's "varf\u00f6r 45 lampor" without exposing
@@ -5423,10 +5498,10 @@ function alternativHtml(st, cfg) {
             ? '<div style="line-height:1.3">' + Math.round(alt.cost_sek).toLocaleString('sv') + ' kr<div style="font-size:10px;color:var(--kk-gray-500)">' + esc(String(pc.quantity)) + ' \u00d7 ' + perUnit.toLocaleString('sv') + ' kr annonspris</div></div>'
             : '<div style="line-height:1.3">' + Math.round(alt.cost_sek).toLocaleString('sv') + ' kr' + priceBasisNote(alt) + '</div>'));
       html += '<tr class="alt-row' + (isSel ? ' selected' : '') + '" data-comp="' + cid + '" data-alt="' + i + '">' +
-        '<td><input type="radio" name="' + cid + '"' + (isSel ? ' checked' : '') + '></td>' +
+        '<td><input type="radio" name="' + cid + '"' + (isSel && pickIdx < 0 ? ' checked' : '') + '></td>' +
         '<td>' + getTypeBadge(alt) + '</td>' +
-        '<td style="font-weight:500">' + esc(alt.name) + stockNote(alt, pc) + '</td>' +
-        '<td style="font-size:11px">' + gwpBasisBadge(alt) + formatSource(alt.source) + '</td>' +
+        '<td style="font-weight:500">' + esc(alt.name) + stockNote(alt, pc) + pickControls(cid, i, alt, pickable, pickIdx, curPicks, pc) + '</td>' +
+        '<td style="font-size:11px">' + gwpBasisBadge(alt) + formatSource(alt.source, alt.url) + '</td>' +
         '<td style="text-align:right">' + Math.round(alt.co2e_kg) + ' <span style="color:' + (saving >= 0 ? 'var(--green-saving)' : 'var(--kk-red-orange)') + ';font-size:11px">' + (saving >= 0 ? '\u2193' : '\u2191') + Math.abs(saving) + '%</span></td>' +
         '<td style="text-align:right">' + costCell + '</td>' +
         '<td style="text-align:right;font-size:12px">' + formatValuePerKg(comp, alt) + '</td>' +
@@ -5467,13 +5542,27 @@ function alternativHtml(st, cfg) {
 // the tab would quietly drift apart, which is the thing §12 exists to prevent.
 function bindAltRows() {
   document.querySelectorAll('.alt-row').forEach(row => {
-    row.onclick = function() { selectAlt(this.dataset.comp, this.dataset.alt, this); };
+    row.onclick = function(e) {
+      // The combine box, its quantity and the listing link live inside the row.
+      // A click on them is not a click on the row.
+      if (e && e.target && typeof e.target.closest === 'function'
+          && e.target.closest('.pick-toggle, .pick-qty, a')) return;
+      selectAlt(this.dataset.comp, this.dataset.alt, this);
+    };
+  });
+  document.querySelectorAll('.pick-toggle input').forEach(box => {
+    box.onchange = function() { togglePick(this.dataset.comp, this.dataset.alt); };
+  });
+  document.querySelectorAll('input.pick-qty').forEach(el => {
+    el.onchange = function() { setPickQuantity(this.dataset.comp, this.dataset.alt, this.value); };
+    el.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } };
   });
   if (state.alternatives && Object.keys(state.selections).length > 0) updateSummary();
 }
 
 function renderAlternativContent() {
   document.getElementById('resultContent').innerHTML = alternativHtml(effectiveState(state));
+  bindCells();
   bindAltRows();
 }
 
@@ -6375,6 +6464,9 @@ function renderSheet() {
 
 // === Selection handling ===
 function selectAlt(compId, altIdx, row) {
+  const prevSel = state.selections[compId];
+  const hadPicks = !!(prevSel && prevSel.selected_alternative
+    && Array.isArray(prevSel.selected_alternative.picks) && prevSel.selected_alternative.picks.length > 1);
   row.closest('table').querySelectorAll('.alt-row').forEach(r => r.classList.remove('selected'));
   row.classList.add('selected');
   row.querySelector('input[type=radio]').checked = true;
@@ -6397,8 +6489,171 @@ function selectAlt(compId, altIdx, row) {
   }
   // Durable intent, so a later rerun can rebind it (increment 3).
   rememberIntent(compId, comp.component_name, state.selections[compId].selected_alternative.name);
-  updateSummary();
+  // A row click ends a combination. The boxes are redrawn so none stays ticked.
+  if (hadPicks) { refreshResults(); } else { updateSummary(); }
   scheduleAutoSave();
+}
+
+// === Multi-pick: several reuse listings for one component ===
+// Johanna, April: "fönster höger och vänster" are two listings, and a component
+// could only take one. A combination splits the component's need across the
+// listings picked. Each reuse row's figures are computed for the WHOLE need, so
+// a part is that figure scaled to its share; summing full-need figures would
+// count the need twice. Only rows priced per unit for the whole need qualify:
+// counted in st, and not the per-article "*" rows whose total is unknown.
+function canCombine(alt, pc) {
+  return !!alt && alt.alternative_type === 'reuse'
+    && !String(alt.name || '').endsWith('*')
+    && !!pc && String(pc.unit || '').toLowerCase() === 'st' && Number(pc.quantity) > 0
+    // Parts are whole units. A split of 4.5 st would round to parts summing to
+    // 5 while the figures are scaled over 4.5, overstating both by a ninth.
+    && Number.isInteger(Number(pc.quantity));
+}
+
+// Split `need` across the picked listings, in pick order. Every part but the
+// last takes the quantity the user gave it, or by default what the listing has
+// in stock; the last takes the rest, so the parts always add up to the need.
+// Earlier parts are capped so each later part keeps at least one unit.
+function allocatePicks(comp, names, need, requested) {
+  const alts = names
+    .map(n => (comp.alternatives || []).find(a => normAltName(a.name) === normAltName(n)))
+    .filter(Boolean);
+  let left = Math.max(0, Math.round(Number(need) || 0));
+  return alts.map((a, idx) => {
+    let q;
+    if (idx === alts.length - 1) {
+      q = left;
+    } else {
+      const req = requested ? requested[normAltName(a.name)] : undefined;
+      const stock = Number(a.available_quantity) > 0 ? Number(a.available_quantity) : left;
+      q = (req !== undefined && req !== null && !isNaN(req)) ? Number(req) : stock;
+      const cap = Math.max(0, left - (alts.length - 1 - idx));
+      q = Math.max(0, Math.min(Math.round(q), cap));
+    }
+    left -= q;
+    return {alt: a, quantity: q};
+  });
+}
+
+// One selection object for a combination. The combined figures are what every
+// consumer (summary, report, sheet, follow-up) already reads, so none of them
+// needs to know a combination exists; `picks` carries the parts.
+function combinedSelection(comp, allocs, need) {
+  const n = Number(need) || 0;
+  const picks = allocs.map(p => ({
+    name: p.alt.name,
+    quantity: p.quantity,
+    co2e_kg: n > 0 ? p.alt.co2e_kg * p.quantity / n : 0,
+    cost_sek: n > 0 ? p.alt.cost_sek * p.quantity / n : 0,
+    source: p.alt.source,
+    url: p.alt.url || '',
+    available_quantity: (p.alt.available_quantity === undefined ? null : p.alt.available_quantity),
+  }));
+  // An unpriced part makes the whole unpriced: a partial sum would read as the
+  // price of the combination and understate it (same rule as summaryTotals).
+  const unpriced = picks.some(p => !(p.cost_sek > 0) && p.quantity > 0);
+  const priced = picks.filter(p => p.cost_sek > 0);
+  // Units covered by stock across the parts, so the report's "N av M i lager"
+  // caveat still fires for a combination that assumes more than Palats holds.
+  const avail = picks.every(p => p.available_quantity !== null)
+    ? picks.reduce((s, p) => s + Math.min(p.available_quantity, p.quantity), 0)
+    : null;
+  return {id: comp.component_id, name: comp.component_name,
+    selected_alternative: {
+      name: picks.map(p => p.name + ' × ' + p.quantity).join(' + '),
+      co2e_kg: picks.reduce((s, p) => s + p.co2e_kg, 0),
+      cost_sek: unpriced ? 0 : priced.reduce((s, p) => s + p.cost_sek, 0),
+      source: picks.map(p => p.source).join('; '),
+      available_quantity: avail,
+      price_basis: picks.every(p => p.cost_sek > 0) ? 'listing' : '',
+      gwp_basis: '',
+      picks: picks},
+    baseline_co2e_kg: comp.baseline_co2e_kg, baseline_cost_sek: comp.baseline_cost_sek};
+}
+
+function pickControls(cid, i, alt, pickable, pickIdx, picks, pc) {
+  if (!pickable) return '';
+  let html = '<label class="pick-toggle" title="Välj flera annonser för samma komponent, till exempel höger- och vänsterhängda fönster">'
+    + '<input type="checkbox" data-comp="' + cid + '" data-alt="' + i + '"' + (pickIdx >= 0 ? ' checked' : '') + '> kombinera</label>';
+  if (pickIdx >= 0 && picks.length > 1) {
+    const p = picks[pickIdx];
+    if (pickIdx < picks.length - 1) {
+      html += '<span class="pick-share"><input class="pick-qty" type="number" min="0" step="1" data-comp="' + cid + '" data-alt="' + i
+        + '" value="' + esc(String(p.quantity)) + '" aria-label="Antal från ' + esc(alt.name) + '"> av ' + esc(String(pc.quantity)) + ' ' + esc(pc.unit) + '</span>';
+    } else {
+      html += '<span class="pick-share">resten: ' + esc(String(p.quantity)) + ' ' + esc(pc.unit) + '</span>';
+    }
+  }
+  return html;
+}
+
+function _pickContext(compId) {
+  const comp = state.alternatives.components.find(c => c.component_id === compId);
+  const pc = ((state.project && state.project.components) || []).find(p => p.id === compId);
+  const sel = state.selections[compId];
+  const chosen = sel && sel.selected_alternative;
+  let names = [];
+  const requested = {};
+  if (chosen && Array.isArray(chosen.picks) && chosen.picks.length) {
+    names = chosen.picks.map(p => p.name);
+    chosen.picks.slice(0, -1).forEach(p => { requested[normAltName(p.name)] = p.quantity; });
+  } else if (chosen && comp && (comp.alternatives || []).some(a => normAltName(a.name) === normAltName(chosen.name) && canCombine(a, pc))) {
+    // A single reuse choice is the first part of a combination about to start.
+    names = [chosen.name];
+  }
+  return {comp, pc, names, requested};
+}
+
+function _writePicks(compId, ctx, names, requested) {
+  const {comp, pc} = ctx;
+  if (!names.length) {
+    delete state.selections[compId];
+    if (state.selectionIntent) delete state.selectionIntent[compId];
+  } else if (names.length === 1) {
+    const alt = comp.alternatives.find(a => normAltName(a.name) === normAltName(names[0]));
+    state.selections[compId] = bindIntent(comp, alt.name);
+    rememberIntent(compId, comp.component_name, alt.name);
+  } else {
+    // Split in the order the table shows the rows, so the part that takes the
+    // rest is always the lowest one on screen, not whichever was ticked last.
+    const order = rankedAlternatives(comp).map(e => normAltName(e.alt.name));
+    names = names.slice().sort((x, y) => order.indexOf(normAltName(x)) - order.indexOf(normAltName(y)));
+    const sel = combinedSelection(comp, allocatePicks(comp, names, Number(pc.quantity), requested), Number(pc.quantity));
+    state.selections[compId] = sel;
+    rememberIntent(compId, comp.component_name, sel.selected_alternative.name, sel.selected_alternative.picks);
+  }
+  refreshResults();
+  scheduleAutoSave();
+}
+
+function togglePick(compId, altIdx) {
+  const ctx = _pickContext(compId);
+  if (!ctx.comp || !ctx.pc) return;
+  const alt = ctx.comp.alternatives[parseInt(altIdx)];
+  if (!alt || !canCombine(alt, ctx.pc)) return;
+  const key = normAltName(alt.name);
+  let names = ctx.names.slice();
+  if (names.some(n => normAltName(n) === key)) {
+    names = names.filter(n => normAltName(n) !== key);
+    delete ctx.requested[key];
+  } else {
+    names.push(alt.name);
+  }
+  _writePicks(compId, ctx, names, ctx.requested);
+}
+
+function setPickQuantity(compId, altIdx, value) {
+  const ctx = _pickContext(compId);
+  if (!ctx.comp || !ctx.pc || ctx.names.length < 2) return;
+  const alt = ctx.comp.alternatives[parseInt(altIdx)];
+  const n = Number(value);
+  if (!alt || !(n >= 0)) {
+    addMsg('Antalet måste vara ett heltal, noll eller större.', 'system');
+    refreshResults();
+    return;
+  }
+  ctx.requested[normAltName(alt.name)] = Math.round(n);
+  _writePicks(compId, ctx, ctx.names, ctx.requested);
 }
 
 // The only place selection totals get summed. Pure, so the test suite can

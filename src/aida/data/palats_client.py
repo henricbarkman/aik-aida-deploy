@@ -37,6 +37,33 @@ LOCATION_NAMES: dict[int, dict[str, str]] = {
     5761: {"name": "Vänersnipan", "address": "Bogsprötsgatan 20, Karlstad"},
 }
 
+# Vendor id -> public shop slug. The public listing page lives at
+# https://palats.app/shop/<slug>/listing/<id> and renders without a login
+# (verified in a browser 2026-09-14 on listing 39999, "WC-stol"). The API does
+# not expose the slug, so it is mapped here by hand. A vendor missing from this
+# map gets the internal /web/listing/<id> URL, which requires a Palats account.
+SHOP_SLUGS: dict[str, str] = {
+    "ve_01ka8cx0n1fckb4pyzv43gk3mf": "solabyggaterbruk-byggmaterial",
+}
+PALATS_WEB_URL = "https://palats.app"
+
+
+def listing_url(listing_id: str, vendor_id: str = "") -> str:
+    """Deep link a reader can click straight through to the listing.
+
+    Until 2026-09-14 Aida linked to /web/listing/<id>, which only works for a
+    logged-in Palats user, and wrote "palats.app/listing/<id>" in the source
+    column, which redirects to palats.io and 404s. Johanna had to type the
+    article number into Sola's shop search by hand.
+    """
+    if not listing_id:
+        return ""
+    slug = SHOP_SLUGS.get(vendor_id or "")
+    if slug:
+        return f"{PALATS_WEB_URL}/shop/{slug}/listing/{listing_id}"
+    return f"{PALATS_WEB_URL}/web/listing/{listing_id}"
+
+
 # Cache listings for 10 minutes within a process
 _listings_cache: list[dict] | None = None
 _listings_cache_time: float = 0
@@ -205,7 +232,7 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
     ],
     "dörr": [
         ("innerdörr", ["innerdörr"]),
-        ("ytterdörr", ["ytterdörr", "entrédörr"]),
+        ("ytterdörr", ["ytterdörr", "entrédörr", "ytterport", "entréport"]),
         ("branddörr", ["branddörr"]),
         ("skjutdörr", ["skjutdörr"]),
     ],
@@ -224,6 +251,21 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
         ("mikro", ["mikrovågsugn", "mikrovåg", "mikro"]),
         ("köksfläkt", ["köksfläkt", "spisfläkt", "spiskåp", "fläktkåp"]),
         ("spis", ["spis", "häll", "ugn"]),
+    ],
+    # Same keys as EPD_SUBCATEGORY_KEYWORDS["fast_inredning"] in
+    # build_epd_alternatives, so a Swedish component or listing and an English
+    # EPD meet in one bucket. Cabinets before fronts: "Diskbänksskåp" is a
+    # cabinet, and bare "lucka"/"låda" are safe only because the category is
+    # already decided.
+    "fast_inredning": [
+        ("badrumsinredning", ["spegelskåp", "badrumsskåp", "tvättställsskåp",
+                              "badrumsinredning", "badrumsmöbl", "kommod"]),
+        ("köksskåp", ["diskbänksskåp", "köksskåp", "bänkskåp", "överskåp",
+                      "underskåp", "högskåp", "köksinredning"]),
+        ("kökslucka", ["kökslucka", "köksluckor", "kökslåd", "lucka", "luckor",
+                       "låda", "lådor"]),
+        ("diskbänk", ["diskbänk", "diskho"]),
+        ("bänkskiva", ["bänkskiv"]),
     ],
 }
 
@@ -295,6 +337,14 @@ _NON_BUILDING_EXCEPTIONS = (
     # Cooker hoods are vitvaror. "spiskåpa"/"spiskåpor" both end in the
     # guarded "skåp", which is a pure spelling coincidence.
     "spiskåp", "fläktkåp", "imkåp",
+    # Fixed interior, category fast_inredning since 2026-09-14. A mirror cabinet
+    # or a kitchen base cabinet is mounted to the building; a förvaringsskåp or a
+    # garderob is not, and still falls to the "skåp" tail. Worktops are named by
+    # material: a bare "Övrig bänkskiva" from the furniture vendor stays out.
+    "spegelskåp", "badrumsskåp", "tvättställsskåp", "köksskåp", "bänkskåp",
+    "överskåp", "underskåp", "högskåp", "diskbänksskåp",
+    "laminatbänkskiv", "granitbänkskiv", "träbänkskiv", "stenbänkskiv",
+    "kompositbänkskiv", "köksbänkskiv",
 )
 
 # Furniture, loose inventory and workwear. Palats carries all three (48
@@ -392,6 +442,17 @@ def _normalize_to_aida_category(title: str, description: str = "") -> str:
     # Order matters — more specific matches first
     # Multi-word patterns checked before single-word to avoid false positives
     category_keywords: list[tuple[str, list[str]]] = [
+        # First, because its words are compounds that end in other categories'
+        # words or sit next to them: "Överskåp kyl/frys" would reach
+        # kylanläggning's "kyl", "Spegelskåp med belysning" belysning, and
+        # "Tvättställsskåp" sanitet. Measured on Sola 2026-09-14: 5 diskbänkar,
+        # 4 diskhoar, 4 kökslådor, 4 köksluckor, 2 bänkskåp, 6 spegelskåp and 4
+        # material-named bänkskivor, none of which had a category before.
+        ("fast_inredning", [
+            "spegelskåp", "badrumsskåp", "tvättställsskåp", "köksskåp",
+            "bänkskåp", "överskåp", "underskåp", "högskåp", "kökslucka",
+            "köksluckor", "kökslåd", "diskbänk", "diskho", "bänkskiv",
+        ]),
         ("fönster", [
             "fönster", "fönsterbåge", "fönsterkassett", "fönsterbänk",
             "energiglas",
@@ -475,6 +536,13 @@ def _normalize_to_aida_category(title: str, description: str = "") -> str:
         excluded = CATEGORY_EXCLUSIONS.get(category, ())
         if any(x in text for x in excluded):
             continue
+        # fast_inredning is checked first, so a title that names a fixture as
+        # well ("Tvättställ med underskåp", "Diskbänksblandare") must fall
+        # through to sanitet. Same rule as normalize_component_name.
+        if category == "fast_inredning":
+            from aida.data.climate_data import fixture_named_besides_cabinet
+            if fixture_named_besides_cabinet(text, keywords):
+                continue
         for kw in keywords:
             if kw in text:
                 return category
@@ -586,7 +654,7 @@ def _extract_listing(raw: dict) -> PalatsListing:
         category=category,
         subcategory=subcategory,
         image_url=image_url,
-        url=f"https://palats.app/web/listing/{listing_id}" if listing_id else "",
+        url=listing_url(listing_id, str(raw.get("vendorId") or "")),
         location=location,
     )
 
@@ -603,6 +671,7 @@ def component_subcategory(component_name: str, category: str) -> str:
 def search_listings_for_component(
     component_name: str,
     all_listings: list[dict] | None = None,
+    category: str | None = None,
 ) -> list[PalatsListing]:
     """Find Palats listings matching an Aida component.
 
@@ -614,13 +683,20 @@ def search_listings_for_component(
     Args:
         component_name: Aida component name (e.g. 'Toalettstol', 'Golv vinyl')
         all_listings: Pre-fetched raw listings (avoids re-fetching per component)
+        category: The category the component was ROUTED to, when the caller
+            has one. The alternatives agent routes by name + usage_context +
+            directive (a tiled "Väggytskikt" goes to kakel), and until
+            2026-09-14 the Palats side ignored that and re-derived the category
+            from the bare name, so the EPD list and the reuse list for one
+            component could come from two different materials. Falls back to
+            the name-derived category when not given.
 
     Returns:
         Matched listings, ordered subcategory-match first.
     """
     from aida.data.climate_data import normalize_component_name
 
-    target_category = normalize_component_name(component_name)
+    target_category = category or normalize_component_name(component_name)
     if not target_category:
         return []
 

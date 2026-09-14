@@ -319,6 +319,27 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
         else:
             scope_note = ""
 
+        # Which population the number rests on, stated with both counts. A
+        # "global" key is not a weaker typvärde, it is a typvärde with a known
+        # limitation the reader can weigh; hiding it behind a bare n would
+        # imply a Swedish context the data does not have.
+        geo_scope = typvärde_data.get("geo_scope", "")
+        n_global = typvärde_data.get("sample_size_global", n)
+        n_europe = typvärde_data.get("sample_size_europe", 0)
+        if geo_scope == "europa":
+            geo_note = (
+                f" Urvalet är europeiska EPD:er (SE/Norden/EU), {n} av "
+                f"{n_global} i kategorin."
+            )
+        elif geo_scope == "global":
+            geo_note = (
+                f" Bara {n_europe} europeiska EPD:er, under golvet "
+                f"{typvärde_data.get('min_samples_europe', '')}, så hela det globala "
+                f"urvalet används."
+            )
+        else:
+            geo_note = ""
+
         material_note = (
             f" Antaget standardmaterial: {r.assumed_material}."
             if r.assumed_material else ""
@@ -340,6 +361,9 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
             "full_median": full_med,
             "min": typvärde_data.get("min"),
             "max": typvärde_data.get("max"),
+            "geo_scope": geo_scope,
+            "sample_size_global": n_global,
+            "sample_size_europe": n_europe,
         }
         # assumed_material is deliberately NOT cleared. Before 2026-09-01 this
         # assignment replaced the whole description, and the standard material
@@ -347,9 +371,9 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
         # why "vilket golv har den räknat på?" had no answer.
         r.description = (
             f"Baslinje från EPD-typvärde: median av övre halvan av "
-            f"{n} Environdec EPD:er i kategorin {cat_label} "
+            f"{n} EPD:er (Environdec, EPD Norge) i kategorin {cat_label} "
             f"({baseline_per_unit} kg CO2e/{comp.unit}) × {comp.quantity} {comp.unit}."
-            f"{material_note}{scope_note}{mass_note} "
+            f"{material_note}{scope_note}{geo_note}{mass_note} "
             f"Övre halvan används för att approximera 'standardval utan "
             f"klimathänsyn' — full median ({full_med}) hade underskattat "
             f"konventionellt val pga selection bias i EPD-databasen. "

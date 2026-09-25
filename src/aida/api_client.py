@@ -61,18 +61,20 @@ def get_client() -> anthropic.Anthropic:
 
 
 # Default model for Aida's reasoning agents (OpenRouter format).
-# Opus 5: adaptive thinking only — budget_tokens 400s here (see call_model).
-DEFAULT_MODEL = "anthropic/claude-opus-5"
+# Opus 5.5 (from Opus 5, 2026-09-23): adaptive thinking only. budget_tokens AND
+# thinking={"type": "disabled"} both 400 here, forced tool_choice ("any"/"tool")
+# 400s too, and effort defaults to "medium" where Opus 5 defaulted to "high".
+# So every Opus call names its effort explicitly; one that omits it silently
+# thinks less than it did on Opus 5.
+DEFAULT_MODEL = "anthropic/claude-opus-5.5"
 
-# Adaptive-thinking effort levels (Opus 5 / Sonnet 5). These replace the old
+# Adaptive-thinking effort levels (Opus 5.5 / Sonnet 5). These replace the old
 # budget_tokens scheme, which returns 400 on both. Prior budget -> effort:
 #   LOW (1024) -> medium · STANDARD (5000) -> high · DEEP (10000) -> high.
-# Opus 5 "high" is already strong; bump the correctness steps (routing,
-# baseline) to "max" only if matching errors resurface — "max" can overthink.
-# Do NOT reach for thinking={"type": "disabled"} to save cost on Opus 5: it
-# returns 400 at effort xhigh/max, and below that the model sometimes writes a
-# tool call into visible text instead of a tool_use block. Lower the effort
-# instead — that cuts spend without either failure mode.
+# "high" is already strong; bump the correctness steps (routing, baseline) to
+# "max" only if matching errors resurface — "max" can overthink.
+# Thinking cannot be switched off on Opus 5.5 at all. Lower the effort to cut
+# spend instead.
 EFFORT_MEDIUM = "medium"
 EFFORT_HIGH = "high"
 
@@ -89,7 +91,7 @@ REASONING_MAX_TOKENS = 16000
 # Must stay in sync with PRICING_MODEL in data/pricing_provider.py: that module
 # passes PRICING_EFFORT to call_model, and an id missing from this set silently
 # drops both thinking and effort instead of erroring.
-_ADAPTIVE_MODELS = {"anthropic/claude-opus-5", "anthropic/claude-sonnet-5"}
+_ADAPTIVE_MODELS = {"anthropic/claude-opus-5.5", "anthropic/claude-sonnet-5"}
 
 
 def _thinking_request(model: str, effort: str | None) -> dict:

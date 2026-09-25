@@ -27,7 +27,13 @@ from aida import knowledge
 from aida import sheet as sheet_mod
 from aida.agents.alternatives import _format_epd_list, _load_epd_alternatives
 from aida.agents.chat_agent import _format_state, _sanitize_history
-from aida.api_client import DEFAULT_MODEL, extract_text, get_client
+from aida.api_client import (
+    DEFAULT_MODEL,
+    EFFORT_HIGH,
+    call_model,
+    extract_text,
+    get_client,
+)
 from aida.data.climate_data import normalize_component_name
 
 logger = logging.getLogger(__name__)
@@ -271,9 +277,12 @@ def answer_advisory(
     # an API error returns a graceful advisory reply instead.
     try:
         for _ in range(max_turns):
-            response = client.messages.create(
+            # Explicit effort, as in chat_agent: Opus 5.5 defaults to "medium".
+            response = call_model(
+                client,
                 model=ADVISORY_MODEL,
                 max_tokens=max_tokens,
+                effort=EFFORT_HIGH,
                 system=system_prompt,
                 tools=tools,
                 messages=messages,

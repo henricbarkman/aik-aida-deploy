@@ -17,7 +17,13 @@ import logging
 
 from aida import knowledge
 from aida import sheet as sheet_mod
-from aida.api_client import DEFAULT_MODEL, extract_text, get_client
+from aida.api_client import (
+    DEFAULT_MODEL,
+    EFFORT_HIGH,
+    call_model,
+    extract_text,
+    get_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -515,9 +521,13 @@ def run_chat_agent(
         recent + [{"role": "user", "content": message}], blocks)
 
     for _ in range(max_turns):
-        response = client.messages.create(
+        # Explicit effort: on Opus 5 an omitted effort meant "high", on Opus 5.5
+        # it means "medium". Kept at the level the chat was tuned on.
+        response = call_model(
+            client,
             model=DEFAULT_MODEL,
             max_tokens=max_tokens,
+            effort=EFFORT_HIGH,
             system=system_prompt,
             tools=tools,
             messages=messages,

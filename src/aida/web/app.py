@@ -2274,7 +2274,7 @@ a.palats-link { color: inherit; text-decoration: underline; }
     </div>
     <div class="results-content" id="resultContent">
       <div class="empty-state">
-        <p>Beskriv ditt projekt i chatten till vänster för att börja.</p>
+        <p>Beskriv ditt projekt i chatten för att börja.</p>
       </div>
     </div>
   </div>
@@ -2364,6 +2364,19 @@ a.palats-link { color: inherit; text-decoration: underline; }
          file Aida's advisory answers cite, so the two cannot drift apart. -->
     <section class="about-method" id="aboutMethod"></section>
     <script type="application/json" id="aboutMethodSource">{{ method_md|tojson }}</script>
+    <!-- Questions testers actually asked (feedback/johanna-2026-04.md,
+         johanna-2026-06.md), answered where they look for help. HENRIC-2145. -->
+    <section id="aboutFaq">
+      <h3>Vanliga frågor</h3>
+      <p><strong>Hur lång tid tar en analys?</strong><br>
+      Varje steg brukar ta någon eller några minuter. Stora projekt räknas i delar samtidigt, så ett projekt med ett trettiotal byggdelar får sin baslinje på ungefär två minuter. Du kan byta flik medan Aida räknar. Med Pling i sidhuvudet hörs det när ett steg är klart.</p>
+      <p><strong>Vilka byggdelar klarar Aida?</strong><br>
+      Golv, innerväggar, innertak, kakel och klinker, målning, dörrar, fönster, isolering, fasad, ventilation, VVS, el, belysning, radiatorer, sanitet, vitvaror, storköksutrustning, fast inredning och hiss. Hittar Aida inget passande material i databaserna gör den en egen uppskattning och märker den som uppskattning.</p>
+      <p><strong>Hur byter jag namn på ett projekt?</strong><br>
+      Klicka på projektnamnet mitt i sidhuvudet och välj Byt namn på projektet. Där byter du också mellan dina projekt. På en smal mobilskärm syns inte projektmenyn än, där behöver du en dator eller surfplatta.</p>
+      <p><strong>Hur stor är AI:ns egen klimatpåverkan?</strong><br>
+      En hel analys ger i storleksordningen 0,02 till 0,4 kg CO<sub>2</sub>e, troligast runt 0,1 kg. Det är ungefär som att koka en kanna vatten, och omkring en tiotusendel av ett enda golv i ett lärarrum.</p>
+    </section>
     <section>
       <h3>Kontakt</h3>
       <p>Henric Barkman, <a href="mailto:henric.barkman@karlstad.se" style="color:var(--kk-blue)">henric.barkman@karlstad.se</a></p>
@@ -2917,7 +2930,7 @@ function defaultTab() {
   return null;
 }
 
-const STEPWISE_EMPTY = '<div class="empty-state"><p>Beskriv ditt projekt i chatten till vänster för att börja.</p></div>';
+const STEPWISE_EMPTY = '<div class="empty-state"><p>Beskriv ditt projekt i chatten för att börja.</p></div>';
 
 function setMode(m) {
   if (MODES.indexOf(m) === -1 || m === state.mode) return;
@@ -7334,7 +7347,7 @@ function createNewProject() {
   // dead tabs in it.
   _anyTabEnabled = false;
   applyTabStripChrome();
-  document.getElementById('resultContent').innerHTML = '<div class="empty-state"><p>Beskriv ditt projekt i chatten till vänster för att börja.</p></div>';
+  document.getElementById('resultContent').innerHTML = '<div class="empty-state"><p>Beskriv ditt projekt i chatten för att börja.</p></div>';
   resetProgressRail();
   const msgs = document.getElementById('messages');
   msgs.innerHTML = '';

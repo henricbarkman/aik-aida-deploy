@@ -53,6 +53,38 @@ def _get_client() -> anthropic.Anthropic | None:
     )
 
 
+# Spellings a price answer uses for the units Aida counts quantities in, Swedish
+# and English. Anything not listed comes back lowercased and otherwise as
+# written, so it can never equal a component's unit and the price is dropped by
+# the caller instead of being relabelled. Until 2026-09-26 an unknown unit was
+# silently replaced by the unit the caller hoped for: "PRIS: 6500 SEK/styck"
+# (per roll) for a floor became 6500 SEK/m2, times 45 m2, and the unit guard
+# downstream compared the relabelled unit with itself and could never fire
+# (Fable audit 2026-07-19, P2 #9).
+_PRICE_UNIT_SYNONYMS = {
+    "m2": "m2", "m²": "m2", "kvm": "m2", "kvadratmeter": "m2", "sqm": "m2",
+    "m3": "m3", "m³": "m3", "kubikmeter": "m3",
+    "st": "st", "styck": "st", "stycken": "st", "stk": "st", "pcs": "st",
+    "pc": "st", "piece": "st",
+    "lm": "lm", "löpmeter": "lm", "lpm": "lm", "m": "lm", "meter": "lm",
+    "kg": "kg", "kilo": "kg",
+}
+
+
+def normalize_price_unit(raw: str | None) -> str:
+    """Canonical unit (m2, m3, st, lm, kg) for a price's per-unit, or the raw
+    unit lowercased when it is not one Aida counts in. Never guesses."""
+    u = (raw or "").strip().lower().rstrip(".")
+    return _PRICE_UNIT_SYNONYMS.get(u, u)
+
+
+def price_unit_matches(price_unit: str | None, quantity_unit: str | None) -> bool:
+    """True when a per-unit price may be multiplied by a quantity in
+    `quantity_unit`. An empty or unknown price unit never matches."""
+    p = normalize_price_unit(price_unit)
+    return bool(p) and p == normalize_price_unit(quantity_unit)
+
+
 def _build_prompt(product_name: str, unit_hint: str) -> str:
     unit_phrase = f"per {unit_hint}" if unit_hint and unit_hint not in ("kg", "") else ""
     return (
@@ -85,9 +117,9 @@ def _extract_price(text: str, unit_hint: str) -> tuple[float, str] | None:
     except ValueError:
         return None
 
-    unit_map = {"m²": "m2", "m2": "m2", "m³": "m3", "m3": "m3",
-                "st": "st", "pcs": "st", "lm": "lm", "kg": "kg"}
-    unit = unit_map.get(raw_unit.lower(), unit_hint or raw_unit.lower())
+    # The unit the answer states, never the one we asked for: see
+    # normalize_price_unit. unit_hint only shapes the question.
+    unit = normalize_price_unit(raw_unit)
 
     if price <= 0 or price > 10_000_000:
         return None
@@ -352,9 +384,7 @@ def _parse_batch_lines(
         if price <= 0 or price > 10_000_000:
             continue
 
-        unit_map = {"m²": "m2", "m2": "m2", "m³": "m3", "m3": "m3",
-                    "st": "st", "pcs": "st", "lm": "lm", "kg": "kg"}
-        unit = unit_map.get(raw_unit.lower(), raw_unit.lower())
+        unit = normalize_price_unit(raw_unit)
 
         # Match the name the model wrote back to the name we asked about.
         #

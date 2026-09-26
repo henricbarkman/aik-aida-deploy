@@ -254,7 +254,7 @@ class ClimateProvider:
                 return result
             return result  # Enrichment was attempted but found nothing
         try:
-            from aida.data.pricing_provider import lookup_price
+            from aida.data.pricing_provider import lookup_price, price_unit_matches
             pricing = lookup_price(product_name, result.unit)
             if pricing is None:
                 # Mark as attempted so we don't retry every request
@@ -264,9 +264,10 @@ class ClimateProvider:
             # The web-searched price may be quoted in a different unit than the
             # climate result (e.g. SEK/m2 for a window priced per st). Storing it
             # as-is would later multiply by the wrong quantity. On mismatch, keep
-            # the result unpriced and mark enrichment as attempted.
-            if (price_unit and result.unit
-                    and _normalize_unit(price_unit) != _normalize_unit(result.unit)):
+            # the result unpriced and mark enrichment as attempted. An unknown
+            # price unit ("rulle") is a mismatch too: price_unit_matches never
+            # lets it through, and lookup_price no longer relabels it.
+            if result.unit and not price_unit_matches(price_unit, result.unit):
                 logger.debug(
                     "Price unit mismatch for '%s': got %s, expected %s — skipping",
                     product_name, price_unit, result.unit,

@@ -164,9 +164,10 @@ def calculate_baseline(project: Project) -> Baseline:
     provider = ClimateProvider()
     provider.ensure_synced()
 
-    # Phase 1: LLM-based matching against full Boverket product list
+    # Phase 1: LLM-based matching against full Boverket product list, with
+    # exactly one row per component (re-asked once for any the model skipped).
     boverket_products = provider._cache.get_all_boverket()
-    results = _match_components_to_boverket(project, boverket_products)
+    results = _complete_baseline(project, boverket_products)
 
     # Phase 1b: For components where the LLM fell back to "Uppskattning"
     # (no Boverket material proxy fit), substitute an EPD-median where the
@@ -174,30 +175,57 @@ def calculate_baseline(project: Project) -> Baseline:
     _apply_epd_median_fallback(results, project)
 
     # Phase 2: Batch price enrichment
-    from aida.data.pricing_provider import lookup_price, lookup_prices_batch
+    from aida.data.pricing_provider import (
+        lookup_price,
+        lookup_prices_batch,
+        price_unit_matches,
+    )
 
+    comp_map = {c.id: c for c in project.components}
+    # Asked in the unit the component is counted in, and a price that comes
+    # back in another unit is neither used nor cached: SEK/st times 45 m2 is
+    # not a cost (Fable audit 2026-07-19, P2 #9). The row then keeps the
+    # baseline agent's own estimate, which is labelled as one.
+    unit_by_name = {
+        r.component_name.lower(): (comp_map[r.component_id].unit
+                                   if r.component_id in comp_map else "")
+        for r in results
+    }
     products_needing_prices = [
-        (r.component_name, "")
+        (r.component_name, unit_by_name.get(r.component_name.lower(), ""))
         for r in results
         if not _is_price_cached(provider, r.component_name)
     ]
 
+    def _usable(product_key: str, price_unit: str) -> bool:
+        want = unit_by_name.get(product_key, "")
+        if not want or price_unit_matches(price_unit, want):
+            return True
+        logger.warning(
+            "Baseline price for '%s' is per %r but the component is counted in "
+            "%r; discarded", product_key, price_unit, want,
+        )
+        return False
+
     batch_prices: dict[str, tuple[float, str, str]] = {}
     if products_needing_prices:
-        batch_prices = lookup_prices_batch(products_needing_prices)
+        batch_prices = {
+            key: val
+            for key, val in lookup_prices_batch(products_needing_prices).items()
+            if _usable(key, val[1])
+        }
         for product_key, (price, _unit, _source) in batch_prices.items():
             provider._cache.update_cost(product_key, price)
 
         for name, unit in products_needing_prices:
             if name.lower() not in batch_prices:
                 result = lookup_price(name, unit)
-                if result:
+                if result and _usable(name.lower(), result[1]):
                     price, u, src = result
                     batch_prices[name.lower()] = (price, u, src)
                     provider._cache.update_cost(name.lower(), price)
 
     # Phase 3: Apply prices to results
-    comp_map = {c.id: c for c in project.components}
     for r in results:
         batch_result = batch_prices.get(r.component_name.lower())
         if batch_result:
@@ -381,6 +409,54 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
         )
 
 
+def _complete_baseline(project: Project, boverket_products, match=None) -> list[BaselineResult]:
+    """Exactly one baseline row per project component, in project order.
+
+    The matching call returns a JSON list, and nothing checked that the list
+    covered the project. A component the model left out vanished from the
+    baseline, the alternatives, the choices and the report, and the total was
+    still presented as the whole project; a component it returned twice was
+    counted twice (Fable audit 2026-07-19, P2 #5). Duplicates and rows for
+    unknown ids are settled in _match_components_to_boverket. Here, the
+    components still missing are asked for once more on their own. If the
+    model skips them again the step fails with the names, because a baseline
+    that silently covers part of the project is worse than none.
+
+    ``match`` is the matching function, injectable for tests.
+    """
+    match = match or _match_components_to_boverket
+    results = match(project, boverket_products)
+    have = {r.component_id for r in results}
+    missing = [c for c in project.components if c.id not in have]
+    if missing:
+        logger.warning(
+            "Baseline match left out %d of %d components (%s); asking again for those",
+            len(missing), len(project.components), ", ".join(c.id for c in missing),
+        )
+        sub = Project(
+            building_type=project.building_type,
+            area_bta=project.area_bta,
+            components=missing,
+            name=project.name,
+            description=project.description,
+            needs_analysis=project.needs_analysis,
+        )
+        missing_ids = {c.id for c in missing}
+        results += [r for r in match(sub, boverket_products)
+                    if r.component_id in missing_ids and r.component_id not in have]
+        have = {r.component_id for r in results}
+        still = [c for c in project.components if c.id not in have]
+        if still:
+            names = ", ".join(c.name for c in still)
+            raise UserFacingError(
+                f"Baslinjen kunde inte räknas för alla komponenter (saknas: {names})."
+                " Försök igen. Står felet kvar, dela upp projektet i färre komponenter.",
+                status_code=502,
+            )
+    order = {c.id: i for i, c in enumerate(project.components)}
+    return sorted(results, key=lambda r: order.get(r.component_id, len(order)))
+
+
 def _is_price_cached(provider: ClimateProvider, product_name: str) -> bool:
     """Check if a product already has a cached enriched price."""
     cached = provider._cache.get(product_name.lower().strip())
@@ -472,20 +548,37 @@ Matcha varje komponent ovan mot bästa Boverket-produkt. Använd EXAKT de compon
     id_by_index = {i: c.id for i, c in enumerate(project.components)}
     comp_map = {c.id: c for c in project.components}
 
-    results = []
+    if not isinstance(data, list):
+        raise ModelOutputError(
+            f"baslinje-matchningen gav {type(data).__name__}, inte en lista", text)
+
+    known_ids = {c.id for c in project.components}
+    # (how sure the id is, position, row). Lower rank is surer: the model's own
+    # id, then its component name, then the row's position in the list.
+    ranked: list[tuple[int, int, BaselineResult]] = []
     for i, item in enumerate(data):
-        llm_id = item.get("component_id", "")
-        llm_name = item.get("component_name", "")
-        known_ids = {c.id for c in project.components}
+        if not isinstance(item, dict):
+            logger.warning("Baseline match row %d is %s, not an object; skipped",
+                           i, type(item).__name__)
+            continue
+        llm_id = str(item.get("component_id", "") or "")
+        llm_name = str(item.get("component_name", "") or "")
 
         if llm_id in known_ids:
-            comp_id = llm_id
+            comp_id, rank = llm_id, 0
         elif llm_name.lower() in id_by_name:
-            comp_id = id_by_name[llm_name.lower()]
+            comp_id, rank = id_by_name[llm_name.lower()], 1
         elif i in id_by_index:
-            comp_id = id_by_index[i]
+            comp_id, rank = id_by_index[i], 2
         else:
-            comp_id = llm_id
+            # A row for a component the project does not have. Kept until
+            # 2026-09-26, and then summed into the totals as quantity 1 of
+            # something nobody asked about.
+            logger.warning(
+                "Baseline match row %d has unknown id %r (%r); dropped",
+                i, llm_id, llm_name,
+            )
+            continue
 
         comp = comp_map.get(comp_id)
         quantity = comp.quantity if comp else 1
@@ -503,7 +596,7 @@ Matcha varje komponent ovan mot bästa Boverket-produkt. Använd EXAKT de compon
         elif not description:
             description = f"LLM-uppskattning (ej i Boverkets databas). {REASONING['conventional']}"
 
-        results.append(BaselineResult(
+        ranked.append((rank, i, BaselineResult(
             component_id=comp_id,
             component_name=item.get("component_name", ""),
             co2e_kg=round(co2e_kg, 1),
@@ -526,9 +619,24 @@ Matcha varje komponent ovan mot bästa Boverket-produkt. Använd EXAKT de compon
                 "kind": "boverket",
                 "label": f"Boverkets klimatdatabas: {boverket_match}",
             } if boverket_match else {},
-        ))
+        )))
 
-    return results
+    # One row per component. A second row for the same component would be
+    # counted twice in every total, so keep the one whose id the model gave
+    # itself (surest), else the first, and say that the rest were dropped.
+    best: dict[str, tuple[int, int, BaselineResult]] = {}
+    for entry in ranked:
+        cid = entry[2].component_id
+        kept = best.get(cid)
+        if kept is None or entry[:2] < kept[:2]:
+            if kept is not None:
+                logger.warning("Baseline match: duplicate row for %s (row %d); "
+                               "keeping row %d", cid, kept[1], entry[1])
+            best[cid] = entry
+        else:
+            logger.warning("Baseline match: duplicate row for %s (row %d); "
+                           "keeping row %d", cid, entry[1], kept[1])
+    return [entry[2] for entry in sorted(best.values(), key=lambda e: e[1])]
 
 
 def main():

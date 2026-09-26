@@ -41,7 +41,8 @@ logger = logging.getLogger(__name__)
 # Intent classification runs on every routed message (hot path), and is a simple
 # discriminated choice — Haiku 4.5 handles it accurately (verified against the
 # crash inputs + mutation-imperative probe) at lower latency/cost than Sonnet.
-# Advisory answering needs grounded synthesis, so it stays on the default (Sonnet).
+# Advisory answering needs grounded synthesis, so it stays on the default
+# model (DEFAULT_MODEL, Opus 5.5 since 2026-09-23).
 CLASSIFIER_MODEL = "anthropic/claude-haiku-4.5"
 ADVISORY_MODEL = DEFAULT_MODEL
 

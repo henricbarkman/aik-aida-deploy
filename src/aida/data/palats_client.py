@@ -241,6 +241,13 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
         ("fönsterbänk", ["fönsterbänk"]),
     ],
     "vitvaror": [
+        # Fridges and freezers, vitvaror since 2026-09-26 (they sat in
+        # kylanläggning next to chillers and heat pumps). Their own bucket so a
+        # "Kylskåp" component is offered fridges, not the spis and tvättmaskin
+        # listings that share the category. Same key as
+        # EPD_SUBCATEGORY_KEYWORDS["vitvaror"] in build_epd_alternatives.
+        ("kyl_frys", ["kylskåp", "frysskåp", "kylfrys", "frysbox",
+                      "kombiskåp", "kyl", "frys"]),
         ("tvättmaskin", ["tvättmaskin"]),
         ("torktumlare", ["torktumlare", "torkskåp"]),
         # Compounds before the bare words they contain, same rule as sanitet.
@@ -529,13 +536,26 @@ def _normalize_to_aida_category(title: str, description: str = "") -> str:
         ("vitvaror", ["tvättmaskin", "torktumlare", "torkskåp", "spis",
                       "häll", "ugn", "mikrovåg", "köksfläkt", "spisfläkt",
                       "spiskåp", "fläktkåp"]),
-        ("kylanläggning", ["kyl", "frys", "kylskåp", "kylanläggning"]),
+        # Commercial refrigeration only. Household fridges and freezers are
+        # read in the vitvaror step below, with the same function the
+        # component side uses (climate_data.names_household_cold_appliance),
+        # so a "Kylskåp" listing and a "Kylskåp" component meet in one
+        # category. Until 2026-09-26 both sides put it here, next to chillers.
+        ("kylanläggning", ["kyl", "frys", "kylanläggning"]),
     ]
+
+    from aida.data.climate_data import names_household_cold_appliance
 
     for category, keywords in category_keywords:
         excluded = CATEGORY_EXCLUSIONS.get(category, ())
         if any(x in text for x in excluded):
             continue
+        # The drawer and above-fridge-cabinet exclusions were written for
+        # kylanläggning when fridges lived there; they apply to the fridge
+        # read here for the same reason.
+        if (category == "vitvaror" and names_household_cold_appliance(text)
+                and not any(x in text for x in CATEGORY_EXCLUSIONS.get("kylanläggning", ()))):
+            return category
         # fast_inredning is checked first, so a title that names a fixture as
         # well ("Tvättställ med underskåp", "Diskbänksblandare") must fall
         # through to sanitet. Same rule as normalize_component_name.

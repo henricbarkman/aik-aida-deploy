@@ -24,6 +24,7 @@ from aida.api_client import (
     extract_text,
     get_client,
 )
+from aida.data.climate_data import VALID_CATEGORIES
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,15 @@ materialet och kör om baslinjen.
 """
 
 
+# The category a chat correction may set. Generated from the one canonical set
+# instead of hand-kept: until 2026-09-26 this was a literal list of 16 that
+# lacked kakel, vvs, farg, el, radiator, fasadskikt and stomme, so "det är
+# kakel, inte innervägg" could only be written as some other valid-but-wrong
+# category, and the rerun then priced the wrong material without complaint
+# (Fable audit 2026-07-19, P2 #4). Sorted so the schema is stable across runs.
+_CATEGORY_ENUM = sorted(VALID_CATEGORIES)
+
+
 TOOLS = [
     {
         "name": "update_component",
@@ -117,15 +127,7 @@ TOOLS = [
                 "name": {"type": "string"},
                 "quantity": {"type": "number"},
                 "unit": {"type": "string", "enum": ["m2", "st", "lm"]},
-                "category": {
-                    "type": "string",
-                    "enum": [
-                        "golv", "innervägg", "yttervägg", "betongvägg", "tak",
-                        "fönster", "dörr", "isolering", "belysning", "ventilation",
-                        "hiss", "kylanläggning", "sanitet", "vitvaror", "storköksutrustning",
-                        "fast_inredning",
-                    ],
-                },
+                "category": {"type": "string", "enum": _CATEGORY_ENUM},
             },
             "required": ["component_id"],
         },
@@ -148,15 +150,7 @@ TOOLS = [
                 },
                 "quantity": {"type": "number"},
                 "unit": {"type": "string", "enum": ["m2", "st", "lm"]},
-                "category": {
-                    "type": "string",
-                    "enum": [
-                        "golv", "innervägg", "yttervägg", "betongvägg", "tak",
-                        "fönster", "dörr", "isolering", "belysning", "ventilation",
-                        "hiss", "kylanläggning", "sanitet", "vitvaror", "storköksutrustning",
-                        "fast_inredning",
-                    ],
-                },
+                "category": {"type": "string", "enum": _CATEGORY_ENUM},
                 "quantity_source": {
                     "type": "string",
                     "enum": ["user_specified", "estimated"],

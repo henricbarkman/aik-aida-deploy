@@ -1144,14 +1144,44 @@ def _route_components(
     available_categories: set[str],
     user_feedback: str | None = None,
 ) -> dict[str, str]:
+    """{component_id: category}. See _route_components_with_directives."""
+    return _route_components_with_directives(
+        project, baseline_components, available_categories, user_feedback,
+    )[0]
+
+
+# Key in the router's JSON answer listing the components whose material the
+# user's directive changes. Leading underscore so it can never collide with a
+# component id (c1, c2, ...).
+_DIRECTED_KEY = "_direktiv"
+
+
+def _route_components_with_directives(
+    project: Project,
+    baseline_components: list,
+    available_categories: set[str],
+    user_feedback: str | None = None,
+) -> tuple[dict[str, str], set[str]]:
     """LLM-route each component to the EPD category its alternatives fit best.
 
     Why: retrieval is otherwise locked to normalize_component_name(name), which
     maps a "Väggytskikt" to innervägg even when it's a tiled wet-room wall, and
     a user directive ("ge kakel-alternativ") can't pull kakel EPDs. The router
     reads the component name + usage_context + directive and picks the apt
-    catalog category. Returns {component_id: category}. Falls back to
-    normalize_component_name on ANY failure — it never blocks the pipeline.
+    catalog category. Falls back to normalize_component_name on ANY failure —
+    it never blocks the pipeline.
+
+    Returns ``(routing, directed)``. ``directed`` holds the ids of the
+    components whose material the directive itself changes, as the router read
+    it. Only those may have a Boverket baseline replaced (see
+    _effective_baseline_co2e). Until 2026-09-26 that permission came from "is
+    there any feedback at all", so "byt golvet till kakel", or even "bara
+    svenska tillverkare", released every component's Boverket baseline, and a
+    wet-room wall the router moved to kakel on its usage_context alone lost
+    its correct baseline to a kakel typvärde without anyone asking for it
+    (Fable audit 2026-07-19, P2 #3). When the router does not say, nothing is
+    directed: a kept Boverket baseline is a visible mismatch at worst, a
+    silently replaced one is a wrong number.
     """
     fallback: dict[str, str] = {}
     items: list[dict] = []
@@ -1170,23 +1200,32 @@ def _route_components(
             })
 
     if not items or not available_categories:
-        return fallback
+        return fallback, set()
 
     directive = (user_feedback or "").strip()[:500]
     # Skip the LLM call when there's nothing to disambiguate: with no directive
     # and no usage_context, name-based routing is already the right answer.
     if not directive and not any(it["usage_context"] for it in items):
-        return fallback
+        return fallback, set()
 
     cats = sorted(available_categories)
     directive_clause = ""
+    answer_shape = '{"c1": "kategori", "c2": "kategori", ...}'
     if directive:
         directive_clause = (
             f'\nANVÄNDARENS ÖNSKEMÅL (kan gälla en eller flera komponenter): '
             f'"{directive}". Om önskemålet anger ett material (t.ex. kakel), '
             f'välj den kategorin för den komponent önskemålet rör, även om '
-            f'komponentnamnet antyder ett annat material.'
+            f'komponentnamnet antyder ett annat material.\n'
+            f'Lägg också till nyckeln "{_DIRECTED_KEY}": en lista med id för de '
+            f'komponenter vars MATERIAL önskemålet uttryckligen byter. Bara '
+            f'dem önskemålet handlar om, inte komponenter du flyttar till en '
+            f'annan kategori av andra skäl (namn, användningskontext). Tom lista '
+            f'om önskemålet inte byter material för någon komponent (t.ex. '
+            f'"bara svenska tillverkare", "tänk bredare").'
         )
+        answer_shape = ('{"c1": "kategori", "c2": "kategori", ..., '
+                        f'"{_DIRECTED_KEY}": ["c1"]}}')
     prompt = (
         "Du mappar byggkomponenter till rätt materialkategori i en EPD-databas, "
         "så att klimatalternativ hämtas från rätt sorts material.\n\n"
@@ -1200,7 +1239,7 @@ def _route_components(
         "- Välj EXAKT en kategori per komponent, ur listan ovan."
         f"{directive_clause}\n\n"
         f"Komponenter:\n{json.dumps(items, ensure_ascii=False)}\n\n"
-        'Svara ENBART med JSON: {"c1": "kategori", "c2": "kategori", ...}'
+        f"Svara ENBART med JSON: {answer_shape}"
     )
     try:
         client = get_client()
@@ -1216,12 +1255,12 @@ def _route_components(
     except Exception:
         logger.warning("Component routing failed; using name-based fallback",
                        exc_info=True)
-        return fallback
+        return fallback, set()
 
     if not isinstance(data, dict):
         logger.warning("Router returned %s, not a dict; name-based fallback",
                        type(data).__name__)
-        return fallback
+        return fallback, set()
 
     routed: dict[str, str] = {}
     for cid, default_cat in fallback.items():
@@ -1233,7 +1272,22 @@ def _route_components(
             routed[cid] = chosen
         else:
             routed[cid] = default_cat
-    return routed
+
+    directed: set[str] = set()
+    if directive:
+        raw = data.get(_DIRECTED_KEY)
+        if isinstance(raw, list):
+            directed = {str(x) for x in raw if str(x) in fallback}
+        else:
+            logger.warning(
+                "Router gave no %s list for directive %r; treating it as "
+                "changing no component's material (Boverket baselines kept)",
+                _DIRECTED_KEY, directive[:80],
+            )
+        if directed:
+            logger.info("Directive changes material for: %s",
+                        ", ".join(sorted(directed)))
+    return routed, directed
 
 
 def find_alternatives(
@@ -1261,7 +1315,7 @@ def find_alternatives(
     # Route each component to the apt EPD category (name + usage_context +
     # directive), so a tiled "Väggytskikt" or a "ge kakel"-directive pulls kakel
     # EPDs instead of being locked to normalize_component_name's guess.
-    routing = _route_components(
+    routing, directed = _route_components_with_directives(
         project, baseline.components, set(epd_data.keys()), user_feedback,
     )
 
@@ -1291,9 +1345,11 @@ def find_alternatives(
         # directive): a kakel-routed wall is validated against the kakel
         # baseline, not the stored innervägg one — else RC5 drops every kakel
         # alternative and the report shows the wrong-material baseline.
+        # Per component: only a directive that names THIS component's material
+        # may replace its Boverket baseline (see _route_components_with_directives).
         eff_baseline_co2e = _effective_baseline_co2e(
             proj_comp, bl_comp, comp_key,
-            has_directive=bool((user_feedback or "").strip()),
+            has_directive=bl_comp.component_id in directed,
         )
 
         # Note: candidates are NOT narrowed to the component's subcategory.
@@ -1489,10 +1545,12 @@ def _enrich_alternative_prices(
         BASIS_WEB_SEARCH,
         estimate_prices_batch,
         lookup_prices_batch,
+        price_unit_matches,
     )
 
     started_at = time.monotonic()
     quantity_by_cid = {c.id: c.quantity for c in project.components}
+    unit_by_cid = {c.id: c.unit for c in project.components}
     routing = routing or {}
     category_by_cid = {
         c.component_id: (routing.get(c.component_id)
@@ -1509,7 +1567,11 @@ def _enrich_alternative_prices(
             # item, so a generic market price for the material would not be its
             # price. Those keep whatever the listing said.
             if alt.cost_sek <= 0 and alt.alternative_type not in ("baseline", "info", "reuse"):
-                products_needing_prices.append((alt.name, ""))
+                # The component's unit goes into the question ("enhet: m2"),
+                # so the answer comes back in the unit the quantity is counted
+                # in, and is checked against it in apply() below.
+                products_needing_prices.append(
+                    (alt.name, unit_by_cid.get(comp.component_id, "") or ""))
                 alt_index.append((ci, ai))
 
     if not products_needing_prices:
@@ -1529,6 +1591,19 @@ def _enrich_alternative_prices(
             comp = components[ci]
             alt = comp.alternatives[ai]
             quantity = quantity_by_cid.get(comp.component_id, 0) or 0
+            # A per-unit price is only multiplied by a quantity counted in the
+            # same unit. SEK/st times 45 m2 is not a cost, it is a number, and
+            # before 2026-09-26 it went into the total unchecked. Left unpriced
+            # instead, so the estimate pass gets a go and, failing that, the row
+            # says "Pris saknas" rather than a figure off by the pack size.
+            comp_unit = unit_by_cid.get(comp.component_id, "") or ""
+            if comp_unit and not price_unit_matches(unit, comp_unit):
+                logger.warning(
+                    "Price for '%s' is per %r but the component is counted in %r; "
+                    "discarded (%s)", name, unit, comp_unit, basis,
+                )
+                unresolved.append(pos)
+                continue
             alt.cost_sek = round(price_per_unit * quantity) if quantity > 0 else round(price_per_unit)
             # A typical installed price for this KIND of material, or the
             # model's own guess at one. Neither is this product's asking price,

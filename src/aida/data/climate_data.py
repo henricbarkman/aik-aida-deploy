@@ -8,12 +8,72 @@ Hardcoded climate data has been removed. Data sources:
 
 from __future__ import annotations
 
+import re
+
 # Reasoning templates per alternative type
 REASONING = {
     "reuse": "Återbruk eliminerar nästan all tillverkningsrelaterad klimatpåverkan. Kvarvarande CO2e kommer främst från transport och eventuell renovering av materialet.",
     "climate_optimized": "Klimatoptimerat alternativ med lägre CO2e-avtryck jämfört med konventionell produkt, genom val av material med lägre inbyggd klimatpåverkan.",
     "conventional": "Konventionell nyproduktion utan särskild klimathänsyn. Representerar baslinjen: vad standardmaterial kostar klimatmässigt (Boverket Typical A1-A3).",
 }
+
+
+# Household fridges and freezers are vitvaror: in Swedish the word itself means
+# "kyl, frys, spis, disk, tvätt". Until 2026-09-26 kylanläggning's bare "kyl"
+# caught "Kylskåp" first, and kylanläggning is commercial refrigeration: its
+# catalog rows are chillers and heat pumps and its price range starts at
+# 30 000 kr, so a correctly searched 8 000 kr fridge was "corrected" to a
+# 265 000 kr midpoint (Fable audit 2026-07-19, P2 #10).
+#
+# Read per word, because "kyl" is also the head of every commercial compound
+# (kylrum, kylaggregat, kylbaffel, "kyl- och frysrum" in a storkök) and those
+# stay kylanläggning. A word containing one of the stems is a household
+# appliance; a bare "kyl"/"frys" word is one too, unless the same name also
+# carries a commercial kyl/frys compound, which then decides.
+_HOUSEHOLD_COLD_STEMS: tuple[str, ...] = (
+    "kylskåp", "frysskåp", "kylfrys", "frysbox", "kombiskåp",
+)
+_HOUSEHOLD_COLD_WORDS = frozenset({
+    "kyl", "kylen", "kylar", "kylarna", "frys", "frysen", "frysar", "frysarna",
+})
+
+# Beams and columns named without a material prefix. Bare substrings were the
+# bug: "balk" is in "Balkongdörr" and "pelare" in "Duschpelare", so a balcony
+# door and a shower tower were both priced as load-bearing frame (Fable audit
+# 2026-07-19, P2 #10). Matched per word and from the word's start, which keeps
+# "Balk", "Balkar", "Pelare" and "Pelarna" while "balkong*" and "*pelare"
+# compounds fall through to their own categories. The frame compounds that do
+# end in these words (stålbalk, betongpelare, takbalk...) are listed in the
+# stomme row below.
+_WORD_RE = re.compile(r"[a-zåäöéü]+")
+
+
+def _words(text: str) -> list[str]:
+    return _WORD_RE.findall(text.lower())
+
+
+def _names_bare_beam_or_column(text: str) -> bool:
+    for w in _words(text):
+        if w.startswith("balk") and not w.startswith("balkong"):
+            return True
+        if w.startswith("pelar"):
+            return True
+    return False
+
+
+def names_household_cold_appliance(text: str) -> bool:
+    """True when `text` names a household fridge or freezer ("Kylskåp",
+    "Kyl/frys", "Ny kyl Electrolux"), False for commercial refrigeration
+    ("Kylaggregat", "Kyl- och frysrum"). Shared with palats_client so a
+    component and a listing are read the same way: reuse matching compares
+    their categories."""
+    household = False
+    for w in _words(text):
+        if any(s in w for s in _HOUSEHOLD_COLD_STEMS) or w in _HOUSEHOLD_COLD_WORDS:
+            household = True
+        elif "kyl" in w or "frys" in w:
+            return False
+    return household
 
 
 # Checked before the substring table below. Plain substring matching cannot
@@ -75,6 +135,11 @@ def normalize_component_name(name: str) -> str:
                 continue
             return key
 
+    # After the priority tokens, so "Överskåp kyl/frys" is still a cabinet, and
+    # before the table, where kylanläggning's "kyl" would take it.
+    if names_household_cold_appliance(name_lower):
+        return "vitvaror"
+
     mappings = {
         # Keramik/kakel checked BEFORE golv: "golvklinker" contains "golv", so
         # golv would otherwise steal it. Ceramic wall+floor tile share one
@@ -116,12 +181,14 @@ def normalize_component_name(name: str) -> str:
         # so a "betongbjälklag" (a floor slab is frame, not wall) routes here via
         # "bjälklag", while a plain "betongvägg" still falls through below. We
         # deliberately omit bare "bärande" (would steal load-bearing walls) and
-        # bare "stål" (would steal ventilation's "stålkanal").
+        # bare "stål" (would steal ventilation's "stålkanal"). Bare "balk" and
+        # "pelare" are not substrings here any more: see
+        # _names_bare_beam_or_column, checked on this row in the loop below.
         "stomme": ["stomme", "stomsystem", "stålstomme", "stålbalk",
                    "stålpelare", "stålbjälke", "limträ", "limträbalk",
                    "kl-trä", "klträ", "korslimmat", "massivträ", "träbalk",
                    "träpelare", "betongbalk", "betongpelare", "bjälklag",
-                   "håldäck", "balk", "pelare"],
+                   "håldäck", "takbalk", "bärbalk"],
         "betongvägg": ["betongvägg", "betong", "concrete"],
         "fönster": ["fönster", "window", "fönsterbyte", "energiglas"],
         "tak": ["tak", "roof", "takpannor", "takbeläggning", "yttertak",
@@ -184,6 +251,8 @@ def normalize_component_name(name: str) -> str:
         for v in variants:
             if v in name_lower:
                 return key
+        if key == "stomme" and _names_bare_beam_or_column(name_lower):
+            return key
 
     return ""
 

@@ -471,8 +471,77 @@ def _format_boverket_list(products) -> str:
     return "\n".join(lines)
 
 
+# Components per matching call. One call for the whole project stopped fitting:
+# Patrik's Nobelgymnasiet project (31 components, 2026-09-19) spent all 16k
+# output tokens (8.4k thinking, the rest JSON) and was cut off mid-list, twice,
+# and the half-JSON surfaced as a generic error. Re-run 2026-09-26: 153 s,
+# stop_reason=max_tokens. Chunks run in parallel, so a large project takes
+# about as long as a small one instead of timing out. A chunk that is still
+# cut off is split in half and asked again.
+BASELINE_CHUNK_SIZE = 8
+BASELINE_MAX_PARALLEL = 4
+
+
+class _Truncated(Exception):
+    """The matching answer hit max_tokens; the JSON is incomplete."""
+
+
+def _sub_project(project: Project, components: list) -> Project:
+    return Project(
+        building_type=project.building_type,
+        area_bta=project.area_bta,
+        components=list(components),
+        name=project.name,
+        description=project.description,
+        needs_analysis=project.needs_analysis,
+    )
+
+
 def _match_components_to_boverket(project: Project, boverket_products) -> list[BaselineResult]:
-    """Single LLM call: match all components to Boverket products."""
+    """Match every component to a Boverket product, in chunks of
+    BASELINE_CHUNK_SIZE run in parallel. Row order follows the project."""
+    comps = list(project.components)
+    if len(comps) <= BASELINE_CHUNK_SIZE:
+        return _match_or_split(project, boverket_products)
+
+    n_chunks = -(-len(comps) // BASELINE_CHUNK_SIZE)
+    size = -(-len(comps) // n_chunks)  # balanced: 31 -> 8, 8, 8, 7
+    chunks = [comps[i:i + size] for i in range(0, len(comps), size)]
+    logger.info("Baseline matching %d components in %d parallel chunks",
+                len(comps), len(chunks))
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=min(BASELINE_MAX_PARALLEL, len(chunks))) as ex:
+        parts = list(ex.map(
+            lambda cs: _match_or_split(_sub_project(project, cs), boverket_products),
+            chunks,
+        ))
+    return [r for part in parts for r in part]
+
+
+def _match_or_split(project: Project, boverket_products) -> list[BaselineResult]:
+    """One matching call; if the answer is cut off, halve and ask again."""
+    try:
+        return _match_chunk(project, boverket_products)
+    except _Truncated:
+        comps = list(project.components)
+        if len(comps) <= 1:
+            raise UserFacingError(
+                f"Baslinjen för \"{comps[0].name if comps else '?'}\" blev för lång "
+                "för modellens svar. Försök igen. Står felet kvar, korta ner "
+                "komponentens beskrivning.",
+                status_code=502,
+            ) from None
+        half = len(comps) // 2
+        logger.warning("Baseline match cut off at %d components; splitting in two",
+                       len(comps))
+        return (_match_or_split(_sub_project(project, comps[:half]), boverket_products)
+                + _match_or_split(_sub_project(project, comps[half:]), boverket_products))
+
+
+def _match_chunk(project: Project, boverket_products) -> list[BaselineResult]:
+    """Single LLM call: match the given components to Boverket products."""
     client = get_client()
 
     # usage_context is what makes the standard material choosable. Intake
@@ -524,6 +593,16 @@ Matcha varje komponent ovan mot bästa Boverket-produkt. Använd EXAKT de compon
     )
 
     text = extract_text(response)
+
+    # Check before parsing: a cut-off list can still contain a parseable
+    # fragment (the 2026-09-26 re-run parsed one inner object as "dict, not a
+    # list"), and that must never be read as the answer.
+    if getattr(response, "stop_reason", None) == "max_tokens":
+        logger.warning(
+            "Baseline match cut off at max_tokens (%d components, %d chars)",
+            len(project.components), len(text),
+        )
+        raise _Truncated()
 
     try:
         data = extract_json_value(text, what="baslinje-matchningen")

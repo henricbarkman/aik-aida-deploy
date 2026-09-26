@@ -25,6 +25,7 @@ from aida.api_client import (
     get_client,
 )
 from aida.data.climate_data import VALID_CATEGORIES
+from aida.errors import UserFacingError
 
 logger = logging.getLogger(__name__)
 
@@ -517,15 +518,39 @@ def run_chat_agent(
     for _ in range(max_turns):
         # Explicit effort: on Opus 5 an omitted effort meant "high", on Opus 5.5
         # it means "medium". Kept at the level the chat was tuned on.
-        response = call_model(
-            client,
-            model=DEFAULT_MODEL,
-            max_tokens=max_tokens,
-            effort=EFFORT_HIGH,
-            system=system_prompt,
-            tools=tools,
-            messages=messages,
-        )
+        try:
+            response = call_model(
+                client,
+                model=DEFAULT_MODEL,
+                max_tokens=max_tokens,
+                effort=EFFORT_HIGH,
+                system=system_prompt,
+                tools=tools,
+                messages=messages,
+            )
+        except Exception:
+            # Every tool turn is followed by one more model call, so an API
+            # error here used to throw away edits already applied in this
+            # request (Fable audit 2026-07-19, P3 #8). The first call has
+            # applied nothing and still raises; after that, return what was
+            # done with a plain reply, like answer_advisory does.
+            if not tool_calls:
+                raise
+            logger.exception("chat_agent: model call failed after %d tool call(s)",
+                             len(tool_calls))
+            done = [c for c in tool_calls if c.get("ok")]
+            reply = ("Ändringarna är gjorda, men jag kunde inte skriva klart svaret. "
+                     "Kolla resultatet och skriv igen om något saknas."
+                     if done else
+                     "Något gick fel innan jag hann göra ändringen. Försök igen.")
+            return {
+                "reply": reply,
+                "state_updates": _build_state_updates(
+                    touched_bags, project, baseline, alternatives, selections,
+                    pending_actions, overrides=overrides, as_built=as_built, sheet=sheet,
+                ),
+                "tool_calls": tool_calls,
+            }
 
         if sheet_mod.cut_off(response):
             logger.warning("chat_agent: reply cut off inside a tool call")
@@ -597,7 +622,11 @@ def run_chat_agent(
                 )
             except Exception as e:
                 logger.exception("Tool %s failed", block.name)
-                result_text = f"Fel vid {block.name}: {e}"
+                # The raw exception stays in the log. It used to go into the
+                # tool result, which is returned to the browser in tool_calls
+                # and which the model may quote (Fable audit 2026-07-19, P3 #3).
+                result_text = (str(e) if isinstance(e, UserFacingError)
+                               else f"Verktyget {block.name} misslyckades. Inget ändrades.")
                 ok = False
                 handler_touched = set()
 

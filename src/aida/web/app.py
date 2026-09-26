@@ -117,31 +117,65 @@ def get_user_claims():
         return None
     token = auth_header[7:]
 
+    # Garbage never leaves the process. Until 2026-09-26 any string after
+    # "Bearer " ended in a blocking 5 s call to Supabase's /auth/v1/user before
+    # the 401, so anyone could make every request cost us an outbound call
+    # (Fable audit 2026-07-19, P3 #5). A token that is not structurally a JWT
+    # (three segments, a readable header naming an algorithm) is refused here.
+    if len(token) > 8192 or token.count('.') != 2:
+        return None
+    try:
+        header = pyjwt.get_unverified_header(token)
+    except Exception:
+        return None
+    alg = header.get('alg') if isinstance(header, dict) else None
+    if not alg or alg == 'none':
+        return None
+
+    # Set when local verification failed for a reason Supabase's own endpoint
+    # could still settle (a key we do not have, an algorithm we do not check).
+    # A token whose signature, expiry or audience was checked and found wrong
+    # is not asked about again.
+    key_unknown = alg not in ('ES256', 'HS256')
+
     # Try ES256 via JWKS first (Supabase default since 2024)
     jwks = _get_jwks_client()
-    if jwks:
+    if jwks and alg == 'ES256':
         try:
             signing_key = jwks.get_signing_key_from_jwt(token)
-            payload = pyjwt.decode(
-                token, signing_key.key,
-                algorithms=['ES256'], audience='authenticated'
-            )
-            if payload.get('sub'):
-                return payload
         except Exception as e:
-            app.logger.debug("ES256 JWKS validation failed: %s", e)
+            app.logger.debug("ES256 key lookup failed: %s", e)
+            key_unknown = True
+        else:
+            try:
+                payload = pyjwt.decode(
+                    token, signing_key.key,
+                    algorithms=['ES256'], audience='authenticated'
+                )
+                if payload.get('sub'):
+                    return payload
+            except Exception as e:
+                app.logger.debug("ES256 JWKS validation failed: %s", e)
+    elif alg == 'ES256':
+        key_unknown = True
 
     # Fallback: HS256 with local secret
-    if SUPABASE_JWT_SECRET:
-        try:
-            payload = pyjwt.decode(
-                token, SUPABASE_JWT_SECRET,
-                algorithms=['HS256'], audience='authenticated'
-            )
-            if payload.get('sub'):
-                return payload
-        except Exception as e:
-            app.logger.debug("HS256 validation failed: %s", e)
+    if alg == 'HS256':
+        if SUPABASE_JWT_SECRET:
+            try:
+                payload = pyjwt.decode(
+                    token, SUPABASE_JWT_SECRET,
+                    algorithms=['HS256'], audience='authenticated'
+                )
+                if payload.get('sub'):
+                    return payload
+            except Exception as e:
+                app.logger.debug("HS256 validation failed: %s", e)
+        else:
+            key_unknown = True
+
+    if not key_unknown:
+        return None
 
     # Last resort: verify token via Supabase auth API (handles any algorithm)
     try:
@@ -398,15 +432,62 @@ body { font-family: 'Roboto', sans-serif; height: 100vh; display: flex; align-it
 </html>"""
 
 
+# Legacy shared-password login (Fable audit 2026-07-19, P3 #6). Kept, hardened:
+# a constant-time compare, and a lockout after LOGIN_MAX_FAILURES wrong
+# passwords from one address within LOGIN_WINDOW_S. In-process like the rate
+# limiter above, so on serverless it is per warm instance: it turns an
+# unlimited guessing loop into a slow one, it is not a global counter.
+LOGIN_MAX_FAILURES = 5
+LOGIN_WINDOW_S = 15 * 60
+_login_failures: dict[str, list[float]] = {}
+_login_lock = threading.Lock()
+
+
+def _login_client_key() -> str:
+    return (request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
+            or request.remote_addr or 'unknown')
+
+
+def _login_locked(key: str, now: float) -> bool:
+    with _login_lock:
+        recent = [t for t in _login_failures.get(key, []) if now - t < LOGIN_WINDOW_S]
+        if recent:
+            _login_failures[key] = recent
+        else:
+            _login_failures.pop(key, None)
+        return len(recent) >= LOGIN_MAX_FAILURES
+
+
+def _login_record_failure(key: str, now: float) -> None:
+    with _login_lock:
+        _login_failures.setdefault(key, []).append(now)
+
+
+def _password_ok(given: str) -> bool:
+    import hmac
+    return hmac.compare_digest((given or '').encode('utf-8'),
+                               AIDA_PASSWORD.encode('utf-8'))
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if not AIDA_PASSWORD:
         return redirect(url_for('index'))
     error = None
     if request.method == 'POST':
-        if request.form.get('password') == AIDA_PASSWORD:
+        key, now = _login_client_key(), time.monotonic()
+        if _login_locked(key, now):
+            app.logger.warning("Legacy login locked out for %s", key)
+            return render_template_string(
+                LOGIN_TEMPLATE,
+                error='För många felaktiga försök. Vänta en kvart och försök igen.',
+            ), 429
+        if _password_ok(request.form.get('password', '')):
+            with _login_lock:
+                _login_failures.pop(key, None)
             session['authenticated'] = True
             return redirect(url_for('index'))
+        _login_record_failure(key, now)
         error = 'Fel lösenord'
     return render_template_string(LOGIN_TEMPLATE, error=error)
 
@@ -2570,11 +2651,16 @@ function esc(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g
 
 function renderMd(text) {
   text = text.replace(/^(\d+)\)\s/gm, '$1. ');
-  let html;
-  if (typeof marked !== 'undefined') html = marked.parse(text);
-  else html = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  // Fail closed (Fable audit 2026-07-19, P3 #2): marked's HTML only reaches
+  // innerHTML through DOMPurify. If the sanitizer did not load (CDN blocked)
+  // the text is escaped instead of rendered, so model-written markup can
+  // never run unsanitized. Until 2026-09-26 raw marked output went through.
+  if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+    return DOMPurify.sanitize(marked.parse(text));
+  }
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;')
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');
-  return typeof DOMPurify !== 'undefined' ? DOMPurify.sanitize(html) : html;
 }
 
 // === Orchestration increment 4: one durable conversation per analysis ===

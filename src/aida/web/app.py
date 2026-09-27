@@ -390,10 +390,15 @@ def index():
 
 # Not for search engines. Henric's call, 2026-09-27: the link keeps working
 # for anyone who has it, but AIda should not be findable, and registration is
-# open. Three layers because crawlers read different things: robots.txt (asked
-# before crawling), X-Robots-Tag (on every response, including JSON and the
-# /docs pages, which carry no meta tag of their own), and the meta tag in the
-# page itself.
+# open. noindex only works if the crawler is allowed to fetch the page and
+# read it — Google's own docs: "If a page is disallowed from crawling ...
+# any information about indexing or serving rules will not be found and
+# will therefore be ignored." A robots.txt Disallow was blocking exactly the
+# request that would have delivered the noindex signal, so Google could
+# still list the bare URL. robots.txt therefore allows everything; the real
+# work is X-Robots-Tag (on every response, including JSON and the /docs
+# pages, which carry no meta tag of their own) and the meta tag in the page
+# itself.
 ROBOTS_TAG = 'noindex, nofollow'
 
 
@@ -405,7 +410,7 @@ def _no_indexing(response):
 
 @app.route('/robots.txt')
 def robots_txt():
-    return Response('User-agent: *\nDisallow: /\n', mimetype='text/plain')
+    return Response('User-agent: *\nAllow: /\n', mimetype='text/plain')
 
 
 @app.route('/docs/<path:filename>')

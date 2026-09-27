@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import secrets
 import sys
 import threading
 import time
@@ -15,7 +14,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from flask import Flask, Response, jsonify, redirect, render_template_string, request, session, url_for
+from flask import Flask, Response, jsonify, render_template_string, request
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -65,22 +64,11 @@ def step_failed(exc: Exception, step: str):
 
 app = Flask(__name__)
 
-AIDA_PASSWORD = os.environ.get('AIDA_PASSWORD', '')
+# Supabase is the only login. The legacy shared-password login (/login,
+# AIDA_PASSWORD) was removed 2026-09-27 on Henric's decision: it granted no
+# access in production, but /login still confirmed whether a guess was right.
+# The Flask session is no longer used, so there is no cookie signing key.
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip()
-
-# Session cookie signing key. When legacy password auth is the active mechanism
-# (no Supabase JWT), a per-process random key breaks sessions across serverless
-# instances (login loops). Require a stable key in that case. With Supabase JWT
-# the Flask session isn't used for auth, so a random fallback is harmless.
-_secret = os.environ.get('AIDA_SECRET_KEY', '')
-if not _secret:
-    if AIDA_PASSWORD and not SUPABASE_URL:
-        raise RuntimeError(
-            "AIDA_SECRET_KEY must be set when AIDA_PASSWORD is used — a random "
-            "per-instance key breaks login across serverless instances."
-        )
-    _secret = secrets.token_hex(32)
-app.secret_key = _secret
 SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '').strip()
 SUPABASE_JWT_SECRET = os.environ.get('SUPABASE_JWT_SECRET', '').strip()
 
@@ -278,19 +266,12 @@ def require_auth(f):
                 return jsonify({'error': 'Kontot saknar behörighet'}), 403
             request.user_id = claims['sub']
             return f(*args, **kwargs)
-        # Legacy password auth
-        if not AIDA_PASSWORD:
-            # Neither Supabase nor a password is configured. In a serverless
-            # (production) deploy that means the LLM-cost endpoints would be
-            # public — fail closed. Locally, keep the no-auth convenience.
-            if os.environ.get('VERCEL'):
-                return jsonify({'error': 'Autentisering ej konfigurerad'}), 503
-            return f(*args, **kwargs)
-        if session.get('authenticated'):
-            return f(*args, **kwargs)
-        if request.is_json:
-            return jsonify({'error': 'Ej inloggad'}), 401
-        return redirect(url_for('login'))
+        # Supabase is not configured. In a serverless (production) deploy that
+        # means the LLM-cost endpoints would be public — fail closed. Locally,
+        # keep the no-auth convenience.
+        if os.environ.get('VERCEL'):
+            return jsonify({'error': 'Autentisering ej konfigurerad'}), 503
+        return f(*args, **kwargs)
     return decorated
 
 
@@ -394,104 +375,6 @@ def require_supabase_auth(f):
     return decorated
 
 
-LOGIN_TEMPLATE = r"""<!DOCTYPE html>
-<html lang="sv">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aida | Logga in</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-<style>
-:root { --kk-gold: #FFCC01; --kk-dark-red: #B5201F; --kk-burgundy: #890200; --kk-charcoal: #444; --kk-cream: #FFF9DE; --kk-warm-bg: #FAF9F6; --kk-gray-200: #e6e4e0; --kk-gray-400: #8a8883; --kk-gray-500: #6a6864; --kk-gold-light: #FFF1B6; }
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Roboto', sans-serif; height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--kk-warm-bg); }
-.login-box { background: white; border-radius: 12px; padding: 40px; width: 360px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); border-top: 3px solid var(--kk-gold-light); }
-.login-box h1 { font-size: 24px; color: var(--kk-charcoal); margin-bottom: 8px; }
-.login-box p { font-size: 13px; color: var(--kk-gray-500); margin-bottom: 24px; }
-.login-box input { width: 100%; padding: 12px 16px; border: 1px solid var(--kk-gray-200); border-radius: 8px; font-size: 14px; font-family: inherit; outline: none; }
-.login-box input:focus { border-color: var(--kk-dark-red); box-shadow: 0 0 0 2px rgba(181,32,31,0.15); }
-.login-box button { width: 100%; padding: 12px; background: var(--kk-charcoal); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 12px; font-family: inherit; }
-.login-box button:hover { background: var(--kk-dark-red); }
-.error { color: var(--kk-dark-red); font-size: 12px; margin-top: 8px; }
-.footer { position: fixed; bottom: 16px; font-size: 11px; color: var(--kk-gray-500); }
-</style>
-</head>
-<body>
-<div class="login-box">
-  <h1>Aida</h1>
-  <p>Klimatkalkyl och beslutsstöd för ombyggnationer</p>
-  <form method="POST">
-    <input type="password" name="password" placeholder="Lösenord" autofocus>
-    {% if error %}<div class="error">{{ error }}</div>{% endif %}
-    <button type="submit">Logga in</button>
-  </form>
-</div>
-<div class="footer"></div>
-</body>
-</html>"""
-
-
-# Legacy shared-password login (Fable audit 2026-07-19, P3 #6). Kept, hardened:
-# a constant-time compare, and a lockout after LOGIN_MAX_FAILURES wrong
-# passwords from one address within LOGIN_WINDOW_S. In-process like the rate
-# limiter above, so on serverless it is per warm instance: it turns an
-# unlimited guessing loop into a slow one, it is not a global counter.
-LOGIN_MAX_FAILURES = 5
-LOGIN_WINDOW_S = 15 * 60
-_login_failures: dict[str, list[float]] = {}
-_login_lock = threading.Lock()
-
-
-def _login_client_key() -> str:
-    return (request.headers.get('X-Forwarded-For', '').split(',')[0].strip()
-            or request.remote_addr or 'unknown')
-
-
-def _login_locked(key: str, now: float) -> bool:
-    with _login_lock:
-        recent = [t for t in _login_failures.get(key, []) if now - t < LOGIN_WINDOW_S]
-        if recent:
-            _login_failures[key] = recent
-        else:
-            _login_failures.pop(key, None)
-        return len(recent) >= LOGIN_MAX_FAILURES
-
-
-def _login_record_failure(key: str, now: float) -> None:
-    with _login_lock:
-        _login_failures.setdefault(key, []).append(now)
-
-
-def _password_ok(given: str) -> bool:
-    import hmac
-    return hmac.compare_digest((given or '').encode('utf-8'),
-                               AIDA_PASSWORD.encode('utf-8'))
-
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if not AIDA_PASSWORD:
-        return redirect(url_for('index'))
-    error = None
-    if request.method == 'POST':
-        key, now = _login_client_key(), time.monotonic()
-        if _login_locked(key, now):
-            app.logger.warning("Legacy login locked out for %s", key)
-            return render_template_string(
-                LOGIN_TEMPLATE,
-                error='För många felaktiga försök. Vänta en kvart och försök igen.',
-            ), 429
-        if _password_ok(request.form.get('password', '')):
-            with _login_lock:
-                _login_failures.pop(key, None)
-            session['authenticated'] = True
-            return redirect(url_for('index'))
-        _login_record_failure(key, now)
-        error = 'Fel lösenord'
-    return render_template_string(LOGIN_TEMPLATE, error=error)
-
-
 @app.route('/')
 def index():
     if SUPABASE_URL:
@@ -500,8 +383,6 @@ def index():
             supabase_anon_key=SUPABASE_ANON_KEY,
             has_supabase=True,
             method_md=knowledge.method_markdown())
-    if AIDA_PASSWORD and not session.get('authenticated'):
-        return redirect(url_for('login'))
     return render_template_string(HTML_TEMPLATE,
         supabase_url='', supabase_anon_key='', has_supabase=False,
         method_md=knowledge.method_markdown())

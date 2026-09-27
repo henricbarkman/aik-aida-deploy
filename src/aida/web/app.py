@@ -388,6 +388,26 @@ def index():
         method_md=knowledge.method_markdown())
 
 
+# Not for search engines. Henric's call, 2026-09-27: the link keeps working
+# for anyone who has it, but AIda should not be findable, and registration is
+# open. Three layers because crawlers read different things: robots.txt (asked
+# before crawling), X-Robots-Tag (on every response, including JSON and the
+# /docs pages, which carry no meta tag of their own), and the meta tag in the
+# page itself.
+ROBOTS_TAG = 'noindex, nofollow'
+
+
+@app.after_request
+def _no_indexing(response):
+    response.headers['X-Robots-Tag'] = ROBOTS_TAG
+    return response
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    return Response('User-agent: *\nDisallow: /\n', mimetype='text/plain')
+
+
 @app.route('/docs/<path:filename>')
 def serve_docs(filename):
     """Serve static docs files."""
@@ -1353,6 +1373,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
 <title>Aida | Klimatkalkyl för ombyggnationer</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23E84E0D' stroke-width='1.5' stroke-linecap='round'><circle cx='12' cy='12' r='5'/><path d='M12 1v3M12 20v3M1 12h3M20 12h3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">

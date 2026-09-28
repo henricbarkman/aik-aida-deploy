@@ -63,6 +63,12 @@ Reglar, läkt och balkar behöver en dimension och en längd för att kunna jäm
 
 Lösa möbler (stolar, kontorsstolar, bord, förvaringsskåp, hyllor, soffor, fristående skärmar, gardiner, mattor) läggs till med category los_inredning och unit st, en komponent per sort och med sorten i namnet ("Elevstol", "Kontorsstol", "Skrivbord"). Alternativ och återbruk jämförs bara inom samma sort. Säger användaren bara "möbler", fråga vilka sorter och hur många av varje innan du anropar add_component.
 
+Undertak och akustik läggs till med category undertak och sorten i namnet: "Akustikplattor" (undertaksplattor), "Väggabsorbenter", "Bafflar" eller "Bärverk T24" (profiler och upphängning). Sorterna jämförs var för sig, så säger användaren bara "akustik" eller "ljudabsorbenter", fråga vilken sort det är. Plattor, absorbenter och bafflar räknas i m2, bärverk i lm. Ett innertak är undertak; category tak betyder yttertaket.
+
+Tätskikt i våtrum läggs till med category tätskikt, som en egen komponent skild från kaklet ovanpå. Avjämning (flytspackel, avjämningsmassa) läggs till med category golv och "Avjämning" i namnet, skild från golvbeläggningen. Båda deklareras nästan alltid per kg, så vet användaren vikten (till exempel antal säckar gånger säckvikt) läggs de till med unit kg. Räkna aldrig om kvadratmeter till kg själv: åtgången beror på produkten och skikttjockleken. Har användaren bara kvadratmeter, lägg till i m2 och säg att alternativen behöver mängden i kg.
+
+Glaspartier och glasväggar är innervägg med "Glasparti" i namnet, i m2. De jämförs bara med andra glaspartier, inte med gipsväggar.
+
 Säg aldrig till användaren att hen ska lägga till komponenten någon annanstans, i projektvyn eller genom att börja om. Du kan göra det härifrån.
 
 KONFIRMATION VID FULL OMKÖRNING:
@@ -131,7 +137,7 @@ TOOLS = [
                 },
                 "name": {"type": "string"},
                 "quantity": {"type": "number"},
-                "unit": {"type": "string", "enum": ["m2", "st", "lm"]},
+                "unit": {"type": "string", "enum": ["m2", "st", "lm", "kg"]},
                 "category": {"type": "string", "enum": _CATEGORY_ENUM},
             },
             "required": ["component_id"],
@@ -154,7 +160,7 @@ TOOLS = [
                     "description": "Komponentens namn som användaren beskriver den, t.ex. 'Innerdörrar' eller 'Linoleumgolv'.",
                 },
                 "quantity": {"type": "number"},
-                "unit": {"type": "string", "enum": ["m2", "st", "lm"]},
+                "unit": {"type": "string", "enum": ["m2", "st", "lm", "kg"]},
                 "category": {"type": "string", "enum": _CATEGORY_ENUM},
                 "quantity_source": {
                     "type": "string",

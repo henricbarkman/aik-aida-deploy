@@ -327,6 +327,7 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
     default a user would pick if they weren't actively climate-optimizing.
     """
     from aida.data.epd_baseline_medians import (
+        _SPLIT_SUBCATEGORIES,
         get_baseline_typvärde,
         member_typvärde,
         split_subcategory_miss,
@@ -362,7 +363,11 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
         # and keep the name-derived one as the fallback.
         subcategory = component_subcategory(comp.name, category)
         material_subtype = subtype_from_material(category, r.assumed_material)
-        if material_subtype:
+        # Except when the name already names a split subtype: an
+        # "Avjämningsmassa" whose assumed material reads "flytspackel under
+        # vinylmatta" is still a levelling compound, not a vinyl floor
+        # (HENRIC-3290 del 3).
+        if material_subtype and subcategory not in _SPLIT_SUBCATEGORIES.get(category, {}):
             subcategory = material_subtype
         typvärde_data = get_baseline_typvärde(category, comp.unit, subcategory)
 

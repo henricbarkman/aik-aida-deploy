@@ -123,6 +123,24 @@ _WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
         "aggregat-EPD:er per kg spänner över alla storlekar, och ett "
         "kg-värde ger inget styckvärde utan aggregatets vikt"
     ),
+    # HENRIC-3290 del 3, counted per group rather than per owner string: the
+    # dominance test's _owner_key keeps Saint-Gobain's national subsidiaries
+    # apart, so it sees avjämning/kg at 0.18 when one group declares 48 of 60.
+    ("golv", "avjämning", "kg"): (
+        "48 av 60 EPD:er för avjämningsmassa kommer från en och samma koncern "
+        "(Saint-Gobain, Weber), så ett typvärde vore deras sortiment och inte "
+        "ett typiskt val"
+    ),
+    ("undertak", "baffel", "m2"): (
+        "24 av 32 EPD:er för bafflar och akustiköar kommer från en och samma "
+        "leverantör (Ecophon), så ett typvärde vore deras sortiment och inte "
+        "ett typiskt val"
+    ),
+    ("undertak", "bärverk", "lm"): (
+        "31 av 35 EPD:er för undertakets bärverk kommer från en och samma "
+        "leverantör (Rockfon Chicago Metallic), så ett typvärde vore deras "
+        "sortiment och inte ett typiskt val"
+    ),
 }
 
 
@@ -163,8 +181,19 @@ _SUBTYPE_PREFERRED_CATEGORIES = {"golv"}
 # listed are the ones the subtype is counted in. A component in another unit
 # ("Ventilation, aggregat och kanaler", per m2 BTA) describes a whole system,
 # not a unit, and keeps the category key it had before.
+#
+# golv/avjämning and innervägg/glasparti, 2026-09-28 (HENRIC-3290 del 3), the
+# same shape. A levelling compound (0.2-1 kg CO2e/kg) lies under a floor
+# covering and is never one; a glazed partition system (27-292 kg CO2e/m2) is
+# ten to fifty times the plasterboard wall innervägg is otherwise made of.
+# Both list every unit a component can be given in, unlike aggregat: an
+# "Avjämningsmassa" in m2 or in säckar is still a levelling compound, and the
+# floor covering's m2 or st value is not its number. With no value of its own
+# it gets none, and the row says to give the quantity in kg.
 _SPLIT_SUBCATEGORIES: dict[str, dict[str, tuple[str, ...]]] = {
     "ventilation": {"aggregat": ("st", "kg")},
+    "golv": {"avjämning": ("kg", "m2", "st")},
+    "innervägg": {"glasparti": ("m2", "st", "kg")},
 }
 
 
@@ -188,7 +217,12 @@ def split_subcategory_miss(category: str, unit: str, subcategory: str) -> bool:
 # The m3 keys are not what a component is counted in. A stud is bought per
 # löpmeter and a board per m2, and member_typvärde below bridges the m3 value
 # with the member's own section or thickness, read from its name.
-_MATERIAL_SUBCATEGORIZED_CATEGORIES = {"stomme"}
+#
+# undertak, 2026-09-28 (HENRIC-3290 del 3), for the same two reasons: a ceiling
+# tile per m2, a wall absorber, a free-hanging baffle and the T24 grid per m2
+# of ceiling or per kg are four products, and each is declared in the unit it
+# is sold in. A ceiling of no stated kind ("Ljudabsorbent") gets no typvärde.
+_MATERIAL_SUBCATEGORIZED_CATEGORIES = {"stomme", "undertak"}
 
 # The stomme families whose m3 value may be bridged by geometry. Solid material
 # only: a steel stud or section is a thin-walled profile, and its weight per
@@ -391,7 +425,14 @@ def _group_rows(epds: list[dict]) -> dict[tuple[str, str, str], Rows]:
             # complete, because it is the fallback for every subtype too thin to
             # publish — building it from the leftovers instead would make it the
             # mean of exactly the floors nobody could name.
+            #
+            # Except a split subtype (golv/avjämning): that one is not a floor
+            # the aggregate should describe, so it is counted once, in its own
+            # key, like aggregat below.
             sub = _epd_subcategory(cat, e)
+            if sub in _SPLIT_SUBCATEGORIES.get(cat, {}):
+                grouped.setdefault((cat, sub, unit), []).append((float(gwp), e))
+                continue
             if sub:
                 grouped.setdefault((cat, sub, unit), []).append((float(gwp), e))
             sub = ""
@@ -559,6 +600,15 @@ def get_baseline_typvärde(category: str, unit: str, subcategory: str = "") -> d
     if _TYPVÄRDEN is None:
         _TYPVÄRDEN = _compute_typvärden()
 
+    # Split subtypes first, so a golv/avjämning miss never reaches the
+    # subtype-preferred fallback below (the floor covering's aggregate).
+    split_units = _SPLIT_SUBCATEGORIES.get(category, {}).get(subcategory)
+    if split_units:
+        if unit in split_units:
+            # No fallback to the category key: see _SPLIT_SUBCATEGORIES.
+            return _TYPVÄRDEN.get((category, subcategory, unit))
+        return _TYPVÄRDEN.get((category, "", unit))
+
     if category in _SUBTYPE_PREFERRED_CATEGORIES and subcategory:
         hit = _TYPVÄRDEN.get((category, subcategory, unit))
         if hit:
@@ -566,13 +616,6 @@ def get_baseline_typvärde(category: str, unit: str, subcategory: str = "") -> d
         # Fall through to the category aggregate below. Deliberately not
         # returning None: an unfamiliar or thin floor subtype should still get a
         # baseline, just an honestly labelled one.
-
-    split_units = _SPLIT_SUBCATEGORIES.get(category, {}).get(subcategory)
-    if split_units:
-        if unit in split_units:
-            # No fallback to the category key: see _SPLIT_SUBCATEGORIES.
-            return _TYPVÄRDEN.get((category, subcategory, unit))
-        return _TYPVÄRDEN.get((category, "", unit))
 
     keyed = _SUBCATEGORIZED_CATEGORIES | _MATERIAL_SUBCATEGORIZED_CATEGORIES
     sub = subcategory if category in keyed else ""

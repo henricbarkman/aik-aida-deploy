@@ -27,6 +27,11 @@ from aida import followup as followup_mod
 from aida import overrides as overrides_mod
 from aida.data.climate_data import canonical_category
 
+# The units a component can be counted in. kg since HENRIC-3290 del 3: a
+# levelling compound or a liquid membrane is declared per kg, and converting
+# m2 to kg needs a product's own consumption rate, which Aida does not have.
+COMPONENT_UNITS = ("m2", "st", "lm", "kg")
+
 
 def _find_component(project, component_id):
     if not project:
@@ -133,6 +138,14 @@ def _apply_update_component(inp, project, baseline, alternatives, selections, pe
     if not target:
         return f"Komponent {cid} finns inte i projektet.", False, set()
 
+    # The same units add_component allows. Without the check an update to
+    # "ton" was stored, and a unit with no class in alternatives falls back to
+    # the whole mixed-unit bucket (found in review, HENRIC-3290 del 3).
+    unit = inp.get("unit")
+    if unit is not None and unit not in COMPONENT_UNITS:
+        name = target.get("name") or cid
+        return f"Enheten för {name} måste vara m2, st, lm eller kg.", False, set()
+
     changed = {}
     old_quantity = target.get("quantity")
     for key in ("name", "quantity", "unit", "category"):
@@ -214,8 +227,8 @@ def _apply_add_component(inp, project, baseline, alternatives, selections, pendi
         return f"Mängden för {name} måste vara större än noll.", False, set()
 
     unit = inp.get("unit") or ""
-    if unit not in ("m2", "st", "lm"):
-        return f"Enheten för {name} måste vara m2, st eller lm.", False, set()
+    if unit not in COMPONENT_UNITS:
+        return f"Enheten för {name} måste vara m2, st, lm eller kg.", False, set()
 
     # A duplicate name is more likely a second attempt at the same thing than a
     # genuine second component, and two rows with the same name are impossible

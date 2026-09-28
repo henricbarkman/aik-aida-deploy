@@ -42,7 +42,7 @@ Svara ALLTID med giltig JSON i detta format:
   "name": "projektnamn om nämnt",
   "description": "original beskrivning",
   "components": [
-    {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm", "category": "kategori", "quantity_source": "user_specified" eller "estimated", "usage_context": "1-3 meningar om brukare + miljö + funktionella krav"}
+    {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm|kg", "category": "kategori", "quantity_source": "user_specified" eller "estimated", "usage_context": "1-3 meningar om brukare + miljö + funktionella krav"}
   ],
   "needs_analysis": {
     "from_user": "Parafras av användarens input — bara det användaren faktiskt sagt om byggnaden, användningen, kraven. Ingen agent-tolkning.",
@@ -56,8 +56,12 @@ Svara ALLTID med giltig JSON i detta format:
 Regler:
 - Komponent-id ska vara c1, c2, c3 etc
 - Gissa rimlig quantity om den inte anges (baserat på area och byggnadstyp)
-- Unit ska vara m2, st, eller lm (löpmeter)
-- Category ska vara en av: golv, kakel, innervägg, yttervägg, fasadskikt, betongvägg, tak, fönster, dörr, isolering, belysning, ventilation, hiss, kylanläggning, sanitet, vitvaror, storköksutrustning, vvs, farg, el, radiator, fast_inredning, los_inredning, stomme
+- Unit ska vara m2, st, eller lm (löpmeter). kg bara för avjämning och tätskikt, och bara när användaren själv angett vikten (till exempel antal säckar gånger säckvikt); räkna aldrig om kvadratmeter till kg.
+- Category ska vara en av: golv, kakel, innervägg, yttervägg, fasadskikt, betongvägg, tak, undertak, tätskikt, fönster, dörr, isolering, belysning, ventilation, hiss, kylanläggning, sanitet, vitvaror, storköksutrustning, vvs, farg, el, radiator, fast_inredning, los_inredning, stomme
+  - tak vs undertak: tak är yttertaket (takpapp, takpannor, plåttak). undertak är innertak och akustik: undertaksplattor, akustikplattor, väggabsorbenter, bafflar och undertakets bärverk (T24-profiler). Namnge sorten ("Akustikplattor", "Väggabsorbenter", "Bafflar", "Bärverk T24"), eftersom sorterna jämförs var för sig. Plattor, absorbenter och bafflar i m2, bärverk i lm.
+  - tätskikt: tätskikt i våtrum (rollat eller flytande tätskikt, tätskiktsmembran, tätskiktsduk) under kakel. Egen komponent, skild från kaklet. Yttertakets tätskikt (papp, takduk) är tak.
+  - Avjämning (flytspackel, avjämningsmassa) är golv, men en egen komponent med "Avjämning" i namnet, skild från golvbeläggningen ovanpå.
+  - Glaspartier och glasväggar är innervägg, med "Glasparti" i namnet.
   - stomme: bärande stomme, alltså balkar, pelare och bjälklag i stål, limträ, KL-trä eller betong. Bärande väggar är inte stomme.
     Reglar (trä eller stål), läkt, syll, konstruktionsvirke och konstruktionsskivor (OSB, plywood, spånskiva) är också stomme, även när de sitter i en innervägg. Skriv dimensionen i namnet ("Reglar 45x95", "Stålreglar 70 mm", "OSB-skiva 12 mm") och räkna reglar i lm (antal × längd), skivor i m2. Saknas dimension eller längd för reglar: fråga efter den i clarification_needed, och gissa den inte.
   - kakel: kaklad/klinkad yta (våtrumsvägg, -golv, kakel/klinker). Välj kakel framför golv/innervägg när ytan är keramisk.

@@ -313,6 +313,14 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
                    "glespanel", "syll", "träbalk", "träpelare", "takstol",
                    "konstruktionsträ"]),
     ],
+    # Levelling compound, golv's split subtype (HENRIC-3290 del 3). Only this
+    # one: which floor COVERING a component is comes from the standard material
+    # the baseline names (epd_baseline_medians.subtype_from_material), not from
+    # the name, but a levelling compound is named as what it is.
+    "golv": [
+        ("avjämning", ["avjämning", "flytspackel", "golvspackel",
+                       "självutjämnande", "självnivellerande"]),
+    ],
 }
 
 # Categories whose reuse matches must share the component's subcategory, not
@@ -324,7 +332,9 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
 # Loose interior since 2026-09-28 (HENRIC-3290 del 2): thirty elevstolar are
 # not replaced by a bokhylla, and a component that says only "Möbler" gets no
 # listings until it says which kind.
-STRICT_SUBCATEGORY_CATEGORIES: frozenset[str] = frozenset({"stomme", "los_inredning"})
+# Ceilings since HENRIC-3290 del 3: a T24 cross tee is not a ceiling tile.
+STRICT_SUBCATEGORY_CATEGORIES: frozenset[str] = frozenset(
+    {"stomme", "los_inredning", "undertak"})
 
 
 def _normalize_to_aida_subcategory(category: str, text: str) -> str:
@@ -338,6 +348,16 @@ def _normalize_to_aida_subcategory(category: str, text: str) -> str:
         # sides, so a listing and a component meet in the same bucket.
         from aida.data.climate_data import furniture_subcategory
         return furniture_subcategory(text)
+    if category == "undertak":
+        # Same reason, HENRIC-3290 del 3: the kind is often a trailing
+        # qualifier ("Akustikpaneler vägg") that a substring table misreads.
+        from aida.data.climate_data import ceiling_subcategory
+        return ceiling_subcategory(text)
+    if category == "innervägg":
+        # A glazed partition is innervägg's split subtype. Read from the head:
+        # "Gipsvägg med glasparti" is a plasterboard wall.
+        from aida.data.climate_data import glazed_partition
+        return "glasparti" if glazed_partition(text) else ""
     subcats = SUBCATEGORY_KEYWORDS.get(category)
     if not subcats:
         return ""
@@ -437,8 +457,9 @@ def _is_non_building(title: str) -> bool:
 # this is where the known catches get thrown back. Substring match on title.
 CATEGORY_EXCLUSIONS: dict[str, tuple[str, ...]] = {
     # A glazed partition is not insulation, however much its title says
-    # "ljudisolering". Closest real category is innervägg, but a glass wall is
-    # not a gypsum wall either, so it gets no category rather than a wrong one.
+    # "ljudisolering". Since 2026-09-28 (del 3) it falls through to innervägg,
+    # where glasparti is a split subtype with its own EPD rows, and meets
+    # glazed partitions rather than plasterboard.
     "isolering": ("glasparti",),
     # An awning shades a window, it does not replace one. A window sill has
     # its own subcategory and is not a window either.
@@ -504,6 +525,24 @@ def _normalize_to_aida_category(title: str, description: str = "") -> str:
     if _is_non_building(title):
         return ""
 
+    # Ceilings, acoustics and wet-room waterproofing, HENRIC-3290 del 3, with
+    # the component side's readers, so a listing and a component that both say
+    # "T24 tvärprofil" or "Ljudabsorbent" meet. Before the table, whose tak
+    # row used to hold "undertak" and "undertaksplatt". A glazed partition
+    # likewise, read from the head: "Glasparti med dörr" is a partition, and
+    # the table's dörr row comes before innervägg.
+    from aida.data.climate_data import (
+        glazed_partition,
+        names_ceiling,
+        names_wet_room_waterproofing,
+    )
+    if names_ceiling(title):
+        return "undertak"
+    if names_wet_room_waterproofing(title):
+        return "tätskikt"
+    if glazed_partition(title):
+        return "innervägg"
+
     # Order matters — more specific matches first
     # Multi-word patterns checked before single-word to avoid false positives
     category_keywords: list[tuple[str, list[str]]] = [
@@ -542,10 +581,13 @@ def _normalize_to_aida_category(title: str, description: str = "") -> str:
             "golv", "parkett", "vinylgolv", "vinylmatta", "laminatgolv",
             "trägolv", "golvplatta", "golvmatta", "plastmatta",
             "heltäckningsmatta", "textilmatta", "entrématta", "linoleum",
+            # Levelling compound, golv's split subtype (del 3).
+            "avjämning", "flytspackel", "golvspackel",
         ]),
+        # "undertak" and "undertaksplatt" moved out 2026-09-28: a suspended
+        # ceiling is undertak, read above.
         ("tak", [
-            "takpann", "takplåt", "takskiva", "yttertak", "undertak",
-            "undertaksplatt", "takbrygga",
+            "takpann", "takplåt", "takskiva", "yttertak", "takbrygga",
         ]),
         ("belysning", [
             "lampa", "armatur", "belysning", "spotlight",
@@ -559,8 +601,10 @@ def _normalize_to_aida_category(title: str, description: str = "") -> str:
         # "reglar" moved out 2026-09-28: a listing of studs is stomme, read by
         # names_frame_member above. A wall listing that names them after its
         # head ("Gipsvägg med reglar") still lands here on "gips".
+        # Glazed partitions since 2026-09-28 (del 3), innervägg/glasparti.
         ("innervägg", [
             "gipsskiva", "gips", "väggskiva", "byggskiva", "innervägg",
+            "glasparti", "glasvägg",
         ]),
         ("yttervägg", ["fasadskiva", "fasadplatta", "puts", "fasad"]),
         # Cooker hoods moved to vitvaror below, so this list must no longer
@@ -791,6 +835,14 @@ def search_listings_for_component(
     if strict and not target_subcategory:
         return []
 
+    # A split subtype (a glazed partition in innervägg, a levelling compound in
+    # golv, an air handling unit in ventilation) is not an alternative to the
+    # rest of its category in either direction, the same rule the EPD side
+    # applies in alternatives._split_subtype_rows. Without it a used glass
+    # partition was offered as reuse for a plasterboard wall (HENRIC-3290 del 3).
+    from aida.data.epd_baseline_medians import _SPLIT_SUBCATEGORIES
+    splits = _SPLIT_SUBCATEGORIES.get(target_category, {})
+
     primary: list[PalatsListing] = []
     secondary: list[PalatsListing] = []
     for raw in all_listings:
@@ -799,7 +851,8 @@ def search_listings_for_component(
             continue
         if target_subcategory and listing.subcategory == target_subcategory:
             primary.append(listing)
-        elif not strict:
+        elif not strict and listing.subcategory not in splits \
+                and target_subcategory not in splits:
             secondary.append(listing)
 
     return primary + secondary
@@ -821,6 +874,11 @@ REUSE_CO2E_PER_UNIT: dict[str, float] = {
     "dörr": 3.0,       # st
     "tak": 1.0,        # m2
     "isolering": 0.5,  # m2
+    "undertak": 0.5,   # m2 — same handling as isolering: a mineral or glass
+                       # wool board lifted down and put up again. Got its own
+                       # listing-side category 2026-09-28 (HENRIC-3290 del 3).
+                       # tätskikt has none and takes the labelled default: a
+                       # membrane is not taken up and laid again.
     "belysning": 1.0,  # st
     "ventilation": 0.5,  # lm
     "diskmaskin": 15.0,  # st

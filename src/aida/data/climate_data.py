@@ -114,6 +114,11 @@ _PRIORITY_TOKENS: tuple[tuple[str, tuple[str, ...]], ...] = (
     # asks which kind rather than comparing chairs with sofas.
     ("los_inredning", ("lös inredning", "lösa inredning", "los_inredning",
                        "lösa möbler", "möbler", "möblering")),
+    # Cooker hoods, 2026-09-28 (HENRIC-3290 del 3). The ventilation row's bare
+    # "fläkt" is checked before vitvaror's "köksfläkt" in the table below, so a
+    # "Köksfläkt" was priced as a duct fitting. Before the ventilation tokens.
+    ("vitvaror", ("köksfläkt", "spisfläkt", "fläktkåpa", "fläktkåpor",
+                  "spiskåpa", "spiskåpor")),
     # Air handling units, added 2026-09-28. They sit here and not on the
     # ventilation row below because kylanläggning is checked first and its bare
     # "kyl" would take "Luftbehandlingsaggregat med kylbatteri". "FTX-aggregat"
@@ -122,7 +127,10 @@ _PRIORITY_TOKENS: tuple[tuple[str, tuple[str, ...]], ...] = (
     # component name; it is NOT safe in EPD names (Jotun's "Ultra One D FTX" is
     # a paint), which is why the catalog side matches it as a word.
     ("ventilation", ("ftx", "ventilationsaggregat", "luftbehandlingsaggregat",
-                     "luftbehandlingsenhet")),
+                     "luftbehandlingsenhet",
+                     # A roof or ceiling fan, 2026-09-28 (del 3). The table's
+                     # "tak" is checked before its "fläkt", so it was a roof.
+                     "takfläkt")),
 )
 
 
@@ -410,6 +418,165 @@ def furniture_subcategory(text: str) -> str:
     return ""
 
 
+# Suspended ceilings and fixed acoustics, HENRIC-3290 del 3. "Undertak
+# akustikplattor" reached the table's bare "tak" and was given 39 roofs as
+# alternatives; "Akustikpaneler vägg", "Ljudabsorbent" and a Palats "T24
+# tvärprofil" had no category at all. One reader for components and listings,
+# like furniture_subcategory, so both land in the same bucket.
+#
+# Stems, read inside a compound: "Gipsundertak" and "Undertaksplattor" are
+# ceilings. So are "innertak" and "himling", as ceilings of no stated kind:
+# either is as often plaster that is painted as a suspended ceiling, but left
+# where the table put them they reached "tak" and were offered roofs, the
+# error this reader was written for. No kind gives a question, and the
+# question says what a plastered ceiling is; "Innertaksplattor" and
+# "Himlingsplattor" name their kind.
+_CEILING_STEMS = ("undertak", "innertak", "himling", "akustikplatt",
+                  "akustikpanel", "akustiktak",
+                  "akustikskiv", "ljudabsorbent", "väggabsorbent",
+                  "takabsorbent", "akustikabsorbent", "baffel", "bafflar",
+                  "akustikö", "takplatt", "tvärprofil", "huvudprofil",
+                  "ecophon", "rockfon")
+# The ceiling grid series, as words: "T24 tvärprofil", "T15-profil".
+_GRID_SERIES_RE = re.compile(r"\bt(?:24|15)\b")
+# Compound tails that make a word something done to a ceiling or mounted in
+# one, or another surface: "Målning av undertak" is paint, "Takarmatur i
+# undertak" a luminaire, "Gipsvägg med akustikpanel" a wall. Checked per word
+# before the stems, because a Swedish compound is named by its last part.
+_NOT_CEILING_TAILS = ("målning", "färg", "lamp", "armatur", "belysning",
+                      "högtalare", "sprinkler", "vägg", "golv")
+# A chilled or supply-air beam is called a baffel too ("Kylbaffel",
+# "Tilluftsbaffel"), and is kylanläggning or ventilation, not acoustics.
+_AIR_BEAM_RE = re.compile(r"(?:kyl|tilluft|luft|klimat|ventilation|värme|komfort)s?baff")
+# Which kind, most specific first: the grid before anything ("Bärverk
+# undertak"), free-hanging units before the tiles they are made of, a wall
+# before a tile ("Akustikplattor vägg" hang on a wall). The brands last, for
+# names that say nothing else ("Ecophon Focus A").
+_CEILING_KINDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("bärverk", ("bärverk", "tvärprofil", "huvudprofil", "bärprofil",
+                 "undertaksprofil", "vinkelprofil", "kantprofil", "bärskena",
+                 "upphängning")),
+    ("baffel", ("baffel", "bafflar", "akustikö", "frihängande")),
+    ("väggabsorbent", ("vägg", "vegg")),
+    ("akustikplatta", ("platt", "undertak", "akustiktak", "akustikskiv",
+                       "takabsorbent", "ecophon", "rockfon")),
+)
+
+
+def _ceiling_kind_in(text: str) -> str:
+    if _GRID_SERIES_RE.search(text):
+        return "bärverk"
+    words = [c.replace("-", "") for c in _COMPOUND_RE.findall(text)]
+    for kind, stems in _CEILING_KINDS:
+        if any(s in w for w in words for s in stems):
+            return kind
+    return ""
+
+
+def ceiling_kind(text: str) -> str | None:
+    """The ceiling kind `text` names, "" for a ceiling of no stated kind, or
+    None when `text` is not a ceiling.
+
+    Kinds: akustikplatta (ceiling tiles), väggabsorbent (wall absorbers),
+    baffel (free-hanging baffles and islands), bärverk (the grid). Whether it
+    is a ceiling at all is decided by the first word that says so, reading the
+    head first ("Akustikpaneler vägg", "Undertak i korridor") and then the rest
+    ("Byte av undertak"), and a word that names something else stops it
+    ("Målning av undertak"). The kind is read from the head and, failing that,
+    from the whole name, since it is often a trailing qualifier: "Undertak
+    inkl. bärverk" is a ceiling, "Akustikpaneler på vägg" a wall absorber.
+    "Ljudabsorbent" and a bare "Akustikpanel" are ceilings of no stated kind,
+    and the alternatives step asks which.
+    """
+    text = _ELIDED_RE.sub("", text.lower().strip())
+    head = _HEAD_SPLIT_RE.split(" " + text + " ", maxsplit=1)[0]
+    found = bool(_GRID_SERIES_RE.search(head))
+    if not found:
+        for part in (head, text[len(head.strip()):]):
+            for w in (c.replace("-", "") for c in _COMPOUND_RE.findall(part)):
+                if (any(compound_tail(w, t) for t in _NOT_CEILING_TAILS)
+                        or _AIR_BEAM_RE.search(w)):
+                    return None
+                if any(s in w for s in _CEILING_STEMS):
+                    found = True
+                    break
+            if found:
+                break
+    if not found and not _GRID_SERIES_RE.search(text):
+        return None
+    return _ceiling_kind_in(head) or _ceiling_kind_in(text)
+
+
+def names_ceiling(text: str) -> bool:
+    """True when `text` names a suspended ceiling, a fixed acoustic absorber or
+    the grid ("Undertak akustikplattor", "Ljudabsorbent", "T24 tvärprofil")."""
+    return ceiling_kind(text) is not None
+
+
+def ceiling_subcategory(text: str) -> str:
+    """The ceiling kind `text` names, or "" (also for a name that is not a
+    ceiling). Shared with palats_client so a listing and a component meet in
+    the same bucket."""
+    return ceiling_kind(text) or ""
+
+
+# Wet-room waterproofing, HENRIC-3290 del 3. "Tätskikt våtrum" had no category
+# unless intake declared one, and then it was kakel, the tiles laid on it. A
+# roof's waterproofing is the roof's own layer and stays tak: "Taktätskikt",
+# "Tätskikt på tak".
+_WATERPROOFING_STEMS = ("tätskikt", "våtrumsmembran", "våtrumsduk",
+                        "tätskiktsmembran", "vattentätskikt")
+
+
+def names_wet_room_waterproofing(text: str) -> bool:
+    """True when `text` names a waterproofing layer that is not a roof's."""
+    words = _words(text)
+    if not any(s in w for w in words for s in _WATERPROOFING_STEMS):
+        return False
+    return not any(w.startswith(("tak", "yttertak", "roof")) for w in words)
+
+
+# Insulation named as the thing itself, HENRIC-3290 del 3. The table checks
+# innervägg before isolering, so "Mineralull innervägg" was priced as a wall of
+# plasterboard. Read like names_frame_member: the first word of the head that
+# says what the thing is decides. "Mineralull innervägg" is insulation,
+# "Innervägg med mineralull" and "Gipsvägg, mineralull" are walls.
+_INSULATION_STEMS = ("isolering", "mineralull", "glasull", "stenull",
+                     "cellplast", "lösull", "träfiberisolering", "cellulosaisolering")
+_INSULATION_WORDS = frozenset({"eps", "xps", "pir"})
+
+
+def names_insulation(text: str) -> bool:
+    """True when the head of `text` names insulation ("Mineralull innervägg",
+    "Tilläggsisolering vind"), False when it names the part the insulation is
+    in ("Innervägg mineralull")."""
+    text = _ELIDED_RE.sub("", text.lower().strip())
+    head = _HEAD_SPLIT_RE.split(" " + text + " ", maxsplit=1)[0]
+    for w in (c.replace("-", "") for c in _COMPOUND_RE.findall(head)):
+        if w in _INSULATION_WORDS or any(s in w for s in _INSULATION_STEMS):
+            return True
+        if w.endswith(_SURFACE_ENDINGS) or w.startswith("gips") or any(
+                compound_tail(w, t) for t in ("vägg", "golv", "tak", "bjälklag",
+                                              "vind", "grund", "fasad")):
+            return False
+    return False
+
+
+# Glazed partitions, HENRIC-3290 del 3: the innervägg subtype a glass wall is
+# counted in. The head decides, as above: "Glasparti med dörr" is a glazed
+# partition, "Gipsvägg med glasparti" a plasterboard wall with one in it.
+def glazed_partition(text: str) -> bool:
+    """True when the head of `text` names a glazed partition."""
+    text = _ELIDED_RE.sub("", text.lower().strip())
+    head = _HEAD_SPLIT_RE.split(" " + text + " ", maxsplit=1)[0]
+    for w in (c.replace("-", "") for c in _COMPOUND_RE.findall(head)):
+        if "glasparti" in w or compound_tail(w, "glasvägg"):
+            return True
+        if w.endswith(_SURFACE_ENDINGS) or w.startswith("gips"):
+            return False
+    return False
+
+
 def normalize_component_name(name: str) -> str:
     """Normalize a Swedish component name to match our data keys."""
     name_lower = name.lower().strip()
@@ -419,6 +586,12 @@ def normalize_component_name(name: str) -> str:
             if key == "fast_inredning" and fixture_named_besides_cabinet(name_lower, tokens):
                 continue
             return key
+
+    # Before the table, whose kakel row comes first and would take "Tätskikt
+    # under kakel", and whose tak row would take nothing here (roof context is
+    # excluded by the reader and falls through to it).
+    if names_wet_room_waterproofing(name_lower):
+        return "tätskikt"
 
     # After the priority tokens, so "Överskåp kyl/frys" is still a cabinet, and
     # before the table, where kylanläggning's "kyl" would take it.
@@ -440,6 +613,15 @@ def normalize_component_name(name: str) -> str:
     if furniture_subcategory(name_lower):
         return "los_inredning"
 
+    # After the furniture reader, so "Ljudabsorberande bordsskärm" stays a
+    # screen, and before the table, whose "tak" took "Undertak" as a roof.
+    if names_ceiling(name_lower):
+        return "undertak"
+
+    # Before the table, which checks innervägg before isolering.
+    if names_insulation(name_lower):
+        return "isolering"
+
     mappings = {
         # Keramik/kakel checked BEFORE golv: "golvklinker" contains "golv", so
         # golv would otherwise steal it. Ceramic wall+floor tile share one
@@ -451,16 +633,23 @@ def normalize_component_name(name: str) -> str:
         # substring; the compounds are listed anyway so the intent is legible.
         # Which floor a matta is (vinyl vs textil typvärde) is decided one
         # level down, by subtype_from_material in epd_baseline_medians.
+        # Levelling compound added 2026-09-28 (del 3). It is golv's split
+        # subtype avjämning (see epd_baseline_medians._SPLIT_SUBCATEGORIES), so
+        # it gets the compound's own typvärde and never the floor covering's.
         "golv": ["golv", "floor", "golvbeläggning", "vinylgolv",
                  "laminat", "parkett", "trägolv", "golvmaterial",
                  "matta", "mattor", "plastmatta", "textilmatta",
-                 "heltäckningsmatta"],
+                 "heltäckningsmatta", "avjämning", "flytspackel"],
         # Paint moved out to the dedicated "farg" category 2026-06-17 (it has its
         # own EPDs and a wrong unit basis vs gypsum). "ytskikt" stays here since
         # an unqualified surface layer on an interior wall is usually board, not paint.
+        # "glasparti" and "glasvägg" added 2026-09-28 (del 3): a glazed
+        # partition is innervägg's split subtype glasparti, with its own
+        # typvärde. It had no category before.
         "innervägg": ["innervägg", "innerväggar", "interior wall", "gipsvägg",
                       "mellanvägg", "gipsskiva", "byggskivor", "byggskiva",
-                      "ytskikt", "väggöverdraget", "väggöverdrag"],
+                      "ytskikt", "väggöverdraget", "väggöverdrag",
+                      "glasparti", "glasvägg"],
         # Facade CLADDING, checked before yttervägg. Renovating the skin of a
         # building is not the same job as building a wall, and conflating the
         # two made both numbers wrong at once: Sara's 22mm wood panel was
@@ -572,7 +761,7 @@ VALID_CATEGORIES = {
     "betongvägg", "fönster", "tak", "isolering", "storköksutrustning",
     "kylanläggning", "belysning", "ventilation", "dörr", "hiss", "sanitet",
     "vitvaror", "vvs", "farg", "el", "radiator", "fast_inredning",
-    "los_inredning",
+    "los_inredning", "undertak", "tätskikt",
 }
 
 _FOLD = str.maketrans("åäö", "aao")
@@ -627,12 +816,33 @@ def resolve_category(name: str, declared_category: str = "") -> str:
                 and furniture_subcategory(name) in _NEVER_FIXED_KINDS
                 and normalize_component_name(name) == "los_inredning"):
             return "los_inredning"
+        # HENRIC-3290 del 3: the same shape three more times. An intake that
+        # predates a category filed its members under the part they sit in or
+        # on. Each override needs the name-based reading to agree, so a
+        # declaration the name does not contradict still stands.
+        name_key = normalize_component_name(name)
+        if cat in _CEILING_HOST_CATEGORIES and name_key == "undertak":
+            return "undertak"
+        if cat in _WATERPROOFING_HOST_CATEGORIES and name_key == "tätskikt":
+            return "tätskikt"
+        if cat in _FRAME_HOST_CATEGORIES and name_key == "isolering" and names_insulation(name):
+            return "isolering"
+        if cat == "ventilation" and name_key == "vitvaror":
+            return "vitvaror"
         return cat
     return normalize_component_name(name)
 
 
 # Declared categories a frame member is commonly filed under by mistake.
 _FRAME_HOST_CATEGORIES = {"innervägg", "yttervägg", "tak", "golv"}
+
+# Declared categories a ceiling or a wall absorber was filed under before
+# undertak existed: the roof its name contains, the wall it hangs on, and the
+# stone wool it is made of.
+_CEILING_HOST_CATEGORIES = {"tak", "innervägg", "isolering"}
+
+# ...and the surfaces waterproofing lies under.
+_WATERPROOFING_HOST_CATEGORIES = {"kakel", "golv", "innervägg", "isolering"}
 
 # Furniture kinds that are never fixed interior (see resolve_category).
 _NEVER_FIXED_KINDS = {"stol", "kontorsstol", "bord", "soffa", "akustik", "textil"}

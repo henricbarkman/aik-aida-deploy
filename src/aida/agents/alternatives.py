@@ -504,7 +504,8 @@ def _stomme_rows(epd_data: dict[str, list[dict]], proj_comp,
 
 
 # Category keys that are not words, as a reader should see them.
-_CATEGORY_TEXT = {"los_inredning": "lös inredning", "fast_inredning": "fast inredning"}
+_CATEGORY_TEXT = {"los_inredning": "lös inredning", "fast_inredning": "fast inredning",
+                  "undertak": "undertak och akustik"}
 
 # How each loose-furniture subcategory is named in a reason, in Swedish.
 _FURNITURE_LABELS = {
@@ -561,6 +562,112 @@ def _furniture_rows(epd_data: dict[str, list[dict]], proj_comp) -> tuple[list[di
         f"EPD:erna för {label} anges per {declared}, och komponenten i "
         f"{proj_comp.unit}. Ange antalet i styck så jämförs de."
     )
+
+
+# How each ceiling kind is named in a reason, in Swedish.
+_CEILING_LABELS = {
+    "akustikplatta": "undertaksplattor", "väggabsorbent": "väggabsorbenter",
+    "baffel": "bafflar och akustiköar", "bärverk": "bärverk (T-profiler)",
+}
+
+
+def _ceiling_rows(epd_data: dict[str, list[dict]], proj_comp) -> tuple[list[dict], str]:
+    """Rows a ceiling, an acoustic absorber or a grid can be compared against,
+    or the reason there are none (HENRIC-3290 del 3).
+
+    Strict per kind, like _furniture_rows: a ceiling tile is not replaced by a
+    wall absorber, and the grid is a steel profile. Units are matched exactly
+    and not through _select_epd_candidates' unit classes, which put kg and st
+    together and fall back to the whole bucket when nothing matches: a grid
+    per kg against "T24 tvärprofil 40 st" is exactly the comparison that must
+    not be made, and a ceiling in m2 must only meet rows per m2.
+    """
+    from aida.data.climate_data import ceiling_subcategory
+
+    sub = ceiling_subcategory(proj_comp.name)
+    if not sub:
+        return [], (
+            "Namnet säger inte vilken sorts undertak eller akustikprodukt det "
+            "gäller, och alternativ jämförs bara inom samma sort. Ange till "
+            "exempel \"Undertaksplattor\", \"Väggabsorbenter\", \"Bafflar\" "
+            "eller \"Bärverk T24\". Ett putsat eller gipsat innertak är inget "
+            "undertak, och där finns inga alternativ att jämföra med."
+        )
+    label = _CEILING_LABELS.get(sub, sub)
+    pool = [e for e in epd_data.get("undertak", []) if e.get("subcategory") == sub]
+    if not pool:
+        return [], f"Katalogen har inga EPD:er för {label}, så ingen jämförelse med nyköp görs."
+
+    rows = _exact_unit_rows(pool, proj_comp.unit)
+    if rows:
+        return rows, ""
+    return [], _unit_mismatch_reason(label, pool, proj_comp.unit)
+
+
+def _exact_unit_rows(pool: list[dict], comp_unit: str) -> list[dict]:
+    """Rows of `pool` declared in the component's own unit, spellings folded
+    (st/styck, m2/m², lm/m) but kg and st kept apart."""
+    unit = comp_unit.strip().lower()
+    if unit in _COUNT_UNITS:
+        wanted = {"st"}
+    elif unit in _AREA_UNITS:
+        wanted = {"m2"}
+    elif unit in _LENGTH_UNITS:
+        wanted = {"lm", "m"}
+    else:
+        wanted = {unit}
+    return [e for e in pool if _epd_comparable(e)[1] in wanted]
+
+
+def _unit_mismatch_reason(label: str, pool: list[dict], comp_unit: str) -> str:
+    """Why no row meets a component in `comp_unit`, naming the unit most of
+    `pool` is declared in as the one to give (not the alphabetically first:
+    the grid is 35 rows per lm and one per kg)."""
+    counts: dict[str, int] = {}
+    for e in pool:
+        u = _epd_comparable(e)[1]
+        counts[u] = counts.get(u, 0) + 1
+    declared = ", ".join(sorted(counts))
+    common = max(sorted(counts), key=lambda u: counts[u])
+    return (
+        f"EPD:erna för {label} anges per {declared}, och komponenten i "
+        f"{comp_unit}. Ange mängden i {common} så jämförs de."
+    )
+
+
+# Split subtypes named in a reason, in Swedish.
+_SPLIT_LABELS = {"avjämning": "avjämningsmassa", "glasparti": "glaspartier",
+                 "aggregat": "ventilationsaggregat"}
+
+
+def _split_unit_reason(rows: list[dict], proj_comp, category: str) -> tuple[list[dict], str]:
+    """Rows of a split subtype declared in this component's own unit, or the
+    reason there are none (HENRIC-3290 del 3).
+
+    _select_epd_candidates falls back to the whole bucket when no row shares
+    the component's unit, which on the category side is a deliberate choice.
+    On a split subtype the bucket is the subtype, and every row in it is in
+    the wrong unit: an "Avjämningsmassa" in m2 would be offered compounds per
+    kg as a 97 % saving. The answer there is a question, not a list.
+
+    The unit is matched exactly, as for ceilings, and not by unit class. The
+    class puts kg and st together, so "Avjämningsmassa 20 st" (bags) met all
+    60 compounds per kg, and a unit outside the subtype's own ("Glasparti
+    12 lm") was let through to that same fallback. Found in review.
+    """
+    from aida.data.epd_baseline_medians import _SPLIT_SUBCATEGORIES
+    from aida.data.palats_client import component_subcategory
+
+    splits = _SPLIT_SUBCATEGORIES.get(category)
+    if not splits or not rows:
+        return rows, ""
+    sub = component_subcategory(proj_comp.name, category)
+    if sub not in splits:
+        return rows, ""
+    matching = _exact_unit_rows(rows, proj_comp.unit)
+    if matching:
+        return matching, ""
+    return [], _unit_mismatch_reason(_SPLIT_LABELS.get(sub, sub), rows, proj_comp.unit)
 
 
 def _row_key(epd: dict) -> tuple:
@@ -803,6 +910,13 @@ _COMPONENT_ONLY_KEYWORDS = [
 ]
 
 
+# Components that are themselves one layer of a build-up, HENRIC-3290 del 3.
+# Wet-room waterproofing is a membrane, and a levelling compound is sold as an
+# "underlayment"; for them the words above name the product, not a part of it.
+_LAYER_CATEGORIES = {"tätskikt"}
+_LAYER_SUBTYPES = {("golv", "avjämning")}
+
+
 def _is_component_only(name: str) -> bool:
     """Check if an alternative name suggests it's just a component part, not a complete system.
 
@@ -838,6 +952,13 @@ def _validate_alternatives(
     # prices against kakel ranges, not the name-derived innervägg ranges.
     if category is None:
         category = normalize_component_name(component_name)
+    # A component that IS a layer (del 3): its alternatives are membranes and
+    # underlayments by definition, and the complete-system filter below would
+    # drop every one of them.
+    from aida.data.palats_client import component_subcategory
+    is_layer = (category in _LAYER_CATEGORIES
+                or (category, component_subcategory(component_name, category or ""))
+                in _LAYER_SUBTYPES)
     valid = []
     for alt in alternatives:
         # A) Filter zero/negative CO2 — all building materials have emissions
@@ -861,7 +982,7 @@ def _validate_alternatives(
             continue
 
         # B) Filter component-only products (membranes, vapor barriers etc.)
-        if _is_component_only(alt.name):
+        if not is_layer and _is_component_only(alt.name):
             logger.info(
                 "Filtered alternative '%s' for %s: component part, not complete system",
                 alt.name, component_name,
@@ -1629,13 +1750,22 @@ def find_alternatives(
         # "Förvaringsskåp" under fast_inredning, a "Golvskärm" under golv): its
         # rows and reuse are strict per kind and only exist here. A category
         # the component itself declares still wins, as in resolve_category.
-        elif resolve_category(proj_comp.name, proj_comp.category) == "los_inredning":
-            comp_key = "los_inredning"
+        elif resolve_category(proj_comp.name, proj_comp.category) in (
+                "los_inredning", "undertak", "tätskikt"):
+            # Ceilings, absorbers and wet-room waterproofing the same way
+            # (del 3): "Undertak akustikplattor" filed under tak met 39 roofs,
+            # and "Tätskikt våtrum" under kakel met the tiles laid on it.
+            comp_key = resolve_category(proj_comp.name, proj_comp.category)
         if comp_key == "los_inredning":
             category_rows, no_alt_reason = _furniture_rows(epd_data, proj_comp)
+        elif comp_key == "undertak":
+            category_rows, no_alt_reason = _ceiling_rows(epd_data, proj_comp)
         else:
             category_rows, no_alt_reason = _stomme_rows(epd_data, proj_comp, comp_key)
         category_rows = _split_subtype_rows(category_rows, proj_comp, comp_key)
+        if category_rows and not no_alt_reason:
+            category_rows, no_alt_reason = _split_unit_reason(
+                category_rows, proj_comp, comp_key)
         epds_for_category = _select_epd_candidates(
             category_rows, proj_comp.unit, comp_key,
         ) if category_rows else []

@@ -4790,11 +4790,11 @@ function cellInput(cid, field, value, label, type) {
          (type === 'number' ? ' type="number" min="0" step="any"' : ' type="text"') + '>';
 }
 
-// Unit is a closed set: add_component rejects anything outside m2/st/lm, so a
-// free-text cell could only produce a rejection the user has to guess their way
-// out of. An unrecognised stored unit is kept as an option so an older analysis
-// does not silently have its unit rewritten by the act of opening it.
-const CELL_UNITS = ['m2', 'st', 'lm'];
+// Unit is a closed set: add_component rejects anything outside m2/st/lm/kg, so
+// a free-text cell could only produce a rejection the user has to guess their
+// way out of. An unrecognised stored unit is kept as an option so an older
+// analysis does not silently have its unit rewritten by the act of opening it.
+const CELL_UNITS = ['m2', 'st', 'lm', 'kg'];
 function cellUnit(cid, unit) {
   const cur = unit == null ? '' : String(unit);
   const opts = CELL_UNITS.concat(CELL_UNITS.indexOf(cur) === -1 && cur ? [cur] : []);
@@ -4964,8 +4964,8 @@ function addComponentCell() {
   if (!name) return;
   const qty = Number((prompt('Hur många eller hur mycket? (bara siffran)') || '').trim());
   if (!(qty > 0)) { addMsg('Ingen komponent tillagd: mängden måste vara ett tal större än noll.', 'system'); return; }
-  const unit = (prompt('Enhet: m2, st eller lm') || '').trim();
-  if (CELL_UNITS.indexOf(unit) === -1) { addMsg('Ingen komponent tillagd: enheten måste vara m2, st eller lm.', 'system'); return; }
+  const unit = (prompt('Enhet: m2, st, lm eller kg') || '').trim();
+  if (CELL_UNITS.indexOf(unit) === -1) { addMsg('Ingen komponent tillagd: enheten måste vara m2, st, lm eller kg.', 'system'); return; }
   return sendMutation('add_component', {name, quantity: qty, unit, quantity_source: 'user_specified'});
 }
 

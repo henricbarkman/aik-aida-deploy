@@ -718,6 +718,14 @@ _HINT_KEYWORDS: dict[str, set[str]] = {
                       "armchair", "storage", "cabinet", "locker", "shelf",
                       "bookcase", "wardrobe", "pedestal", "screen", "acoustic",
                       "curtain", "rug", "furniture"},
+    # Suspended ceilings and fixed acoustics, HENRIC-3290 del 3. A key of its
+    # own, not only a convenience: the partial match below reads "tak" inside
+    # "undertak" and would rank roofs for a ceiling search.
+    "undertak": {"ceiling", "acoustic", "tile", "panel", "baffle", "absorber",
+                 "grid", "ecophon", "rockfon", "t24", "t15"},
+    # Wet-room waterproofing under tiles. Its own key for the same reason.
+    "tätskikt": {"waterproofing", "wet room", "wetroom", "membrane", "tanking",
+                 "liquid", "slurry"},
 }
 
 
@@ -830,6 +838,10 @@ WORD_BOUNDED_TERMS: frozenset[str] = frozenset({
     # "Gulvlak" (PPG Dyrup, two rows in the top 30), "osb" inside the Finnish
     # cement "KolmosBertta". Both are three letters and only ever a word here.
     "lvl", "osb",
+    # undertak queries, 2026-09-28: the ceiling grid series only as a word.
+    # Inside a word, "t15" is in product codes and units across the index
+    # (a Holcim "NS201T150", a coating "ST150", "at15C" in a Knauf roll).
+    "t24", "t15",
 })
 
 

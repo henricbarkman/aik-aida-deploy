@@ -635,6 +635,17 @@ def _unit_mismatch_reason(label: str, pool: list[dict], comp_unit: str) -> str:
     )
 
 
+def _names_del3_subtype(proj_comp) -> bool:
+    """True when the component, in the category it resolves to itself, names
+    glasparti or avjämning. Not aggregat: that split predates del 3 and the
+    router's hand on it is left as it was."""
+    from aida.data.epd_baseline_medians import UNLIKE_THEIR_CATEGORY
+    from aida.data.palats_client import component_subcategory
+
+    own = resolve_category(proj_comp.name, proj_comp.category)
+    return (own, component_subcategory(proj_comp.name, own)) in UNLIKE_THEIR_CATEGORY
+
+
 # Split subtypes named in a reason, in Swedish.
 _SPLIT_LABELS = {"avjämning": "avjämningsmassa", "glasparti": "glaspartier",
                  "aggregat": "ventilationsaggregat"}
@@ -1755,6 +1766,12 @@ def find_alternatives(
             # Ceilings, absorbers and wet-room waterproofing the same way
             # (del 3): "Undertak akustikplattor" filed under tak met 39 roofs,
             # and "Tätskikt våtrum" under kakel met the tiles laid on it.
+            comp_key = resolve_category(proj_comp.name, proj_comp.category)
+        elif _names_del3_subtype(proj_comp):
+            # And a glazed partition or a levelling compound, whose rows only
+            # exist as their category's split subtype. In the production smoke
+            # the router filed "Glasparti mot korridor" under fönster, and it
+            # was offered used wooden windows against a window baseline.
             comp_key = resolve_category(proj_comp.name, proj_comp.category)
         if comp_key == "los_inredning":
             category_rows, no_alt_reason = _furniture_rows(epd_data, proj_comp)

@@ -313,14 +313,11 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
                    "glespanel", "syll", "träbalk", "träpelare", "takstol",
                    "konstruktionsträ"]),
     ],
-    # Levelling compound, golv's split subtype (HENRIC-3290 del 3). Only this
-    # one: which floor COVERING a component is comes from the standard material
-    # the baseline names (epd_baseline_medians.subtype_from_material), not from
-    # the name, but a levelling compound is named as what it is.
-    "golv": [
-        ("avjämning", ["avjämning", "flytspackel", "golvspackel",
-                       "självutjämnande", "självnivellerande"]),
-    ],
+    # golv has one subtype read from the name, the levelling compound, and it
+    # is read by climate_data.levelling_compound (see
+    # _normalize_to_aida_subcategory). Which floor COVERING a component is
+    # comes from the standard material the baseline names
+    # (epd_baseline_medians.subtype_from_material), not from the name.
 }
 
 # Categories whose reuse matches must share the component's subcategory, not
@@ -358,6 +355,11 @@ def _normalize_to_aida_subcategory(category: str, text: str) -> str:
         # "Gipsvägg med glasparti" is a plasterboard wall.
         from aida.data.climate_data import glazed_partition
         return "glasparti" if glazed_partition(text) else ""
+    if category == "golv":
+        # A levelling compound the same way: "Parkettgolv med avjämning
+        # under" is a parquet floor (found in review, del 3).
+        from aida.data.climate_data import levelling_compound
+        return "avjämning" if levelling_compound(text) else ""
     subcats = SUBCATEGORY_KEYWORDS.get(category)
     if not subcats:
         return ""
@@ -877,6 +879,13 @@ REUSE_CO2E_PER_UNIT: dict[str, float] = {
     "undertak": 0.5,   # m2 — same handling as isolering: a mineral or glass
                        # wool board lifted down and put up again. Got its own
                        # listing-side category 2026-09-28 (HENRIC-3290 del 3).
+                       # The grid is counted per lm and meets the same figure
+                       # by the analogy ventilation's is drawn on: thin sheet
+                       # steel per löpmeter, taken down and hung again. A
+                       # T24 tee is lighter than a duct, so it overstates the
+                       # reuse figure (the production smoke's 135 lm came out
+                       # at 67.5 kg against a low-carbon new grid's 50.3):
+                       # conservative, never a saving that isn't there.
                        # tätskikt has none and takes the labelled default: a
                        # membrane is not taken up and laid again.
     "belysning": 1.0,  # st

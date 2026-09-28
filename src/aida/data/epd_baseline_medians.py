@@ -196,6 +196,14 @@ _SPLIT_SUBCATEGORIES: dict[str, dict[str, tuple[str, ...]]] = {
     "innervägg": {"glasparti": ("m2", "st", "kg")},
 }
 
+# The two del 3 subtypes their category says nothing about, where the category
+# is the wrong reference in two more places: the router may not move them (a
+# glazed partition filed under fönster met used windows), and the baseline's
+# CO2e range for the category does not apply to their typvärde (177.4 kg/m2
+# was clamped to a plasterboard wall's 8). Not aggregat, whose range check
+# caught a unit-tag fault in the catalog and stays.
+UNLIKE_THEIR_CATEGORY = frozenset({("innervägg", "glasparti"), ("golv", "avjämning")})
+
 
 def split_subcategory_miss(category: str, unit: str, subcategory: str) -> bool:
     """True when a component names a split subtype that has no typvärde.

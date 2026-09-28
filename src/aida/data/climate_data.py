@@ -577,6 +577,26 @@ def glazed_partition(text: str) -> bool:
     return False
 
 
+# Levelling compound, golv's split subtype, read the same way (found in review
+# of HENRIC-3290 del 3): "Parkettgolv med avjämning under" and "Klinkergolv
+# med avjämningsmassa" are floors, and only the head says so. Grading the
+# ground ("Markavjämning", "Avjämning av mark") is no floor product at all.
+_LEVELLING_STEMS = ("avjämning", "flytspackel", "golvspackel",
+                    "självutjämnande", "självnivellerande")
+_GROUND_WORDS = ("mark", "tomt", "uteplats", "gräs")
+
+
+def levelling_compound(text: str) -> bool:
+    """True when the head of `text` names a levelling compound."""
+    text = _ELIDED_RE.sub("", text.lower().strip())
+    if any(w.replace("-", "").startswith(_GROUND_WORDS)
+           for w in _COMPOUND_RE.findall(text)):
+        return False
+    head = _HEAD_SPLIT_RE.split(" " + text + " ", maxsplit=1)[0]
+    return any(s in w.replace("-", "") for w in _COMPOUND_RE.findall(head)
+               for s in _LEVELLING_STEMS)
+
+
 def normalize_component_name(name: str) -> str:
     """Normalize a Swedish component name to match our data keys."""
     name_lower = name.lower().strip()

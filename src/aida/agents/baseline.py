@@ -32,6 +32,7 @@ def _validate_baseline(results: list[BaselineResult], components: list) -> list[
 
     Extreme outliers get clamped to reasonable ranges. Mild outliers get flagged.
     """
+    from aida.data.epd_baseline_medians import UNLIKE_THEIR_CATEGORY
     from aida.data.price_validation import validate_co2e, validate_total_price
 
     comp_map = {c.id: c for c in components}
@@ -56,8 +57,16 @@ def _validate_baseline(results: list[BaselineResult], components: list) -> list[
             if price_note and price_note.lower() not in r.description.lower():
                 r.description = r.description.rstrip(". ") + f". {price_note}."
 
-        # Validate CO2
-        if quantity > 0 and r.co2e_kg > 0:
+        # Validate CO2. Not the typvärde of a subtype its category's range
+        # says nothing about: a glazed partition's 177.4 kg CO2e/m2 was
+        # clamped to the plasterboard wall's midpoint, 1419 kg to 64
+        # (HENRIC-3290 del 3, found in the production smoke). Every other
+        # subtype typvärde (toalett, vinyl, armatur) keeps the check, which
+        # is how a mis-tagged catalog row gets noticed.
+        basis = r.basis or {}
+        unlike_category = (basis.get("kind") == "epd_typvärde"
+                           and (category, basis.get("subcategory")) in UNLIKE_THEIR_CATEGORY)
+        if quantity > 0 and r.co2e_kg > 0 and not unlike_category:
             co2e_per_unit = r.co2e_kg / quantity
             validated_co2, co2_note = validate_co2e(
                 co2e_per_unit, quantity, category, comp.unit if comp else "")

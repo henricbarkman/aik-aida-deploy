@@ -259,19 +259,26 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
         ("köksfläkt", ["köksfläkt", "spisfläkt", "spiskåp", "fläktkåp"]),
         ("spis", ["spis", "häll", "ugn"]),
     ],
+    # Air handling units against ducts and terminals, 2026-09-28. The SAME list
+    # object is EPD_SUBCATEGORY_KEYWORDS["ventilation"] in build_epd_alternatives,
+    # and climate_provider reads English EPD names through it too, so three
+    # terms are guarded rather than substrings: "ahu" sits inside "Mahurangi"
+    # (a New Zealand concrete), "ftx" is a Jotun paint ("Ultra One D FTX"), and
+    # "aggregat" heads English "aggregate", which is crushed rock. Swedish and
+    # Norwegian "aggregat", "aggregatet", "FTX-aggregat" still match. An
+    # aggregat is 270 to 16 700 kg CO2e/st, a duct or a diffuser tens, so a
+    # component that names one must never be given the other's typvärde.
+    "ventilation": [
+        ("aggregat", ["air handling", "air-handling", "luftbehandling",
+                      "ventilation unit", "heat recovery unit",
+                      re.compile(r"\bahu\b"), re.compile(r"\bftx\b"),
+                      re.compile(r"aggregat(?!es?\b)")]),
+    ],
     # Same keys as EPD_SUBCATEGORY_KEYWORDS["fast_inredning"] in
     # build_epd_alternatives, so a Swedish component or listing and an English
     # EPD meet in one bucket. Cabinets before fronts: "Diskbänksskåp" is a
     # cabinet, and bare "lucka"/"låda" are safe only because the category is
     # already decided.
-    # Air handling units against ducts and terminals, 2026-09-28. Same key as
-    # EPD_SUBCATEGORY_KEYWORDS["ventilation"] in build_epd_alternatives. An
-    # aggregat is 1 700 to 16 700 kg CO2e/st, a duct or a diffuser tens, so a
-    # component that names one must never be given the other's typvärde.
-    # Everything unmatched stays in the plain ventilation bucket.
-    "ventilation": [
-        ("aggregat", ["aggregat", "ftx", "luftbehandling", "air handling"]),
-    ],
     "fast_inredning": [
         ("badrumsinredning", ["spegelskåp", "badrumsskåp", "tvättställsskåp",
                               "badrumsinredning", "badrumsmöbl", "kommod"]),
@@ -296,9 +303,17 @@ def _normalize_to_aida_subcategory(category: str, text: str) -> str:
     text_lower = text.lower()
     for subcat, keywords in subcats:
         for kw in keywords:
-            if kw in text_lower:
+            if keyword_hit(kw, text_lower):
                 return subcat
     return ""
+
+
+def keyword_hit(kw, text: str) -> bool:
+    """A keyword is a substring, or a compiled pattern where a substring would
+    fire inside an unrelated word."""
+    if isinstance(kw, re.Pattern):
+        return kw.search(text) is not None
+    return kw in text
 
 
 # Swedish inflection endings a compound noun can carry. Used to match a term

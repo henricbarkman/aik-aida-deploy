@@ -103,6 +103,14 @@ _WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
         "EPD:erna spänner 270 till 16 700 kg CO2e/st beroende på aggregatets "
         "storlek (luftflöde), så inget enskilt typvärde per styck stämmer"
     ),
+    # The kg key is empty today (one row). Withheld in advance anyway, because
+    # the baseline and the reroute both bridge st -> kg when st has no value,
+    # and a kg median over units of every size would bring the same spread
+    # back by that door once five kg rows exist.
+    ("ventilation", "aggregat", "kg"): (
+        "aggregat-EPD:er per kg spänner över alla storlekar, och ett "
+        "kg-värde ger inget styckvärde utan aggregatets vikt"
+    ),
 }
 
 

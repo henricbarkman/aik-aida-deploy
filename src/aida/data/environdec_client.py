@@ -714,6 +714,10 @@ _HINT_KEYWORDS: dict[str, set[str]] = {
     "fast_inredning": {"kitchen cabinet", "kitchen front", "kitchen door",
                        "cabinet door", "bathroom cabinet", "mirror cabinet",
                        "vanity", "worktop", "countertop", "kitchen sink"},
+    "los_inredning": {"chair", "stool", "seating", "table", "desk", "sofa",
+                      "armchair", "storage", "cabinet", "locker", "shelf",
+                      "bookcase", "wardrobe", "pedestal", "screen", "acoustic",
+                      "curtain", "rug", "furniture"},
 }
 
 
@@ -758,6 +762,11 @@ _NEGATIVE_TERMS: dict[str, set[str]] = {
     # ones, and "Studio table" and "Student locker" start with "stud".
     "stomme": {"table", "desk", "chair", "locker", "cabinet", "furniture",
                "möbler"},
+    # Loose interior: the fixed interior and sanitary ware that share its words
+    # ("bathroom cabinet", "toilet seat"), and the facade and floor products
+    # that "curtain" and "rug" also reach.
+    "los_inredning": {"kitchen", "bathroom", "toilet", "shower", "curtain wall",
+                      "air curtain", "carpet tile", "ceiling"},
 }
 
 

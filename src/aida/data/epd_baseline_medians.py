@@ -67,7 +67,8 @@ _MIN_SAMPLES_OVERRIDE: dict[tuple[str, str], int] = {
 # (toalett, handfat, blandare...), reusing the Palats subcategory taxonomy.
 # Each (category, subcategory, unit) gets its own typvärde; items that don't
 # classify into a subcategory get no typvärde (stay LLM-uppskattning).
-_SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror", "fast_inredning"}
+_SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror", "fast_inredning",
+                              "los_inredning"}
 
 # Subcategorized categories whose typvärde is published per piece only. Fixed
 # interior is specified and bought per piece (a front, a cabinet), so a st value
@@ -76,7 +77,7 @@ _SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror", "fast_inrednin
 # badrumsinredning/kg was 9 of 12 rows Dahl Sverige AB (0.75, over the dominance
 # ceiling), where badrumsinredning/st spreads over five makers. The kg and m2 rows
 # stay in the catalog and are still offered as alternatives.
-_ST_ONLY_CATEGORIES = {"fast_inredning"}
+_ST_ONLY_CATEGORIES = {"fast_inredning", "los_inredning"}
 
 # Keys that clear the sample floor but are not published, each with its reason.
 # Only for a key that would be NEW; the keys already published while dominated
@@ -97,8 +98,19 @@ _ST_ONLY_CATEGORIES = {"fast_inredning"}
 # airflow field to scale by (Flexit's names do not state it). The rows stay in
 # the catalog as alternatives; the baseline gets an estimate that can read the
 # size from the description, and the row says why (split_subcategory_miss).
+#
+# los_inredning/förvaring/st, 2026-09-28: 51 rows, 40 of them AJ Produkter
+# (0.78), and three other makers with more than one row. A storage component
+# would be measured against one mail-order catalogue's lockers and shelving.
+# Same call as badrumsinredning: hold back rather than publish one supplier's
+# range. The rows stay in the catalog as alternatives.
 _WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
     ("fast_inredning", "badrumsinredning", "st"): "Sonas bathrooms 5 av 8 rader",
+    ("los_inredning", "förvaring", "st"): (
+        "40 av 51 EPD:er för förvaring kommer från en och samma leverantör "
+        "(AJ Produkter), så ett typvärde vore deras sortiment och inte ett "
+        "typiskt val"
+    ),
     ("ventilation", "aggregat", "st"): (
         "EPD:erna spänner 270 till 16 700 kg CO2e/st beroende på aggregatets "
         "storlek (luftflöde), så inget enskilt typvärde per styck stämmer"

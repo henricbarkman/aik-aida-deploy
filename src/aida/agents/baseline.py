@@ -122,8 +122,10 @@ Låna ALDRIG en produkt av annan typ bara för att den delar basmaterial. Det ge
 vilseledande baslinje. Exempel på vad som är FÖRBJUDET:
 - Vinylgolv mot "Takduk, PVC": golvbeläggning och takduk är olika produkter även om båda
   är PVC. Sätt boverket_product=null och source="Uppskattning" istället.
-Boverket saknar bl.a. golvbeläggning, sanitetsporslin, vitvaror och belysning som egna
-produkter. Leta inte efter en ersättare för dem i Boverket.
+- En stol eller ett bord mot "Sågat virke" eller en stålprodukt: en möbel är en färdig
+  produkt, inte sitt stommaterial.
+Boverket saknar bl.a. golvbeläggning, sanitetsporslin, vitvaror, belysning och möbler
+(lös inredning) som egna produkter. Leta inte efter en ersättare för dem i Boverket.
 
 STEG 3 — JUSTERA FÖR MATERIALEGENSKAPER:
 När du valt en Boverket-produkt av rätt material men dimensionerna skiljer (tjocklek,
@@ -418,6 +420,22 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
                     f"{category.capitalize()}-kategorins typvärde gäller andra "
                     f"produkter och används inte. Siffran är därför en uppskattning."
                 )
+                if note.strip() not in (r.description or ""):
+                    r.description = (r.description or "").rstrip() + note
+                r.basis = {
+                    "kind": "saknar_typvärde",
+                    "label": f"Inget EPD-typvärde för {category}/{subcategory}",
+                    "subcategory": subcategory,
+                    "reason": why[0].upper() + why[1:],
+                }
+            elif subcategory and withheld_reason(category, subcategory, comp.unit):
+                # Enough EPDs, deliberately not published (one supplier's
+                # range, los_inredning/förvaring). Same reasoning as above: a
+                # reader who can see the catalog rows would otherwise assume
+                # the estimate is their median.
+                why = withheld_reason(category, subcategory, comp.unit)
+                note = (f" Inget EPD-typvärde för {category}/{subcategory}: {why}. "
+                        f"Siffran är därför en uppskattning.")
                 if note.strip() not in (r.description or ""):
                     r.description = (r.description or "").rstrip() + note
                 r.basis = {

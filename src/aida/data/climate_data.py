@@ -90,19 +90,30 @@ _PRIORITY_TOKENS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("sanitet", ("blandararmatur", "sanitetsarmatur", "tvättställsarmatur",
                  "duscharmatur")),
     # Same trap the other way round: "tak" is checked before belysning, so a
-    # "taklampa" landed in tak and got a roof typvärde per m2.
-    ("belysning", ("taklampa", "takarmatur", "takbelysning")),
+    # "taklampa" landed in tak and got a roof typvärde per m2. And "golv" took
+    # "Golvlampa" into golv with 77 floor coverings as alternatives
+    # (2026-09-28); a desk lamp would reach the furniture reader's "bord".
+    ("belysning", ("taklampa", "takarmatur", "takbelysning", "golvlampa",
+                   "golvarmatur", "bordslampa", "bordsarmatur", "läslampa",
+                   "vägglampa", "fönsterlampa")),
     # Fast inredning, added 2026-09-14 (Notion 3d6b0484). Every token names a
     # cabinet, front or worktop that is mounted to the building. They sit here
     # because the table below would misread them: "tvättställsskåp" contains
     # sanitet's "tvättställ", and "spegelskåp med belysning" belysning's word.
-    # Loose furniture (förvaringsskåp, garderob, hyllor) is deliberately absent:
-    # whether loose interior belongs in the baseline is still an open question.
+    # Loose furniture (förvaringsskåp, garderob, hyllor) is los_inredning, read
+    # by furniture_subcategory below. "Platsbyggd" makes anything fixed: a
+    # "platsbyggd garderob" is joinery, not a wardrobe you can move.
     ("fast_inredning", ("spegelskåp", "tvättställsskåp", "badrumsskåp",
                         "badrumsinredning", "köksskåp", "kökslucka", "köksluckor",
                         "kökslåd", "köksinredning", "bänkskåp", "överskåp",
                         "underskåp", "bänkskiv", "fast inredning",
-                        "fast_inredning")),
+                        "fast_inredning", "platsbyggd")),
+    # Loose interior as a category word, HENRIC-3290 del 2. After fast
+    # inredning, so "platsbyggda möbler" stays fixed. A name that says only
+    # "Möbler" lands here without a subcategory, and the alternatives step
+    # asks which kind rather than comparing chairs with sofas.
+    ("los_inredning", ("lös inredning", "lösa inredning", "los_inredning",
+                       "lösa möbler", "möbler", "möblering")),
     # Air handling units, added 2026-09-28. They sit here and not on the
     # ventilation row below because kylanläggning is checked first and its bare
     # "kyl" would take "Luftbehandlingsaggregat med kylbatteri". "FTX-aggregat"
@@ -245,6 +256,160 @@ def fixture_named_besides_cabinet(text: str, cabinet_tokens) -> bool:
     return any(w in rest for w in _FIXTURE_WORDS)
 
 
+# Swedish inflection endings a compound noun can carry. Used to match a term
+# as the HEAD of a compound ("halvmånebord" ends in "bord") without the false
+# positives a bare substring test gives. Moved here from palats_client
+# 2026-09-28 so a listing and a component read furniture with one matcher.
+INFLECTIONS = ("", "a", "s", "n", "t", "an", "en", "et", "ar", "er", "or",
+               "arna", "erna", "orna", "na")
+
+
+def compound_tail(word: str, term: str) -> bool:
+    """True when `word` is `term`, or a Swedish compound ending in `term`.
+
+    This is the shape Swedish compounding actually needs. Neither simple form
+    works on its own: `"stol" in word` also matches "toalettstol", while a
+    word-boundary regex misses "kontorsstol". Matching on the compound TAIL
+    catches kontorsstol/elevstol/mötesstol and leaves toalettstol to an
+    exception set, which is checked first and with the same matcher, so an
+    exception written as a stem covers its inflections too ("spiskåp" has to
+    cover both "spiskåpa" and "spiskåpor").
+    """
+    return any(word.endswith(term + suffix) for suffix in INFLECTIONS)
+
+
+def compound_units(title: str) -> list[str]:
+    """Words in a title, plus a de-hyphenated form of each hyphenated word.
+
+    Swedish writes plenty of compounds with a hyphen, especially after an
+    initialism: "WC-stol", "LED-lampa". Splitting on the hyphen alone leaves a
+    bare "stol". Emitting the joined form as well lets an exception set see
+    the whole compound.
+    """
+    tokens = [t for t in re.split(r"[^\w-]+", title.lower()) if t.strip("-")]
+    units: list[str] = []
+    for token in tokens:
+        parts = [p for p in token.split("-") if p]
+        units.extend(parts)
+        if len(parts) > 1:
+            units.append("".join(parts))
+    return units
+
+
+# Loose furniture, HENRIC-3290 del 2. The subcategories match the catalog's
+# (build_epd_alternatives.EPD_SUBCATEGORY_KEYWORDS["los_inredning"]) and
+# Palats', so a Swedish "Elevstol", a Palats "Mötesstolar" and an English
+# "Student Chair" land in one bucket. Read as compound tails: a Swedish
+# compound is named by its last part, which is why "Skrivbordsstol" is a chair,
+# "Bordsskärm" a screen and "Soffbord" a table.
+#
+# Order is checked per word, first match wins, so it only matters inside one
+# compound: "skärmvägg" must reach akustik before anything reads "vägg".
+# Written as stems where the plural drops a vowel ("hyll" for hylla/hyllor,
+# "soff" for soffa/soffor).
+#
+# akustik is the loose kind only (desk, floor and free-standing screens). A
+# wall absorber or an acoustic ceiling panel is fixed to the building and is
+# not in this category. textil has no EPD rows today (the catalog's "curtain"
+# hits are curtain walls and shutters), so a curtain gets the honest "no
+# comparable products" rather than somebody else's number.
+_FURNITURE_TAILS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("akustik", ("skärmvägg", "skärm", "rumsavdelare")),
+    ("soffa", ("soff", "fåtölj", "schäslong", "divan")),
+    # "bänk" only in compounds that name furniture: a bare "bänk" is as often a
+    # diskbänk or a workbench. An "elevbänk" is a pupil's desk.
+    ("förvaring", ("skåp", "hyll", "hyllsystem", "byrå", "garderob", "hurts",
+                   "sideboard", "skänk", "reol", "klädfack", "förvaring",
+                   "tvbänk")),
+    ("bord", ("bord", "elevbänk", "skolbänk")),
+    # A task chair, with castors and a gas lift, is its own kind: the EPDs put
+    # it at 60 to 180 kg CO2e against 3 to 55 for a four-legged chair or a
+    # stool, and one typvärde over both was the Aeron's 86.7 for every
+    # elevstol. Before "stol", which every one of these also ends in.
+    ("kontorsstol", ("kontorsstol", "kontorstol", "arbetsstol",
+                     "skrivbordsstol", "datorstol")),
+    ("stol", ("stol", "pall", "taburett", "sittbänk")),
+    ("textil", ("gardin", "draperi")),
+)
+
+# Compounds that END in a furniture word and are something else. Checked first,
+# with the same tail matcher. Most are appliances or installations ("kylskåp",
+# "elskåp", "spiskåpa", which ends in "skåp" plus "a" by spelling coincidence),
+# sanitary ware ("toalettstol", "duschpall"), fixed interior with its own
+# category ("köksskåp", "spegelskåp"), or not a building product at all
+# ("bildskärm", "rullstol", "lastpall").
+_FURNITURE_EXCEPTIONS = (
+    "toalettstol", "wcstol", "duschstol", "duschpall", "badpall", "rullstol",
+    # A roof truss. names_frame_member takes it first on both sides, but this
+    # reader is shared and should not call a truss a chair on its own.
+    "takstol",
+    "lastpall", "europall", "eurpall", "engångspall", "plastpall",
+    "kylskåp", "frysskåp", "torkskåp", "värmeskåp", "elskåp", "apparatskåp",
+    "kopplingsskåp", "säkringsskåp", "fördelningsskåp", "mätarskåp",
+    "centralskåp", "fläktskåp", "brandskåp", "slangskåp", "serverskåp",
+    "rackskåp", "nätverksskåp", "spiskåp",
+    "spegelskåp", "badrumsskåp", "tvättställsskåp", "köksskåp", "bänkskåp",
+    "överskåp", "underskåp", "högskåp", "diskbänksskåp", "diskskåp",
+    "duschskärm", "badkarsskärm", "solskärm", "bildskärm", "datorskärm",
+    "tvskärm", "lampskärm", "stänkskärm", "vindskärm", "insynsskärm",
+    "projektorskärm", "projektionsskärm", "radiatorskärm", "elementskärm",
+    "brandskärm",
+    # A dishwashing table is storköksutrustning. A roller blind (Palats'
+    # "Myggnät rullgardin") belongs to the window, not with curtains.
+    "diskbord", "rullgardin",
+    # "Bord" is also a sawn board. These went to golv, yttervägg and tak before
+    # furniture was read, and still should. A skötbord is a changing table,
+    # normally fixed in the toilet room rather than moved like a desk.
+    "golvbord", "panelbord", "fasadbord", "lockbord", "spontbord", "takbord",
+    "formbord", "skötbord",
+)
+
+# A word that names a part or a holder stops the reading, wherever it stands
+# in the head: "Slanghållare städskåp" is a hose holder for a cleaning cabinet,
+# not a cabinet (Palats, 2026-09-28), and so is "Städskåp slanghållare".
+# "Stolsdyna" and "Bordsskiva" already end in no furniture tail.
+_FURNITURE_PART_TAILS = ("hållare", "fäste", "konsol", "underrede", "stativ",
+                         "dyna", "klädsel", "skiva", "lucka", "dörr", "hjul")
+
+# A rug, as opposed to a floor covering. Bare "matta" is a rug; the floor
+# compounds (plastmatta, textilmatta, heltäckningsmatta, golvmatta,
+# entrématta) keep going to golv, and so does a "matta" that intake declared
+# as golv. Only these prefixes make a compound a rug.
+_RUG_FORMS = ("matta", "mattan", "mattor", "mattorna")
+_RUG_PREFIXES = ("", "ry", "rya", "tras", "gång", "dörr", "bad", "badrums",
+                 "lek", "ull", "sisal", "jute", "bomulls", "plysch")
+
+
+def furniture_subcategory(text: str) -> str:
+    """The loose-furniture subcategory `text` names, or "".
+
+    One of akustik, soffa, förvaring, bord, kontorsstol, stol, textil. Reads the head of
+    the name the way names_frame_member does ("Kontorsstol med armstöd" is a
+    chair, "Bord och stolar" a table), and returns "" for anything whose head
+    is not furniture ("Bordsskiva", "Kylskåp", "Toalettstol", "Plastmatta").
+    Shared with palats_client so a listing and a component read the same way.
+    """
+    text = _ELIDED_RE.sub("", text.lower().strip())
+    head = _HEAD_SPLIT_RE.split(" " + text + " ", maxsplit=1)[0]
+    words = [c.replace("-", "") for c in _COMPOUND_RE.findall(head)]
+    # Exceptions and parts first, over the whole head: "Städskåp slanghållare"
+    # is a hose holder as much as "Slanghållare städskåp" is, and reading the
+    # words in order let the cabinet answer before the holder was seen.
+    for w in words:
+        if any(compound_tail(w, exc) for exc in _FURNITURE_EXCEPTIONS):
+            return ""
+        if any(compound_tail(w, part) for part in _FURNITURE_PART_TAILS):
+            return ""
+    for w in words:
+        for form in _RUG_FORMS:
+            if w.endswith(form) and w[:-len(form)] in _RUG_PREFIXES:
+                return "textil"
+        for sub, tails in _FURNITURE_TAILS:
+            if any(compound_tail(w, t) for t in tails):
+                return sub
+    return ""
+
+
 def normalize_component_name(name: str) -> str:
     """Normalize a Swedish component name to match our data keys."""
     name_lower = name.lower().strip()
@@ -268,6 +433,12 @@ def normalize_component_name(name: str) -> str:
     # whose "golv" would take "Golvreglar".
     if names_frame_member(name_lower):
         return "stomme"
+
+    # After the frame reader, so "Massivträ" stays timber while "Massivträbord"
+    # is a table, and before the table below, whose "golv" would take
+    # "Golvskärm" and whose "matta" would take a rug.
+    if furniture_subcategory(name_lower):
+        return "los_inredning"
 
     mappings = {
         # Keramik/kakel checked BEFORE golv: "golvklinker" contains "golv", so
@@ -338,8 +509,8 @@ def normalize_component_name(name: str) -> str:
         # Stem "armatur", not "armaturer": matching is substring, so the
         # plural never matched "LED-armatur". Plumbing armaturer are caught
         # by _PRIORITY_TOKENS above before this row is reached.
-        "belysning": ["belysning", "ljus", "lighting", "lampor", "armatur",
-                      "led-armatur"],
+        "belysning": ["belysning", "ljus", "lighting", "lampa", "lampor",
+                      "armatur", "led-armatur"],
         "ventilation": ["ventilation", "ventilationskanal", "fläkt",
                         "stålkanal"],
         # Door subtypes (inner/ytter/brand/skjut) are one category here; the
@@ -401,6 +572,7 @@ VALID_CATEGORIES = {
     "betongvägg", "fönster", "tak", "isolering", "storköksutrustning",
     "kylanläggning", "belysning", "ventilation", "dörr", "hiss", "sanitet",
     "vitvaror", "vvs", "farg", "el", "radiator", "fast_inredning",
+    "los_inredning",
 }
 
 _FOLD = str.maketrans("åäö", "aao")
@@ -445,11 +617,24 @@ def resolve_category(name: str, declared_category: str = "") -> str:
         # is not a frame member and keeps its declared category.
         if cat in _FRAME_HOST_CATEGORIES and names_frame_member(name):
             return "stomme"
+        # A chair or a desk declared as fixed interior, which is what an intake
+        # did before los_inredning existed. It then met countertops and mirror
+        # cabinets. Storage is left alone: a wardrobe or a cabinet can be
+        # built in, and then the declared category is right. So is anything
+        # the name itself calls built in ("Platsbyggd soffa"): the name-based
+        # reading has to agree before the declaration is overruled.
+        if (cat == "fast_inredning"
+                and furniture_subcategory(name) in _NEVER_FIXED_KINDS
+                and normalize_component_name(name) == "los_inredning"):
+            return "los_inredning"
         return cat
     return normalize_component_name(name)
 
 
 # Declared categories a frame member is commonly filed under by mistake.
 _FRAME_HOST_CATEGORIES = {"innervägg", "yttervägg", "tak", "golv"}
+
+# Furniture kinds that are never fixed interior (see resolve_category).
+_NEVER_FIXED_KINDS = {"stol", "kontorsstol", "bord", "soffa", "akustik", "textil"}
 
 

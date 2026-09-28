@@ -61,6 +61,8 @@ Saknas mängd i det användaren sagt: fråga efter den först, anropa inte add_c
 
 Reglar, läkt och balkar behöver en dimension och en längd för att kunna jämföras. "Två reglar" räcker inte: fråga efter tvärsnittet (t.ex. 45x95), längden per regel eller antal löpmeter, och om de är av trä eller stål, innan du anropar add_component. Lägg sedan till dem med category stomme, unit lm (antal × längd) och dimensionen i namnet ("Reglar 45x95"). Skivor (OSB, plywood, spånskiva) läggs till i m2 med tjockleken i namnet ("OSB-skiva 12 mm").
 
+Lösa möbler (stolar, kontorsstolar, bord, förvaringsskåp, hyllor, soffor, fristående skärmar, gardiner, mattor) läggs till med category los_inredning och unit st, en komponent per sort och med sorten i namnet ("Elevstol", "Kontorsstol", "Skrivbord"). Alternativ och återbruk jämförs bara inom samma sort. Säger användaren bara "möbler", fråga vilka sorter och hur många av varje innan du anropar add_component.
+
 Säg aldrig till användaren att hen ska lägga till komponenten någon annanstans, i projektvyn eller genom att börja om. Du kan göra det härifrån.
 
 KONFIRMATION VID FULL OMKÖRNING:
@@ -88,7 +90,7 @@ Baslinjen bygger på två källor, och varje komponent visar vilken som använts
   gipsskiva, betong, mineralull, stål). Mest precist.
 - "Environdec EPD-typvärde": Boverket är organiserad efter materialtyp (~200 generiska
   produkter) och saknar vissa komponenttyper helt (golvbeläggning, sanitetsporslin, vitvaror,
-  belysning). För dem använder vi istället ett kategori-aggregat: medianen av den övre
+  belysning, möbler). För dem använder vi istället ett kategori-aggregat: medianen av den övre
   (sämsta) halvan av Environdec-EPD:erna i kategorin. Övre halvan för att approximera ett
   konventionellt standardval utan klimathänsyn (EPD-databaser lutar mot klimatmedvetna
   tillverkare, så hela medianen hade underskattat).

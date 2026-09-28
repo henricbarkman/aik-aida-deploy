@@ -321,7 +321,10 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
 # because the one is 0.1 kg CO2e per metre and the other a tonne of concrete.
 # A stomme component with no subcategory gets no listings, mirroring the EPD
 # side, which asks for the material instead of guessing.
-STRICT_SUBCATEGORY_CATEGORIES: frozenset[str] = frozenset({"stomme"})
+# Loose interior since 2026-09-28 (HENRIC-3290 del 2): thirty elevstolar are
+# not replaced by a bokhylla, and a component that says only "Möbler" gets no
+# listings until it says which kind.
+STRICT_SUBCATEGORY_CATEGORIES: frozenset[str] = frozenset({"stomme", "los_inredning"})
 
 
 def _normalize_to_aida_subcategory(category: str, text: str) -> str:
@@ -329,6 +332,12 @@ def _normalize_to_aida_subcategory(category: str, text: str) -> str:
 
     Returns '' if the category has no subcategories defined or no keyword matched.
     """
+    if category == "los_inredning":
+        # Furniture is read as compound tails, not substrings: "bord" is inside
+        # "skrivbordsstol" and "stol" inside "toalettstol". One reader for both
+        # sides, so a listing and a component meet in the same bucket.
+        from aida.data.climate_data import furniture_subcategory
+        return furniture_subcategory(text)
     subcats = SUBCATEGORY_KEYWORDS.get(category)
     if not subcats:
         return ""
@@ -348,44 +357,14 @@ def keyword_hit(kw, text: str) -> bool:
     return kw in text
 
 
-# Swedish inflection endings a compound noun can carry. Used to match a term
-# as the HEAD of a compound ("halvmånebord" ends in "bord") without the
-# false positives a bare substring test gives.
-_INFLECTIONS = ("", "a", "s", "n", "t", "an", "en", "et", "ar", "er", "or",
-                "arna", "erna", "orna", "na")
-
-
-def _compound_tail(word: str, term: str) -> bool:
-    """True when `word` is `term`, or a Swedish compound ending in `term`.
-
-    This is the shape Swedish compounding actually needs. Neither simple form
-    works on its own: `"stol" in word` also matches "toalettstol", while a
-    word-boundary regex misses "kontorsstol". Matching on the compound TAIL
-    catches kontorsstol/elevstol/mötesstol and leaves toalettstol to the
-    exception set, which is checked first and with the same matcher — so an
-    exception written as a stem covers its inflections too ("spiskåp" has to
-    cover both "spiskåpa" and "spiskåpor").
-    """
-    return any(word.endswith(term + suffix) for suffix in _INFLECTIONS)
-
-
-def _compound_units(title: str) -> list[str]:
-    """Words in a title, plus a de-hyphenated form of each hyphenated word.
-
-    Swedish writes plenty of compounds with a hyphen, especially after an
-    initialism: "WC-stol", "LED-lampa". Splitting on the hyphen alone leaves a
-    bare "stol", which the furniture guard would catch. Emitting the joined
-    form as well lets the exception set see the whole compound.
-    """
-    tokens = [t for t in re.split(r"[^\w-]+", title.lower()) if t.strip("-")]
-    units: list[str] = []
-    for token in tokens:
-        parts = [p for p in token.split("-") if p]
-        units.extend(parts)
-        if len(parts) > 1:
-            units.append("".join(parts))
-    return units
-
+# The compound matcher lives in climate_data since 2026-09-28, where the
+# furniture reader both sides share needs it too.
+from aida.data.climate_data import (  # noqa: E402
+    compound_tail as _compound_tail,
+)
+from aida.data.climate_data import (
+    compound_units as _compound_units,
+)
 
 # Compounds that END in a guarded term but ARE building products or
 # appliances. Checked before the guard, so "toalettstol" survives the "stol"
@@ -410,14 +389,15 @@ _NON_BUILDING_EXCEPTIONS = (
 )
 
 # Furniture, loose inventory and workwear. Palats carries all three (48
-# mötesstolar, 42 arbetskläder-underdelar), and until Aida has an inredning
-# category they cannot substitute a building component. Matched as compound
-# tails against the TITLE only.
+# mötesstolar, 42 arbetskläder-underdelar). Matched as compound tails against
+# the TITLE only.
 #
-# The guard makes furniture invisible, not visible. That is the right order:
-# today a "Halvmånebord med rejält laminat" is offered as a floor, which is
-# worse than not being offered at all. Offering it as furniture is a separate
-# and larger job (roadmap C1).
+# Since 2026-09-28 furniture has its own category, los_inredning, and
+# _normalize_to_aida_category files it there BEFORE this guard runs. What the
+# furniture words below still catch is what the furniture reader turned down:
+# a part or a spare ("Reservdel stol"), a mattress, a whiteboard. That keeps
+# the original protection: a "Halvmånebord med rejält laminat" is never
+# offered as a floor. Workwear and kitchen machines stay out as before.
 _NON_BUILDING_TAILS = (
     # möbler. Written as stems where the plural drops a vowel: "hyllor" is not
     # "hylla" plus an ending, so a "hylla" tail silently misses every plural
@@ -509,6 +489,17 @@ def _normalize_to_aida_category(title: str, description: str = "") -> str:
     from aida.data.climate_data import names_frame_member
     if any(t in text for t in _structural) or names_frame_member(text):
         return "stomme"
+
+    # Loose furniture, HENRIC-3290 del 2. Before the non-building guard, which
+    # used to drop every chair and table. Read with the component side's own
+    # reader, so it sees only the head of the title: "Stol till konferensrum"
+    # is a chair, "Ben till bord" is a leg. A spare part or an accessory named
+    # as such still falls through to the guard below and stays out.
+    from aida.data.climate_data import furniture_subcategory
+    padded = f" {text} "
+    if (not any(p in padded for p in _ACCESSORY_PHRASES if p != " till ")
+            and furniture_subcategory(title)):
+        return "los_inredning"
 
     if _is_non_building(title):
         return ""

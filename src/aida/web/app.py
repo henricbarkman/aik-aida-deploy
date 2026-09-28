@@ -2278,7 +2278,7 @@ a.palats-link { color: inherit; text-decoration: underline; }
       <p><strong>Hur lång tid tar en analys?</strong><br>
       Varje steg brukar ta någon eller några minuter. Stora projekt räknas i delar samtidigt, så ett projekt med ett trettiotal byggdelar får sin baslinje på ungefär två minuter. Du kan byta flik medan Aida räknar. Med Pling i sidhuvudet hörs det när ett steg är klart.</p>
       <p><strong>Vilka byggdelar klarar Aida?</strong><br>
-      Golv, innerväggar, innertak, kakel och klinker, målning, dörrar, fönster, isolering, fasad, ventilation, VVS, el, belysning, radiatorer, sanitet, vitvaror, storköksutrustning, fast inredning och hiss. Hittar Aida inget passande material i databaserna gör den en egen uppskattning och märker den som uppskattning.</p>
+      Golv, innerväggar, innertak, kakel och klinker, målning, dörrar, fönster, isolering, fasad, ventilation, VVS, el, belysning, radiatorer, sanitet, vitvaror, storköksutrustning, fast inredning, hiss, stomme (reglar, virke, limträ och stål) och lösa möbler. Möbler jämförs bara inom samma sort, stolar med stolar och bord med bord, och räknas i styck. Hittar Aida inget passande material i databaserna gör den en egen uppskattning och märker den som uppskattning.</p>
       <p><strong>Hur byter jag namn på ett projekt?</strong><br>
       Klicka på projektnamnet mitt i sidhuvudet och välj Byt namn på projektet. Där byter du också mellan dina projekt. På en smal mobilskärm syns inte projektmenyn än, där behöver du en dator eller surfplatta.</p>
       <p><strong>Hur stor är AI:ns egen klimatpåverkan?</strong><br>

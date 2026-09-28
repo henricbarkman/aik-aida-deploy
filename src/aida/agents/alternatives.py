@@ -60,7 +60,8 @@ _NORDIC_QUOTA = 5
 # Heterogeneous categories whose candidates are capped and filtered PER
 # subcategory (a toilet, a tap and a basin live in "sanitet" but are not
 # interchangeable alternatives). Mirrors epd_baseline_medians.
-_SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror", "fast_inredning"}
+_SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror", "fast_inredning",
+                              "los_inredning"}
 
 # Smallest share of a component's need a Palats listing must cover to be shown
 # as a reuse alternative. A single door against a need of 70 (coverage 0.014)
@@ -499,6 +500,66 @@ def _stomme_rows(epd_data: dict[str, list[dict]], proj_comp,
         f"{declared} och komponenten i {proj_comp.unit}. Att räkna om kräver en "
         f"vikt per meter eller m² som beror på profilen, så ingen jämförelse görs. "
         f"Ange mängden i kg för att jämföra, eller läs baslinjen som den står."
+    )
+
+
+# Category keys that are not words, as a reader should see them.
+_CATEGORY_TEXT = {"los_inredning": "lös inredning", "fast_inredning": "fast inredning"}
+
+# How each loose-furniture subcategory is named in a reason, in Swedish.
+_FURNITURE_LABELS = {
+    "stol": "stolar och pallar", "kontorsstol": "kontorsstolar",
+    "bord": "bord och skrivbord",
+    "förvaring": "förvaring (skåp, hyllor, garderober)",
+    "soffa": "soffor och fåtöljer", "akustik": "fristående skärmar",
+    "textil": "gardiner och mattor",
+}
+
+
+def _furniture_rows(epd_data: dict[str, list[dict]], proj_comp) -> tuple[list[dict], str]:
+    """Rows a piece of loose furniture can be compared against, or the reason
+    there are none (HENRIC-3290 del 2).
+
+    Strict per subcategory, the way stomme is per family: thirty elevstolar are
+    not replaced by a bookcase, and a queue sorted by GWP across chairs, sofas
+    and lockers would put a 4 kg stool first for every one of them.
+
+    Units are settled here, not in _select_epd_candidates, for the same reason
+    as in _stomme_rows: its unit classes put kg and st together, and its
+    fallback hands over the whole bucket when nothing matches. A chair in kg
+    says nothing about how many chairs it is, so it meets no per-piece row and
+    gets a question instead. The catalog holds no kg rows for this category
+    (build_epd_alternatives.CATEGORY_DECLARED_UNITS), so st meets st and m2
+    meets m2.
+    """
+    from aida.data.climate_data import furniture_subcategory
+
+    sub = furniture_subcategory(proj_comp.name)
+    if not sub:
+        return [], (
+            "Namnet säger inte vilken sorts möbel det gäller, och alternativ "
+            "jämförs bara inom samma sort. Ange till exempel \"Elevstol\", "
+            "\"Skrivbord\", \"Förvaringsskåp\", \"Soffa\" eller \"Golvskärm\"."
+        )
+    label = _FURNITURE_LABELS.get(sub, sub)
+    pool = [e for e in epd_data.get("los_inredning", []) if e.get("subcategory") == sub]
+    if not pool:
+        return [], f"Katalogen har inga EPD:er för {label}, så ingen jämförelse med nyköp görs."
+
+    unit = proj_comp.unit.strip().lower()
+    if unit in _COUNT_UNITS:
+        wanted = {"st"}
+    elif unit in _AREA_UNITS:
+        wanted = {"m2"}
+    else:
+        wanted = set()
+    rows = [e for e in pool if _epd_comparable(e)[1] in wanted]
+    if rows:
+        return rows, ""
+    declared = ", ".join(sorted({str(e.get("unit", "")) for e in pool}))
+    return [], (
+        f"EPD:erna för {label} anges per {declared}, och komponenten i "
+        f"{proj_comp.unit}. Ange antalet i styck så jämförs de."
     )
 
 
@@ -1063,7 +1124,8 @@ def _palats_candidates(
                 cost_sek=0,
                 source="[Palats] palats.app",
                 reasoning=(
-                    f"Palats har {count_label} i kategorin {category} just nu "
+                    f"Palats har {count_label} i kategorin "
+                    f"{_CATEGORY_TEXT.get(category, category)} just nu "
                     f"({other_label}), {mismatch} {component_name.lower()}, "
                     f"{hidden} som alternativ här. Kolla tillbaka när nya "
                     "annonser publicerats, eller sök bredare manuellt på palats.app."
@@ -1563,7 +1625,16 @@ def find_alternatives(
         # listings and its baseline all live in stomme (HENRIC-3290).
         if _is_frame_component(proj_comp, comp_key):
             comp_key = "stomme"
-        category_rows, no_alt_reason = _stomme_rows(epd_data, proj_comp, comp_key)
+        # Same for a piece of furniture the router filed elsewhere (a
+        # "Förvaringsskåp" under fast_inredning, a "Golvskärm" under golv): its
+        # rows and reuse are strict per kind and only exist here. A category
+        # the component itself declares still wins, as in resolve_category.
+        elif resolve_category(proj_comp.name, proj_comp.category) == "los_inredning":
+            comp_key = "los_inredning"
+        if comp_key == "los_inredning":
+            category_rows, no_alt_reason = _furniture_rows(epd_data, proj_comp)
+        else:
+            category_rows, no_alt_reason = _stomme_rows(epd_data, proj_comp, comp_key)
         category_rows = _split_subtype_rows(category_rows, proj_comp, comp_key)
         epds_for_category = _select_epd_candidates(
             category_rows, proj_comp.unit, comp_key,

@@ -211,13 +211,19 @@ def email_is_allowed(claims):
     anon key is public in the page, so /auth/v1/signup stays reachable
     regardless of what the UI offers.
 
+    Entries are whole addresses or a domain written as "@karlstad.se", which
+    admits exactly that domain: not subdomains, not look-alikes.
+
     Unset AIDA_ALLOWED_EMAILS keeps the previous behaviour (any
     authenticated user), so deploying this change alone locks nobody out.
     """
     if not ALLOWED_EMAILS:
         return True
     email = (claims.get('email') or '').strip().lower()
-    return bool(email) and email in ALLOWED_EMAILS
+    local, _, domain = email.partition('@')
+    if not local or not domain or '@' in domain:
+        return False
+    return email in ALLOWED_EMAILS or '@' + domain in ALLOWED_EMAILS
 
 
 def supabase_request(method, path, data=None, token=None, params=None, prefer=None):

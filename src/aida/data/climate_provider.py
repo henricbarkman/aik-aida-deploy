@@ -74,9 +74,14 @@ def _conversion_is_implausible(
     meaningful category-wide figure, and a guard with no yardstick must stay
     open rather than guess.
     """
-    from aida.data.epd_baseline_medians import get_baseline_typvärde
+    from aida.data.epd_baseline_medians import _SPLIT_SUBCATEGORIES, get_baseline_typvärde
+    from aida.data.palats_client import component_subcategory
 
-    typ = get_baseline_typvärde(comp_key, _normalize_unit(unit))
+    # An air handling unit measured against the duct typvärde would be "50x"
+    # and refused; its yardstick is its own subtype, or none.
+    sub = (component_subcategory(product_name, comp_key)
+           if comp_key in _SPLIT_SUBCATEGORIES else "")
+    typ = get_baseline_typvärde(comp_key, _normalize_unit(unit), sub)
     if not typ:
         return False
     bound = typ["baseline_co2e_per_unit"] * _CONVERSION_SANITY_FACTOR

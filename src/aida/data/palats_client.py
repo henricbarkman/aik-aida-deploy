@@ -264,6 +264,14 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
     # EPD meet in one bucket. Cabinets before fronts: "Diskbänksskåp" is a
     # cabinet, and bare "lucka"/"låda" are safe only because the category is
     # already decided.
+    # Air handling units against ducts and terminals, 2026-09-28. Same key as
+    # EPD_SUBCATEGORY_KEYWORDS["ventilation"] in build_epd_alternatives. An
+    # aggregat is 1 700 to 16 700 kg CO2e/st, a duct or a diffuser tens, so a
+    # component that names one must never be given the other's typvärde.
+    # Everything unmatched stays in the plain ventilation bucket.
+    "ventilation": [
+        ("aggregat", ["aggregat", "ftx", "luftbehandling", "air handling"]),
+    ],
     "fast_inredning": [
         ("badrumsinredning", ["spegelskåp", "badrumsskåp", "tvättställsskåp",
                               "badrumsinredning", "badrumsmöbl", "kommod"]),

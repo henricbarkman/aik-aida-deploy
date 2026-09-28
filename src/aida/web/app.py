@@ -5266,6 +5266,12 @@ function fmtNum(n) {
 // someone judge whether it is a tight estimate or a wide guess.
 function basisLine(c) {
   const b = c.basis;
+  // A split subtype (ventilation/aggregat) with too few EPDs: the category
+  // does have a typvärde, but for other products, and the row must say it was
+  // not used rather than leave the reader to assume it was.
+  if (b && b.kind === 'saknar_typvärde') {
+    return subLine(esc(b.label || 'Inget EPD-typvärde'), esc(b.reason || ''));
+  }
   if (!b || b.kind !== 'epd_typvärde') return '';
   const n = b.sample_size;
   let txt = n + ' EPD:er';

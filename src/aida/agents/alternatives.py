@@ -302,6 +302,73 @@ def _select_epd_candidates(
     return _apply_nordic_quota(selected, matching, rank, category)
 
 
+def _split_subtype_rows(epds: list[dict], proj_comp, category: str) -> list[dict]:
+    """Rows of a category with a split subtype (ventilation/aggregat) narrowed
+    to the side the component is on.
+
+    Unlike the heterogeneous categories, where the model picks from a balanced
+    set, the two sides here are not alternatives to each other in either
+    direction: a 50 kg duct offered against an air handling unit reads as a
+    97 % saving, and a 5 000 kg unit against a duct is noise. A component in a
+    unit the subtype is not counted in (a whole system per m2) sees the
+    category side, the same rule the baseline lookup uses.
+    """
+    from aida.data.epd_baseline_medians import _SPLIT_SUBCATEGORIES
+    from aida.data.palats_client import component_subcategory
+
+    splits = _SPLIT_SUBCATEGORIES.get(category)
+    if not splits:
+        return epds
+    sub = component_subcategory(proj_comp.name, category)
+    if sub not in splits or proj_comp.unit not in splits[sub]:
+        sub = ""
+    return [e for e in epds
+            if (e.get("subcategory", "") if e.get("subcategory", "") in splits else "") == sub]
+
+
+# Words that name a stud or framing profile in an EPD. The innervägg bucket is
+# almost all plasterboard per m2, so without narrowing a "Reglar" component was
+# offered gypsum boards; a board is not an alternative to the frame it is
+# screwed to.
+# Matched from the start of a word: bare "stud" is inside "Gyproc® Studio", an
+# acoustic plasterboard.
+_STUD_ROW_RE = re.compile(r"\b(studs?\b|profil|regel|reglar|c-section|framing)")
+
+
+def _stud_rows(epds: list[dict], proj_comp, category: str) -> tuple[list[dict], str]:
+    """Narrow a stud component's candidates to stud rows, with the reason when
+    none can be compared (HENRIC-3290).
+
+    Returns (rows, reason). `reason` is "" unless the component is a stud and
+    no stud row shares its unit class: the catalog's steel studs are declared
+    per kg, and studs are usually counted in löpmeter. Converting would need a
+    weight per metre that depends on the profile and the material, which the
+    component does not state, so the answer is an honest "no comparison" and
+    not a list of plasterboards.
+    """
+    from aida.data.climate_data import names_stud
+
+    if category != "innervägg" or not names_stud(proj_comp.name):
+        return epds, ""
+    studs = [e for e in epds if _STUD_ROW_RE.search(e.get("name", "").lower())]
+    klass = _unit_class(proj_comp.unit)
+    comparable = [e for e in studs if klass is None or _epd_comparable(e)[1] in klass]
+    if comparable:
+        return comparable, ""
+    units = sorted({str(e.get("unit", "")) for e in studs}) or ["-"]
+    if studs:
+        reason = (
+            f"Katalogen har {len(studs)} EPD:er för reglar och profiler, men de "
+            f"anges per {', '.join(units)} och komponenten i {proj_comp.unit}. "
+            f"Att räkna om kräver en vikt per meter som beror på profil och "
+            f"material, så ingen jämförelse görs. Ange reglarna i kg för att "
+            f"jämföra, eller läs baslinjen som den står."
+        )
+    else:
+        reason = "Katalogen har inga EPD:er för reglar, så ingen jämförelse görs."
+    return [], reason
+
+
 def _row_key(epd: dict) -> tuple:
     """Identity for a catalog row. uuid where present, name+category otherwise."""
     return (epd.get("uuid") or "", epd.get("category", ""), epd.get("name", ""))
@@ -1338,8 +1405,10 @@ def find_alternatives(
 
         comp_key = routing.get(bl_comp.component_id) or resolve_category(
             proj_comp.name, proj_comp.category)
+        category_rows = _split_subtype_rows(epd_data.get(comp_key, []), proj_comp, comp_key)
+        category_rows, no_alt_reason = _stud_rows(category_rows, proj_comp, comp_key)
         epds_for_category = _select_epd_candidates(
-            epd_data.get(comp_key, []), proj_comp.unit, comp_key,
+            category_rows, proj_comp.unit, comp_key,
         )
         # Baseline reference must follow the routed material (retroactive
         # directive): a kakel-routed wall is validated against the kakel
@@ -1448,7 +1517,7 @@ def find_alternatives(
                 co2e_kg=eff_baseline_co2e,
                 cost_sek=bl_comp.cost_sek,
                 source="N/A",
-                reasoning="Inga alternativ identifierade.",
+                reasoning=no_alt_reason or "Inga alternativ identifierade.",
                 alternative_type="baseline",
             ))
 

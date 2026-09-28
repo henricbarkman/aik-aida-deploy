@@ -258,7 +258,9 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
     """
     from aida.data.epd_baseline_medians import (
         get_baseline_typvärde,
+        split_subcategory_miss,
         subtype_from_material,
+        withheld_reason,
     )
     from aida.data.palats_client import component_subcategory
     from aida.data.unit_conversion import typical_item_mass
@@ -322,6 +324,27 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
                 )
 
         if not typvärde_data:
+            if split_subcategory_miss(category, comp.unit, subcategory):
+                # The category has a typvärde, just not for this kind of
+                # product, and the estimate below is not that number. Said in
+                # the row, because a reader who knows ventilation/st exists
+                # would otherwise assume it was used.
+                why = (withheld_reason(category, subcategory, comp.unit)
+                       or f"katalogen har för få EPD:er för {subcategory} per "
+                          f"{comp.unit} (minst 5 krävs)")
+                note = (
+                    f" Inget EPD-typvärde för {category}/{subcategory}: {why}. "
+                    f"{category.capitalize()}-kategorins typvärde gäller andra "
+                    f"produkter och används inte. Siffran är därför en uppskattning."
+                )
+                if note.strip() not in (r.description or ""):
+                    r.description = (r.description or "").rstrip() + note
+                r.basis = {
+                    "kind": "saknar_typvärde",
+                    "label": f"Inget EPD-typvärde för {category}/{subcategory}",
+                    "subcategory": subcategory,
+                    "reason": why[0].upper() + why[1:],
+                }
             continue  # no usable EPD-typvärde for this (category[, subcat], unit)
 
         baseline_per_unit = typvärde_data["baseline_co2e_per_unit"]

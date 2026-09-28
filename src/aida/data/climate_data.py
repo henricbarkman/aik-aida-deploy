@@ -103,7 +103,50 @@ _PRIORITY_TOKENS: tuple[tuple[str, tuple[str, ...]], ...] = (
                         "kökslåd", "köksinredning", "bänkskåp", "överskåp",
                         "underskåp", "bänkskiv", "fast inredning",
                         "fast_inredning")),
+    # Air handling units, added 2026-09-28. They sit here and not on the
+    # ventilation row below because kylanläggning is checked first and its bare
+    # "kyl" would take "Luftbehandlingsaggregat med kylbatteri". "FTX-aggregat"
+    # had no category at all before. A plain "Kylaggregat" names none of these
+    # and stays kylanläggning. Bare "ftx" is safe as a substring in a Swedish
+    # component name; it is NOT safe in EPD names (Jotun's "Ultra One D FTX" is
+    # a paint), which is why the catalog side matches it as a word.
+    ("ventilation", ("ftx", "ventilationsaggregat", "luftbehandlingsaggregat",
+                     "luftbehandlingsenhet")),
 )
+
+
+# Lightweight expanded clay (lättklinker, Leca) is a masonry and frame
+# material, not a tile, but "klinker" is a substring of it, so "Lättklinkerbalk"
+# and "Lättklinkerblock" were priced as kakel per m2 (2026-09-28). Read before
+# the table: a beam or a slab is stomme, everything else (blocks, walls) is
+# betongvägg, the nearest mineral-wall bucket. "Golvklinker" and "klinkergolv"
+# carry neither stem and stay kakel.
+# Studs (reglar), HENRIC-3290. "Reglar", "Stålreglar" and "Träreglar" matched
+# nothing, so the component had no category and no alternatives at all. Read
+# per word and from the END of the word, because "regel" is also the head of
+# "regelbunden" and "regelverk" (the Swedish for "regular" and "regulations"),
+# which already occur in example texts. Checked only after the whole table has
+# missed, so "Takregel" stays tak and "Reglar innervägg" innervägg.
+_STUD_ENDINGS = ("regel", "regeln", "reglar", "reglarna")
+
+
+def names_stud(text: str) -> bool:
+    """True when `text` names a stud or studs ("Stålreglar 70", "Träregel")."""
+    return any(w.endswith(_STUD_ENDINGS) for w in _words(text))
+
+
+def light_clinker_category(text: str) -> str:
+    """'stomme' or 'betongvägg' for a lättklinker/Leca name, '' otherwise.
+
+    "leca" is matched from the start of a word ("Leca-block", "Lecabalk"), so
+    it cannot fire inside an unrelated word."""
+    words = _words(text)
+    if not any("lättklinker" in w or w.startswith("leca") for w in words):
+        return ""
+    for w in words:
+        if ("balk" in w and "balkong" not in w) or "bjälklag" in w:
+            return "stomme"
+    return "betongvägg"
 
 
 # Sanitary fixtures a cabinet is often named together with. Found in review of
@@ -139,6 +182,10 @@ def normalize_component_name(name: str) -> str:
     # before the table, where kylanläggning's "kyl" would take it.
     if names_household_cold_appliance(name_lower):
         return "vitvaror"
+
+    clinker = light_clinker_category(name_lower)
+    if clinker:
+        return clinker
 
     mappings = {
         # Keramik/kakel checked BEFORE golv: "golvklinker" contains "golv", so
@@ -253,6 +300,11 @@ def normalize_component_name(name: str) -> str:
                 return key
         if key == "stomme" and _names_bare_beam_or_column(name_lower):
             return key
+
+    # Studs belong to the wall they are in; unqualified, that is an interior
+    # wall, where nearly every renovation meets them.
+    if names_stud(name_lower):
+        return "innervägg"
 
     return ""
 

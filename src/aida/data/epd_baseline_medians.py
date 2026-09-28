@@ -87,9 +87,28 @@ _ST_ONLY_CATEGORIES = {"fast_inredning"}
 # supplier's line may be published at all is a decision Henric has open (golv/st,
 # Kingspan), and a new key should not pre-empt it. A bathroom-cabinet component
 # gets an LLM estimate until more makers declare one, or until that is decided.
+#
+# ventilation/aggregat/st, 2026-09-28: 24 rows, but they span 270 to 16 700 kg
+# CO2e/st, a factor of sixty, and the spread is unit SIZE, not maker: Flexit's
+# apartment units (Nordic S2-S7, 270-560) against Kampmann's 6 000-20 000 m3/h
+# school units (5 000-16 700). The upper-half median, 6 195, would put a school
+# unit's figure on every "FTX per lägenhet" component, times the number of
+# flats. No single per-piece value describes both, and the catalog has no
+# airflow field to scale by (Flexit's names do not state it). The rows stay in
+# the catalog as alternatives; the baseline gets an estimate that can read the
+# size from the description, and the row says why (split_subcategory_miss).
 _WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
     ("fast_inredning", "badrumsinredning", "st"): "Sonas bathrooms 5 av 8 rader",
+    ("ventilation", "aggregat", "st"): (
+        "EPD:erna spänner 270 till 16 700 kg CO2e/st beroende på aggregatets "
+        "storlek (luftflöde), så inget enskilt typvärde per styck stämmer"
+    ),
 }
+
+
+def withheld_reason(category: str, subcategory: str, unit: str) -> str:
+    """Why a key that clears the sample floor is not published, or ''."""
+    return _WITHHELD_KEYS.get((category, subcategory, unit), "")
 
 # Categories where a subtype is PREFERRED but the category aggregate is still a
 # legitimate answer. Different from _SUBCATEGORIZED_CATEGORIES above: there, a
@@ -109,6 +128,35 @@ _WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
 # not, and a thin bucket is a worse answer than an honest category mean. Which
 # level was used is reported back in the result so the UI can say so.
 _SUBTYPE_PREFERRED_CATEGORIES = {"golv"}
+
+# Subtypes split OFF a category that is otherwise flat. The third shape, beside
+# the two above: the category bucket is coherent without them, and it has to be
+# protected FROM them. An air handling unit is 1 700 to 16 700 kg CO2e/st; the
+# ducts, dampers and diffusers in ventilation/st are tens. Until 2026-09-28 the
+# units were kept out only by ventilation's 300 kg ceiling in the catalog build,
+# so a "Ventilationsaggregat" component got the duct typvärde (143 kg/st) and
+# nothing in the report said so.
+#
+# So a split row is counted in its own key and never in the category's, and a
+# component that names the subtype gets the subtype's number or none: falling
+# back to the duct value is exactly the error this exists to stop. The units
+# listed are the ones the subtype is counted in. A component in another unit
+# ("Ventilation, aggregat och kanaler", per m2 BTA) describes a whole system,
+# not a unit, and keeps the category key it had before.
+_SPLIT_SUBCATEGORIES: dict[str, dict[str, tuple[str, ...]]] = {
+    "ventilation": {"aggregat": ("st", "kg")},
+}
+
+
+def split_subcategory_miss(category: str, unit: str, subcategory: str) -> bool:
+    """True when a component names a split subtype that has no typvärde.
+
+    The caller then has an honest "no number" to report instead of the
+    category value, and can say why in the row's text."""
+    units = _SPLIT_SUBCATEGORIES.get(category, {}).get(subcategory)
+    if not units or unit not in units:
+        return False
+    return get_baseline_typvärde(category, unit, subcategory) is None
 
 # Still excluded wholesale: no subcategory taxonomy defined, too heterogeneous
 # to aggregate meaningfully.
@@ -310,6 +358,13 @@ def _group_rows(epds: list[dict]) -> dict[tuple[str, str, str], Rows]:
             if sub:
                 grouped.setdefault((cat, sub, unit), []).append((float(gwp), e))
             sub = ""
+        elif cat in _SPLIT_SUBCATEGORIES:
+            # Counted ONCE, in its own key when it is a split subtype and in
+            # the category key otherwise. The opposite of golv above, on
+            # purpose: here the category value must not contain the subtype.
+            sub = e.get("subcategory") or ""
+            if sub not in _SPLIT_SUBCATEGORIES[cat]:
+                sub = ""
         else:
             sub = ""
         grouped.setdefault((cat, sub, unit), []).append((float(gwp), e))
@@ -470,6 +525,13 @@ def get_baseline_typvärde(category: str, unit: str, subcategory: str = "") -> d
         # Fall through to the category aggregate below. Deliberately not
         # returning None: an unfamiliar or thin floor subtype should still get a
         # baseline, just an honestly labelled one.
+
+    split_units = _SPLIT_SUBCATEGORIES.get(category, {}).get(subcategory)
+    if split_units:
+        if unit in split_units:
+            # No fallback to the category key: see _SPLIT_SUBCATEGORIES.
+            return _TYPVÄRDEN.get((category, subcategory, unit))
+        return _TYPVÄRDEN.get((category, "", unit))
 
     sub = subcategory if category in _SUBCATEGORIZED_CATEGORIES else ""
     return _TYPVÄRDEN.get((category, sub, unit))

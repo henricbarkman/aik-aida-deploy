@@ -42,7 +42,15 @@ GWP_LULUC_NAMES = {"gwp-luluc", "land use and land use change"}
 # Deliberately the parenthesised form: a bare "gwp-ghg" would also be a
 # substring of nothing else, but the datahub writes "Global Warming Potential
 # (GWP-GHG)" and matching the exact token keeps it away from the other four.
-GWP_GHG_NAMES = {"(gwp-ghg)"}
+#
+# "gwp-iobc" is the same indicator as EPD Norge names it: "Global warming
+# potential except emissions and uptake of biogenic carbon (GWP-IOBC/GHG)".
+# That name contains "biogenic", and until 2026-09-28 it was read as
+# GWP-biogenic, overwriting the real one. Flexit's air handling units then
+# failed the fossil+biogenic+luluc=total check (270 + 272 + 1 against 258) and
+# were dropped with no GHG to fall back on, though they sum exactly once read
+# right (376.6 - 12.2 + 1.8 = 366.2).
+GWP_GHG_NAMES = {"(gwp-ghg)", "gwp-iobc"}
 # Pre-A2 declarations carry ONE indicator with no fossil/biogenic split. EPD
 # Norge has 2 066 of them (measured 2026-09-14; the other 10 513 use the four
 # names above). It is a total, not a fossil figure: Kebony's roofing declares
@@ -514,9 +522,10 @@ class EnvirondecClient:
 
             is_fossil = any(n in indicator_name for n in GWP_FOSSIL_NAMES)
             is_total = any(n in indicator_name for n in GWP_TOTAL_NAMES)
-            is_biogenic = "biogenic" in indicator_name
-            is_luluc = any(n in indicator_name for n in GWP_LULUC_NAMES)
             is_ghg = any(n in indicator_name for n in GWP_GHG_NAMES)
+            # Not the GHG indicator, whose EPD Norge name also says "biogenic".
+            is_biogenic = "biogenic" in indicator_name and not is_ghg
+            is_luluc = any(n in indicator_name for n in GWP_LULUC_NAMES)
             is_bare = indicator_name.strip() in GWP_BARE_TOTAL_NAMES
 
             anies = result.get("other", {}).get("anies", [])

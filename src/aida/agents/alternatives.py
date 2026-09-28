@@ -620,6 +620,7 @@ def _validate_alternatives(
     component_name: str,
     quantity: float = 0,
     category: str | None = None,
+    unit: str = "",
 ) -> list[Alternative]:
     """Filter out alternatives with data quality issues.
 
@@ -704,7 +705,7 @@ def _validate_alternatives(
         elif quantity > 0:
             is_estimate = "[uppskattning]" in alt.source.lower()
             _cost, note = validate_total_price(
-                alt.cost_sek, quantity, category, is_estimate=is_estimate,
+                alt.cost_sek, quantity, category, is_estimate=is_estimate, unit=unit,
             )
             if note and note.lower() not in alt.reasoning.lower():
                 alt.reasoning = alt.reasoning.rstrip(". ") + f". {note}."
@@ -1456,7 +1457,7 @@ def find_alternatives(
         # Validate data quality: filter zero CO2, component-only parts, flag prices
         alternatives = _validate_alternatives(
             alternatives, eff_baseline_co2e, proj_comp.name, proj_comp.quantity,
-            category=comp_key,
+            category=comp_key, unit=proj_comp.unit,
         )
 
         # Palats had listings in the category but none of the asked-for type,
@@ -1688,6 +1689,7 @@ def _enrich_alternative_prices(
             if quantity > 0 and category:
                 validated_cost, note = validate_total_price(
                     alt.cost_sek, quantity, category, is_estimate=is_estimate,
+                    unit=comp_unit,
                 )
                 if validated_cost != alt.cost_sek:
                     alt.cost_sek = validated_cost

@@ -63,11 +63,34 @@ CO2_RANGES: dict[str, tuple[float, float, str]] = {
 }
 
 
+def _bounds(table: dict[str, tuple[float, float, str]], category: str,
+            unit: str = "") -> tuple[float, float, str] | None:
+    """The range for `category`, or None when the component is counted in a
+    different unit than the range is written in.
+
+    Every range carries its unit and until 2026-09-28 nothing read it. The
+    ventilation CO2 range is 1-20 kg per lm, a duct; applied per piece it
+    clamped an air handling unit's 4 500 kg estimate to 10.5 kg, and the
+    innervägg price range (SEK per m2) lifted studs counted in lm from 90 to
+    1 150 SEK per metre. A range in another unit says nothing about the value,
+    so it is not applied. `unit` empty keeps the old behaviour for callers
+    that do not know the component's unit.
+    """
+    bounds = table.get(category.lower().strip())
+    if not bounds or not unit:
+        return bounds
+    from aida.data.pricing_provider import normalize_price_unit
+    if normalize_price_unit(unit) != normalize_price_unit(bounds[2]):
+        return None
+    return bounds
+
+
 def validate_unit_price(
     price_per_unit: float,
     category: str,
     *,
     is_estimate: bool = False,
+    unit: str = "",
 ) -> tuple[float, str]:
     """Validate a per-unit price and return (price, note).
 
@@ -96,7 +119,7 @@ def validate_unit_price(
 
     # Check category-specific range
     cat_key = category.lower().strip()
-    bounds = PRICE_RANGES.get(cat_key)
+    bounds = _bounds(PRICE_RANGES, cat_key, unit)
 
     if bounds:
         range_min, range_max, _unit = bounds
@@ -145,6 +168,7 @@ def coerce_per_unit_as_total(
     cost_sek: float,
     quantity: float,
     category: str,
+    unit: str = "",
 ) -> tuple[float, str]:
     """Detect "per-unit price stored as total" and correct it.
 
@@ -166,7 +190,7 @@ def coerce_per_unit_as_total(
     if cost_sek <= 0 or quantity <= 0:
         return cost_sek, ""
 
-    bounds = PRICE_RANGES.get(category.lower().strip())
+    bounds = _bounds(PRICE_RANGES, category, unit)
     if not bounds:
         return cost_sek, ""
 
@@ -193,6 +217,7 @@ def validate_total_price(
     category: str,
     *,
     is_estimate: bool = False,
+    unit: str = "",
 ) -> tuple[float, str]:
     """Validate a total price by deriving per-unit and checking range.
 
@@ -207,10 +232,11 @@ def validate_total_price(
     if total_cost <= 0 or quantity <= 0:
         return total_cost, "Pris ej tillgängligt" if total_cost <= 0 else ""
 
-    total_cost, coerce_note = coerce_per_unit_as_total(total_cost, quantity, category)
+    total_cost, coerce_note = coerce_per_unit_as_total(total_cost, quantity, category, unit)
 
     per_unit = total_cost / quantity
-    validated_per_unit, note = validate_unit_price(per_unit, category, is_estimate=is_estimate)
+    validated_per_unit, note = validate_unit_price(
+        per_unit, category, is_estimate=is_estimate, unit=unit)
 
     if validated_per_unit != per_unit:
         # Price was clamped — recalculate total
@@ -229,6 +255,7 @@ def validate_co2e(
     co2e_per_unit: float,
     quantity: float,
     category: str,
+    unit: str = "",
 ) -> tuple[float, str]:
     """Validate CO2e value against expected range for the category.
 
@@ -239,7 +266,7 @@ def validate_co2e(
         return co2e_per_unit * quantity, ""
 
     cat_key = category.lower().strip()
-    bounds = CO2_RANGES.get(cat_key)
+    bounds = _bounds(CO2_RANGES, cat_key, unit)
     if not bounds:
         return co2e_per_unit * quantity, ""
 

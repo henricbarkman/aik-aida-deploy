@@ -49,6 +49,7 @@ def _validate_baseline(results: list[BaselineResult], components: list) -> list[
         else:
             validated_cost, price_note = validate_total_price(
                 r.cost_sek, quantity, category, is_estimate=is_estimate,
+                unit=comp.unit if comp else "",
             )
             if validated_cost != r.cost_sek:
                 r.cost_sek = validated_cost
@@ -58,7 +59,8 @@ def _validate_baseline(results: list[BaselineResult], components: list) -> list[
         # Validate CO2
         if quantity > 0 and r.co2e_kg > 0:
             co2e_per_unit = r.co2e_kg / quantity
-            validated_co2, co2_note = validate_co2e(co2e_per_unit, quantity, category)
+            validated_co2, co2_note = validate_co2e(
+                co2e_per_unit, quantity, category, comp.unit if comp else "")
             if validated_co2 != r.co2e_kg:
                 r.co2e_kg = validated_co2
             if co2_note and co2_note.lower() not in r.description.lower():

@@ -112,6 +112,10 @@ produkt ENBART när den faktiskt ÄR komponentens standardmaterial:
 - Gipsskiva på innervägg matchar "Gipsskiva, standardskiva" (gips är gips). OK.
 - Betongvägg matchar en betongprodukt (betong är betong). OK.
 - Stålreglar matchar "Lättreglar av stål, primär" (stål är stål). OK.
+- Träreglar och konstruktionsvirke matchar "Sågat virke, u 16 %, barrträ" eller
+  "Hyvlat virke, u 16 %, barrträ", OSB-skiva matchar "OSB" (trä är trä). OK.
+  Systemet räknar själv om ett kg-värde för trä och skivor till löpmeter eller m² ur
+  tvärsnittet eller tjockleken i komponentens namn, så räkna inte om de raderna själv.
 - Mineralull som isolering matchar en mineralullsprodukt. OK.
 
 Låna ALDRIG en produkt av annan typ bara för att den delar basmaterial. Det ger en
@@ -170,6 +174,7 @@ def calculate_baseline(project: Project) -> Baseline:
     # exactly one row per component (re-asked once for any the model skipped).
     boverket_products = provider._cache.get_all_boverket()
     results = _complete_baseline(project, boverket_products)
+    _apply_member_geometry(results, project, boverket_products)
 
     # Phase 1b: For components where the LLM fell back to "Uppskattning"
     # (no Boverket material proxy fit), substitute an EPD-median where the
@@ -240,6 +245,67 @@ def calculate_baseline(project: Project) -> Baseline:
     return Baseline(components=results)
 
 
+# Boverket categories whose kg value is a solid material, so that kg per m3 is a
+# density and a member's section or thickness gives its volume.
+_GEOMETRY_BOVERKET_CATEGORIES = {"Trävaror", "Byggskivor"}
+
+
+def _apply_member_geometry(results: list[BaselineResult], project: Project,
+                           boverket_products) -> None:
+    """Redo a timber or board Boverket baseline per löpmeter or m2 (in-place).
+
+    Boverket declares "Sågat virke" per kg; a stud is counted in löpmeter.
+    Until 2026-09-28 the model did that conversion in its head (STEG 3 asks it
+    to), guessing a section and a density for every stud. Both are known: the
+    density is in Boverket's own record and the section is in the name
+    ("Reglar 45x95"), so the arithmetic is done here instead and written out in
+    the row. Frame members only (stomme): a plasterboard's Boverket record has
+    its own areal weight, and this is not the place to second-guess it.
+
+    A name without a dimension keeps the model's figure, labelled as resting on
+    an assumed section, since the chat is meant to ask for it before this runs.
+    """
+    from aida.data.unit_conversion import member_volume_per_unit
+
+    by_name = {(p.name or "").strip().lower(): p for p in boverket_products}
+    comp_map = {c.id: c for c in project.components}
+    for r in results:
+        comp = comp_map.get(r.component_id)
+        if not r.boverket_product or not comp or comp.unit not in ("lm", "m2"):
+            continue
+        if resolve_category(comp.name, comp.category) != "stomme":
+            continue
+        product = by_name.get(r.boverket_product.strip().lower())
+        if not product or (product.unit or "").lower() != "kg":
+            continue
+        try:
+            extra = json.loads(product.extra_json or "{}")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        density = extra.get("density_kg_m3")
+        if extra.get("category") not in _GEOMETRY_BOVERKET_CATEGORIES or not density:
+            continue
+        geometry = member_volume_per_unit(comp.name, comp.unit)
+        if not geometry:
+            what = "tvärsnitt" if comp.unit == "lm" else "tjocklek"
+            note = (f" Namnet anger inget {what}, så omräkningen från kg bygger "
+                    f"på ett antaget {what}.")
+            if note.strip() not in (r.description or ""):
+                r.description = (r.description or "").rstrip() + note
+            continue
+        factor, label = geometry
+        per_unit = round(product.co2e_per_unit * density * factor, 4)
+        r.co2e_per_unit = per_unit
+        r.unit = comp.unit
+        r.quantity = comp.quantity
+        r.co2e_kg = round(per_unit * comp.quantity, 1)
+        r.description = (r.description or "").rstrip() + (
+            f" Omräknat ur komponentens {label}: {product.co2e_per_unit} kg CO2e/kg "
+            f"× {density:g} kg/m³ (Boverket) × {factor:.6f} m³/{comp.unit} = "
+            f"{per_unit} kg CO2e/{comp.unit}."
+        )
+
+
 def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) -> None:
     """Substitute LLM-uppskattning with EPD-typvärde where available (in-place).
 
@@ -260,6 +326,7 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
     """
     from aida.data.epd_baseline_medians import (
         get_baseline_typvärde,
+        member_typvärde,
         split_subcategory_miss,
         subtype_from_material,
         withheld_reason,
@@ -323,6 +390,18 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
                 mass_note = (
                     f" Omräknat kg→st via antagen typisk vikt {mass} kg/st "
                     f"(approximation)."
+                )
+
+        # m3 -> lm/m2 for a frame member, from its own section or thickness
+        # (HENRIC-3290). Not an approximation like the mass bridge above: the
+        # dimension is the one the component's name states.
+        if not typvärde_data and comp.unit in ("lm", "m2"):
+            bridged = member_typvärde(category, comp.name, comp.unit, subcategory)
+            if bridged:
+                typvärde_data = bridged
+                mass_note = (
+                    f" Omräknat från {bridged['per_m3']} kg CO2e/m³ via "
+                    f"komponentens {bridged['geometry']}."
                 )
 
         if not typvärde_data:

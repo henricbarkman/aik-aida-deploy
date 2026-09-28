@@ -329,44 +329,177 @@ def _split_subtype_rows(epds: list[dict], proj_comp, category: str) -> list[dict
 # Words that name a stud or framing profile in an EPD. The innervägg bucket is
 # almost all plasterboard per m2, so without narrowing a "Reglar" component was
 # offered gypsum boards; a board is not an alternative to the frame it is
-# screwed to.
+# screwed to. Still read here because older builds filed steel profiles under
+# innervägg, and a stud should see them wherever they sit.
 # Matched from the start of a word: bare "stud" is inside "Gyproc® Studio", an
 # acoustic plasterboard.
 _STUD_ROW_RE = re.compile(r"\b(studs?\b|profil|regel|reglar|c-section|framing)")
 
+# The stomme families a stud is compared across. Timber and steel both, in
+# either direction: swapping a steel stud for a timber one is exactly the kind
+# of saving the tool exists to show (HENRIC-3290).
+_STUD_FAMILIES = ("virke", "stålregel")
 
-def _stud_rows(epds: list[dict], proj_comp, category: str) -> tuple[list[dict], str]:
-    """Narrow a stud component's candidates to stud rows, with the reason when
-    none can be compared (HENRIC-3290).
+# Families whose m3 rows can be restated per löpmeter or m2 of a member, from
+# the member's own section or thickness. Solid material only; see
+# epd_baseline_medians._GEOMETRY_BRIDGE_SUBCATEGORIES for why steel is not.
+_SOLID_FAMILIES = {"virke", "limträ", "konstruktionsskiva"}
 
-    Returns (rows, reason). `reason` is "" unless the component is a stud and
-    no stud row shares its unit class: the catalog's steel studs are declared
-    per kg, and studs are usually counted in löpmeter. Converting would need a
-    weight per metre that depends on the profile and the material, which the
-    component does not state, so the answer is an honest "no comparison" and
-    not a list of plasterboards.
+# How each family is named in a reason, in Swedish.
+_FAMILY_LABELS = {
+    "virke": "sågat virke", "limträ": "limträ, KL-trä och fanerträ",
+    "konstruktionsskiva": "konstruktionsskivor", "konstruktionsstål":
+    "konstruktionsstål", "stålregel": "stålreglar", "betong": "betongstomme",
+}
+
+_LENGTH_UNITS = {"lm", "m", "meter", "löpmeter"}
+_COUNT_UNITS = {"st", "styck", "pcs"}
+
+
+def _is_frame_component(proj_comp, category: str) -> bool:
+    """A stud, batten or structural board routed to the part it stands in."""
+    from aida.data.climate_data import _FRAME_HOST_CATEGORIES, names_frame_member
+
+    return category in _FRAME_HOST_CATEGORIES and names_frame_member(proj_comp.name)
+
+
+def _bridge_member_rows(rows: list[dict], proj_comp) -> list[dict]:
+    """Copies of solid-family m3 rows restated per unit of THIS member.
+
+    "Reglar 45x95" in lm is 0.004275 m3 per metre, so a sawmill's 25.6 kg
+    CO2e/m3 is 0.109 per metre of that stud. Same geometric bridge as the
+    facade one in build_epd_alternatives (a panel IS 22 mm), with the
+    dimension read from the component instead of the category: a stud has no
+    typical section the way a facade panel has a typical thickness. Copies, so
+    the catalog rows loaded once per analysis are never written to.
+    """
+    from aida.data.unit_conversion import member_volume_per_unit
+
+    geometry = member_volume_per_unit(proj_comp.name, proj_comp.unit)
+    if not geometry:
+        return []
+    factor, label = geometry
+    unit = proj_comp.unit.strip().lower()
+    out = []
+    for e in rows:
+        gwp = e.get("gwp_a1a3")
+        if (e.get("unit") != "m3" or e.get("subcategory") not in _SOLID_FAMILIES
+                or not isinstance(gwp, (int, float))):
+            continue
+        bridged = dict(e)
+        bridged["gwp_per_functional_unit"] = round(gwp * factor, 4)
+        bridged["functional_unit"] = unit
+        bridged["fu_basis"] = "dimension"
+        bridged["fu_note"] = label
+        out.append(bridged)
+    return out
+
+
+def _stomme_rows(epd_data: dict[str, list[dict]], proj_comp,
+                 category: str) -> tuple[list[dict], str]:
+    """Rows a frame member can be compared against, or the reason there are none.
+
+    Replaces `_stud_rows` (HENRIC-3290, second round). Returns (rows, reason);
+    `reason` is "" whenever rows are returned, and for any category but stomme
+    the function is a no-op.
+
+    Within stomme a component only ever meets its own family: a stud meets
+    timber and steel studs, a glulam beam glulam, a board boards. A median-free
+    queue of beams, boards and sections sorted by GWP would put a per-kg steel
+    figure next to a per-metre stud and call the smaller number better.
+
+    Units are settled here rather than left to _select_epd_candidates, because
+    its fallback ("better a unit-mismatched suggestion than none") is exactly
+    wrong for a frame: the answer to a stud in st is a question, not a list.
+    - st: nothing. A piece of timber has no length, so nothing is comparable;
+      the reason asks for a section and a number of löpmeter.
+    - lm / m2: native rows in that unit, plus the solid families' m3 rows
+      bridged by the member's own section or thickness. Native m2 rows are left
+      out: every one declares a board or element at a thickness its name does
+      not state, so it cannot be set against "OSB-skiva 12 mm".
+    - kg / m3: native rows in that unit.
     """
     from aida.data.climate_data import names_stud
+    from aida.data.palats_client import component_subcategory
 
-    if category != "innervägg" or not names_stud(proj_comp.name):
-        return epds, ""
-    studs = [e for e in epds if _STUD_ROW_RE.search(e.get("name", "").lower())]
-    klass = _unit_class(proj_comp.unit)
-    comparable = [e for e in studs if klass is None or _epd_comparable(e)[1] in klass]
-    if comparable:
-        return comparable, ""
-    units = sorted({str(e.get("unit", "")) for e in studs}) or ["-"]
-    if studs:
-        reason = (
-            f"Katalogen har {len(studs)} EPD:er för reglar och profiler, men de "
-            f"anges per {', '.join(units)} och komponenten i {proj_comp.unit}. "
-            f"Att räkna om kräver en vikt per meter som beror på profil och "
-            f"material, så ingen jämförelse görs. Ange reglarna i kg för att "
-            f"jämföra, eller läs baslinjen som den står."
-        )
+    if category != "stomme":
+        return epd_data.get(category, []), ""
+
+    stomme = epd_data.get("stomme", [])
+    if names_stud(proj_comp.name):
+        pool = [e for e in stomme if e.get("subcategory") in _STUD_FAMILIES]
+        pool += [e for e in epd_data.get("innervägg", [])
+                 if _STUD_ROW_RE.search(e.get("name", "").lower())]
+        seen: set = set()
+        deduped = []
+        for e in pool:
+            key = e.get("uuid") or _row_key(e)
+            if key not in seen:
+                seen.add(key)
+                deduped.append(e)
+        pool, family = deduped, "reglar"
+        # Across materials only per metre of stud. A kilo of timber and a kilo
+        # of steel do different amounts of work, so in kg or m3 a stud meets
+        # its own material: "Stålreglar" steel, anything else timber.
+        # The innervägg profile rows carry no stomme family; all are steel.
+        if proj_comp.unit.strip().lower() in ("kg", "m3"):
+            own = component_subcategory(proj_comp.name, "stomme")
+            own = own if own == "stålregel" else "virke"
+            pool = [e for e in pool if (e.get("subcategory") or "stålregel") == own]
+            family = own
     else:
-        reason = "Katalogen har inga EPD:er för reglar, så ingen jämförelse görs."
-    return [], reason
+        family = component_subcategory(proj_comp.name, "stomme")
+        if not family:
+            return [], (
+                "Namnet säger inte vilket stommaterial det gäller, och alternativ "
+                "jämförs bara inom samma material. Ange material och dimension, "
+                "till exempel \"Limträbalk 90x315\", \"Stålbalk HEA 200\" eller "
+                "\"OSB-skiva 12 mm\"."
+            )
+        pool = [e for e in stomme if e.get("subcategory") == family]
+    label = _FAMILY_LABELS.get(family, family)
+    if not pool:
+        return [], f"Katalogen har inga EPD:er för {label}, så ingen jämförelse görs."
+
+    unit = proj_comp.unit.strip().lower()
+    if unit in _COUNT_UNITS:
+        return [], (
+            f"Komponenten är angiven i styck, och en regel eller balk i styck "
+            f"säger inget om längd eller dimension. EPD:erna för {label} anges "
+            f"per m³, löpmeter eller kg. Ange dimensionen (till exempel 45x95) "
+            f"och antal löpmeter (antal × längd) så kan de jämföras."
+        )
+    if unit == "m3":
+        native = [e for e in pool if _epd_comparable(e)[1] == "m3"]
+    elif unit in _AREA_UNITS:
+        native = []
+    else:
+        klass = _unit_class(unit)
+        native = [e for e in pool if klass is not None and _epd_comparable(e)[1] in klass]
+    rows = native + _bridge_member_rows(pool, proj_comp)
+    if rows:
+        return rows, ""
+
+    units = sorted({str(e.get("unit", "")) for e in pool})
+    declared = ", ".join(units)
+    if unit in _LENGTH_UNITS and any(e.get("subcategory") in _SOLID_FAMILIES for e in pool):
+        return [], (
+            f"EPD:erna för {label} anges per {declared}. För att räkna om till "
+            f"löpmeter behövs tvärsnittet i namnet, till exempel \"45x95\" eller "
+            f"\"90x315\". Ange det så jämförs de."
+        )
+    if unit in _AREA_UNITS and any(e.get("subcategory") in _SOLID_FAMILIES for e in pool):
+        return [], (
+            f"EPD:erna för {label} anges per {declared}. För att räkna om till m² "
+            f"behövs tjockleken i namnet, till exempel \"OSB-skiva 12 mm\" eller "
+            f"\"KL-trä 200 mm\". Ange den så jämförs de."
+        )
+    return [], (
+        f"Katalogen har {len(pool)} EPD:er för {label}, men de anges per "
+        f"{declared} och komponenten i {proj_comp.unit}. Att räkna om kräver en "
+        f"vikt per meter eller m² som beror på profilen, så ingen jämförelse görs. "
+        f"Ange mängden i kg för att jämföra, eller läs baslinjen som den står."
+    )
 
 
 def _row_key(epd: dict) -> tuple:
@@ -542,6 +675,10 @@ def _format_epd_list(epds: list[dict]) -> str:
         fu_unit = epd.get("functional_unit")
         if fu_gwp is not None and fu_unit:
             gwp_str += f" \u2192 {fu_gwp} kg CO2e/{fu_unit}"
+            # A frame member's bridge rests on the component's own dimension,
+            # so the model can say which section the per-metre figure is for.
+            if epd.get("fu_note"):
+                gwp_str += f" (komponentens {epd['fu_note']})"
 
         source = epd.get("source_registry", "environdec")
         source_tag = f" [{source}]" if source != "environdec" else ""
@@ -764,7 +901,7 @@ def _effective_baseline_co2e(
     typvärde (can't honestly recompute). Only the CO2e reference moves; cost
     stays as-is (no routed-category price source).
     """
-    from aida.data.epd_baseline_medians import get_baseline_typvärde
+    from aida.data.epd_baseline_medians import get_baseline_typvärde, member_typvärde
     from aida.data.palats_client import component_subcategory
     from aida.data.unit_conversion import typical_item_mass
 
@@ -792,6 +929,9 @@ def _effective_baseline_co2e(
         mass = typical_item_mass(routed_category, subcat)
         if kg_tv and mass:
             tv = {"baseline_co2e_per_unit": kg_tv["baseline_co2e_per_unit"] * mass}
+    # m3 -> lm/m2 for a frame member, mirroring the same bridge in baseline.py.
+    if not tv:
+        tv = member_typvärde(routed_category, proj_comp.name, proj_comp.unit, subcat)
     if not tv:
         logger.warning(
             "Component %r rerouted %s->%s but routed category has no typvärde; "
@@ -1068,9 +1208,21 @@ def _reuse_figures(
             price_note += " | Täckning: okänd"
         cost_is_estimate = False
 
+    # A category without its own reuse figure gets the default, and the row
+    # says so: the number is a placeholder, not something derived for this
+    # kind of product, and a reader comparing it with a new product's EPD
+    # should know which of the two is the soft one.
+    default_note = ""
+    if category not in REUSE_CO2E_PER_UNIT:
+        default_note = (
+            f"Klimatvärdet för återbruket är en schablon ({_DEFAULT_REUSE_CO2E:g} "
+            f"kg CO2e per {project_unit or 'enhet'}): kategorin saknar eget "
+            f"underlag för transport och upprustning"
+        )
+
     location_note = f"Plats: {listing.location}" if listing.location else ""
     url_note = f"Se annons: {listing.url}" if listing.url else ""
-    detail = " | ".join(p for p in [price_note, location_note, url_note] if p)
+    detail = " | ".join(p for p in [price_note, default_note, location_note, url_note] if p)
     return round(total_co2e, 1), round(total_cost), detail, cost_is_estimate
 
 
@@ -1406,11 +1558,16 @@ def find_alternatives(
 
         comp_key = routing.get(bl_comp.component_id) or resolve_category(
             proj_comp.name, proj_comp.category)
-        category_rows = _split_subtype_rows(epd_data.get(comp_key, []), proj_comp, comp_key)
-        category_rows, no_alt_reason = _stud_rows(category_rows, proj_comp, comp_key)
+        # A stud or board the router filed under the wall, roof or floor it
+        # stands in is still a frame member: its comparable rows, its reuse
+        # listings and its baseline all live in stomme (HENRIC-3290).
+        if _is_frame_component(proj_comp, comp_key):
+            comp_key = "stomme"
+        category_rows, no_alt_reason = _stomme_rows(epd_data, proj_comp, comp_key)
+        category_rows = _split_subtype_rows(category_rows, proj_comp, comp_key)
         epds_for_category = _select_epd_candidates(
             category_rows, proj_comp.unit, comp_key,
-        )
+        ) if category_rows else []
         # Baseline reference must follow the routed material (retroactive
         # directive): a kakel-routed wall is validated against the kakel
         # baseline, not the stored innervägg one — else RC5 drops every kakel

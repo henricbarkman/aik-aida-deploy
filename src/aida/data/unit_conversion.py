@@ -473,3 +473,90 @@ TYPICAL_ITEM_MASS_KG: dict[tuple[str, str], float] = {
 def typical_item_mass(category: str, subcategory: str = "") -> float | None:
     """Typical kg per item for a (category, subcategory), or None if unknown."""
     return TYPICAL_ITEM_MASS_KG.get((category, subcategory))
+
+
+# --- Member geometry from the component name ---------------------------------
+#
+# A stud or a beam is counted in löpmeter and a structural board in m2, while
+# the timber and board EPDs are declared per m3 (HENRIC-3290). The bridge is the
+# member's own geometry: a 45x95 stud IS 0.045 x 0.095 m in section, so one m3
+# of that timber is 234 m of stud. That is a fact the person naming the
+# component stated, not a thickness or density borrowed from the category,
+# which is the line the rest of this module holds: convert_m3_to_m2 uses a
+# category thickness only where the category is a layer of that thickness, and
+# the kg bridge on a category-wide density stays refused.
+#
+# So the dimension is read from the component name and nowhere else. No
+# dimension in the name, no bridge; the caller then says what is missing
+# instead of guessing, and the chat asks for it.
+_CROSS_SECTION_RE = re.compile(r"(?<![\d.,])(\d{2,4})\s*[x×*]\s*(\d{2,4})(?![\d.,])")
+_THICKNESS_RE = re.compile(r"(?<![\d.,x×*])(\d{1,3}(?:[.,]\d)?)\s*mm\b", re.IGNORECASE)
+# A board named by its full format, sheet face then thickness: "OSB-skiva
+# 1200x2400x12 mm", "Plywood 1250x2500x9mm". The thickness is the smallest of
+# the three. Without this the two-number pattern took "1200x2400", left "x12
+# mm" behind, and the thickness pattern refused the number after the "x".
+_BOARD_FORMAT_RE = re.compile(
+    r"(?<![\d.,])(\d{2,4})\s*[x×*]\s*(\d{2,4})\s*[x×*]\s*(\d{1,3}(?:[.,]\d)?)(?![\d.,])")
+# The narrow side of a member section. The widest glulam in Swedish standard
+# widths is 215 mm and a deep beam is still under 400, while the narrow side of
+# a sheet format ("600x1200", "1200x2400") is 600 or more. Found in review
+# 2026-09-28: "Konstruktionsskiva 600x1200 mm" in lm read as 0.72 m3 per metre.
+_MAX_SECTION_NARROW_SIDE_MM = 400
+
+
+def cross_section_mm(name: str) -> tuple[float, float] | None:
+    """(width, height) in mm from "45x95", "45×70" or "90 x 315" in a name.
+
+    Outside 10-2000 mm is not a member section: "2x4" (inches) and panel
+    formats written in metres are left alone rather than read as millimetres.
+    Nor is a pair whose narrow side is wider than any beam: that is the face of
+    a sheet.
+    """
+    m = _CROSS_SECTION_RE.search(name or "")
+    if not m:
+        return None
+    a, b = float(m.group(1)), float(m.group(2))
+    if not (10 <= a <= 2000 and 10 <= b <= 2000):
+        return None
+    if min(a, b) > _MAX_SECTION_NARROW_SIDE_MM:
+        return None
+    return a, b
+
+
+def thickness_mm(name: str) -> float | None:
+    """A stated thickness ("12 mm", "22mm", "200 mm") in a name, or None.
+
+    A full board format ("1200x2400x12 mm") gives its smallest number. A
+    cross-section is removed first, so "45 x 95 mm" is a section and not a 95 mm
+    board. Outside 3-500 mm is not a board or a slab.
+    """
+    fmt = _BOARD_FORMAT_RE.search(name or "")
+    if fmt:
+        value = min(float(g.replace(",", ".")) for g in fmt.groups())
+        return value if 3 <= value <= 500 else None
+    text = _CROSS_SECTION_RE.sub(" ", name or "")
+    m = _THICKNESS_RE.search(text)
+    if not m:
+        return None
+    value = float(m.group(1).replace(",", "."))
+    return value if 3 <= value <= 500 else None
+
+
+def member_volume_per_unit(name: str, unit: str) -> tuple[float, str] | None:
+    """(m3 per component unit, label) from the name's own dimension, or None.
+
+    lm needs a cross-section, m2 a thickness. Any other unit, or a name without
+    the dimension its unit needs, returns None: a stud in st has no length, and
+    a board without a thickness has no volume.
+    """
+    unit = (unit or "").strip().lower()
+    if unit in ("lm", "m", "meter", "löpmeter"):
+        section = cross_section_mm(name)
+        if section:
+            w, h = section
+            return (w / 1000) * (h / 1000), f"tvärsnitt {w:g}×{h:g} mm"
+    elif unit in ("m2", "m²", "kvm"):
+        t = thickness_mm(name)
+        if t:
+            return t / 1000, f"tjocklek {t:g} mm"
+    return None

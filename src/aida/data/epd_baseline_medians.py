@@ -166,6 +166,23 @@ def split_subcategory_miss(category: str, unit: str, subcategory: str) -> bool:
         return False
     return get_baseline_typvärde(category, unit, subcategory) is None
 
+# Frame materials, 2026-09-28 (HENRIC-3290). A fourth shape: per subcategory
+# like sanitet, because a median over a stud, a glulam beam and a steel section
+# describes none of them, but in ANY unit, because the families are declared
+# the way they are traded: timber, glulam and board per m3, steel per kg. There
+# is no flat category key, and a row without a family is skipped (the catalog
+# build drops those anyway, see CATEGORY_SUBCATEGORY_REQUIRED).
+#
+# The m3 keys are not what a component is counted in. A stud is bought per
+# löpmeter and a board per m2, and member_typvärde below bridges the m3 value
+# with the member's own section or thickness, read from its name.
+_MATERIAL_SUBCATEGORIZED_CATEGORIES = {"stomme"}
+
+# The stomme families whose m3 value may be bridged by geometry. Solid material
+# only: a steel stud or section is a thin-walled profile, and its weight per
+# metre is a property of the profile that no name like "Stålregel 70" states.
+_GEOMETRY_BRIDGE_SUBCATEGORIES = {"virke", "limträ", "konstruktionsskiva"}
+
 # Still excluded wholesale: no subcategory taxonomy defined, too heterogeneous
 # to aggregate meaningfully.
 _HETEROGENEOUS_CATEGORIES = {"storköksutrustning"}
@@ -373,6 +390,10 @@ def _group_rows(epds: list[dict]) -> dict[tuple[str, str, str], Rows]:
             sub = e.get("subcategory") or ""
             if sub not in _SPLIT_SUBCATEGORIES[cat]:
                 sub = ""
+        elif cat in _MATERIAL_SUBCATEGORIZED_CATEGORIES:
+            sub = e.get("subcategory") or ""
+            if not sub:
+                continue
         else:
             sub = ""
         grouped.setdefault((cat, sub, unit), []).append((float(gwp), e))
@@ -541,8 +562,43 @@ def get_baseline_typvärde(category: str, unit: str, subcategory: str = "") -> d
             return _TYPVÄRDEN.get((category, subcategory, unit))
         return _TYPVÄRDEN.get((category, "", unit))
 
-    sub = subcategory if category in _SUBCATEGORIZED_CATEGORIES else ""
+    keyed = _SUBCATEGORIZED_CATEGORIES | _MATERIAL_SUBCATEGORIZED_CATEGORIES
+    sub = subcategory if category in keyed else ""
     return _TYPVÄRDEN.get((category, sub, unit))
+
+
+def member_typvärde(category: str, name: str, unit: str,
+                    subcategory: str) -> dict | None:
+    """The m3 typvärde of a solid frame family, per löpmeter or m2 of THIS member.
+
+    "Reglar 45x95" in lm is 0.045 x 0.095 m of sawn timber per metre, so the
+    virke/m3 value times that area is its value per metre. The dimension comes
+    from the name and nowhere else (unit_conversion.member_volume_per_unit); a
+    name without one gets None, and the caller asks for it rather than guess.
+
+    Returns the m3 payload rescaled, with `geometry` naming the section or
+    thickness used, or None.
+    """
+    from aida.data.unit_conversion import member_volume_per_unit
+
+    if category not in _MATERIAL_SUBCATEGORIZED_CATEGORIES:
+        return None
+    if subcategory not in _GEOMETRY_BRIDGE_SUBCATEGORIES:
+        return None
+    geometry = member_volume_per_unit(name, unit)
+    if not geometry:
+        return None
+    m3_data = get_baseline_typvärde(category, "m3", subcategory)
+    if not m3_data:
+        return None
+    factor, label = geometry
+    bridged = dict(m3_data)
+    for key in ("baseline_co2e_per_unit", "full_median", "min", "max"):
+        if isinstance(m3_data.get(key), (int, float)):
+            bridged[key] = round(m3_data[key] * factor, 4)
+    bridged["geometry"] = label
+    bridged["per_m3"] = m3_data["baseline_co2e_per_unit"]
+    return bridged
 
 
 # Back-compat alias — old call sites used "median" terminology before we

@@ -683,7 +683,11 @@ _HINT_KEYWORDS: dict[str, set[str]] = {
     "betongvägg": {"concrete", "betong", "precast", "reinforced"},
     "stomme": {"beam", "column", "girder", "structural steel", "steel section",
                "glulam", "laminated timber", "clt", "cross-laminated",
-               "hollow core", "precast", "slab", "load-bearing", "structural"},
+               "hollow core", "precast", "slab", "load-bearing", "structural",
+               # Studs and boards, 2026-09-28: the frame a renovation actually
+               # touches is timber and steel studs and the boards on them.
+               "timber", "sawn", "planed", "stud", "studs", "framing",
+               "plywood", "osb", "lvl", "particle board"},
     "fönster": {"window", "glass", "glazing", "triple", "double"},
     "tak": {"roof", "tile", "roofing", "membrane", "bitumen", "shingle",
             "sedum", "green roof", "slate"},
@@ -750,6 +754,10 @@ _NEGATIVE_TERMS: dict[str, set[str]] = {
     # do: a mirror cabinet with shelf is still a mirror cabinet).
     "fast_inredning": {"locker", "wardrobe", "desk", "chair", "office", "filing",
                        "möbler"},
+    # Plywood and particleboard are furniture materials as much as building
+    # ones, and "Studio table" and "Student locker" start with "stud".
+    "stomme": {"table", "desk", "chair", "locker", "cabinet", "furniture",
+               "möbler"},
 }
 
 
@@ -809,6 +817,10 @@ WORD_BOUNDED_TERMS: frozenset[str] = frozenset({
     # half of this defect class -- a contaminated row announces itself at the
     # front of a queue, a wrongly excluded one announces nothing ever.
     "bed",
+    # stomme queries, 2026-09-28: "lvl" sits inside the Danish floor lacquer
+    # "Gulvlak" (PPG Dyrup, two rows in the top 30), "osb" inside the Finnish
+    # cement "KolmosBertta". Both are three letters and only ever a word here.
+    "lvl", "osb",
 })
 
 

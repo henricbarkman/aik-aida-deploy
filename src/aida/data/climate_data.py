@@ -125,14 +125,91 @@ _PRIORITY_TOKENS: tuple[tuple[str, tuple[str, ...]], ...] = (
 # nothing, so the component had no category and no alternatives at all. Read
 # per word and from the END of the word, because "regel" is also the head of
 # "regelbunden" and "regelverk" (the Swedish for "regular" and "regulations"),
-# which already occur in example texts. Checked only after the whole table has
-# missed, so "Takregel" stays tak and "Reglar innervägg" innervägg.
+# which already occur in example texts.
 _STUD_ENDINGS = ("regel", "regeln", "reglar", "reglarna")
 
 
 def names_stud(text: str) -> bool:
     """True when `text` names a stud or studs ("Stålreglar 70", "Träregel")."""
     return any(w.endswith(_STUD_ENDINGS) for w in _words(text))
+
+
+# Frame members named as the thing itself, 2026-09-28 (HENRIC-3290, second
+# round). The first round sent a bare stud to innervägg, the wall it usually
+# stands in, and that is where it met no comparable row: innervägg's rows are
+# plasterboard per m2 and a handful of steel profiles per kg, while a stud is
+# bought per löpmeter at a stated section. Sawn timber, glulam and structural
+# board all live in stomme, so a stud does too, and a board or a batten with it.
+#
+# What decides is the HEAD of the name, the part before the first "på", "med",
+# "i" or comma, and within it the first word that says what the thing is.
+# "Reglar innervägg" and "Nya reglar i vägg" are studs; "Innervägg, gips på
+# stålreglar" and "Gipsvägg med stålreglar" are walls that happen to stand on
+# studs, and keep going to innervägg. A name whose head says nothing either way
+# ("Gips på reglar") falls through to the table and, failing that, to the stud
+# fallback at the very end, which still sends it to innervägg.
+_HEAD_SPLIT_RE = re.compile(
+    r"[,(/;:]| (?:på|med|i|till|för|av|och|mot|inkl|samt|under|bakom) ")
+# Words keep their hyphens here and lose them before matching, so "OSB-skiva"
+# is read as the one compound "osbskiva". A Swedish compound is named by its
+# LAST part, which is why every pattern below is anchored at the end:
+# "Golvspånskiva" is a board, "Plywoodbord" and "OSB-hylla" are furniture.
+_COMPOUND_RE = re.compile(r"[a-zåäöéü]+(?:-[a-zåäöéü]+)*")
+_FRAME_WORD_RE = re.compile(
+    r"(?:"
+    # studs, and a frame of them; light steel profiles and roof trusses
+    r"regel|regeln|reglar|reglarna|regelstomme|regelstommen|regelstommar"
+    # The one-letter profile names only at the start of the word: "aluprofil"
+    # (window and glazing aluminium) ends in "uprofil" too.
+    r"|(?:stål|hatt|^[cuz])profil(?:en|er|erna)?|takstol|takstolen|takstolar"
+    # structural board. "Golvspånskiva" moves from golv on purpose: it is a
+    # particleboard subfloor, and golv's typvärde is the vinyl or linoleum that
+    # would be laid on it.
+    r"|(?:plywood|spån|konstruktions|kryssfaner|kryssfanér|osb)skiv(?:a|an|or|orna)"
+    r"|plywood|kryssfaner|kryssfanér|osb|råspont|råsponten"
+    # sawn and engineered timber
+    r"|virke|virket|konstruktionsträ|fanerträ|lvl|lvlbalk|lvlbalkar|kerto"
+    # Solid timber as a material on its own. It was a substring on the stomme
+    # row of the table below, where it also took "Massivträbord" and "Matbord
+    # i massivträ" (tester, 2026-09-28), which then got asked for a stud's
+    # section. As a word ending it is only the timber itself.
+    r"|massivträ"
+    # battens and sole plates. "Läktare" (a grandstand) ends in none of these,
+    # and the lookbehind keeps "släkt" (relatives) and every "fläkt" (a fan:
+    # köksfläkt, takfläkt) out.
+    r"|(?<![sf])(?:läkt|läkten|läkter|läkterna)"
+    r"|glespanel|glespanelen|syll|syllen|syllar|syllarna"
+    r")$")
+# Words that make the head a surface or a wall rather than the member.
+_SURFACE_ENDINGS = ("vägg", "väggen", "väggar", "väggarna", "skiva", "skivan",
+                    "skivor", "skivorna")
+# Compounds that end in a frame word and are not framing. "Fasadvirke" is
+# cladding. A "dörregel", "fönsterregel" or "skjutregel" is a bolt, door and
+# window hardware (tester, 2026-09-28: a Palats "Dörregel mässing" was offered
+# as reuse for timber studs). Firewood and packaging timber are not structural.
+_NOT_FRAME_PREFIXES = ("fasad", "dörr", "dör", "fönster", "skjut", "kolv",
+                       "slag", "bom", "lås", "grind", "port", "luck",
+                       "bränsle", "emballage")
+# An elided compound, "Vägg- och golvregel": the first word lends its tail to
+# the second and names nothing on its own. Without this the head split at "och"
+# left "vägg-", read as a wall (review, 2026-09-28).
+_ELIDED_RE = re.compile(r"[a-zåäöéü]+-\s*(?:och|eller|samt|&|,|/)\s*")
+
+
+def names_frame_member(text: str) -> bool:
+    """True when the head of `text` names a stud, a batten, sawn timber or a
+    structural board ("Reglar 45x95", "OSB-skiva 12 mm", "Takläkt"), False
+    when it names a wall or a surface that merely stands on one ("Gipsvägg med
+    stålreglar")."""
+    text = _ELIDED_RE.sub("", text.lower().strip())
+    head = _HEAD_SPLIT_RE.split(" " + text + " ", maxsplit=1)[0]
+    for compound in _COMPOUND_RE.findall(head):
+        w = compound.replace("-", "")
+        if _FRAME_WORD_RE.search(w) and not w.startswith(_NOT_FRAME_PREFIXES):
+            return True
+        if w.endswith(_SURFACE_ENDINGS) or w.startswith("gips"):
+            return False
+    return False
 
 
 def light_clinker_category(text: str) -> str:
@@ -187,6 +264,11 @@ def normalize_component_name(name: str) -> str:
     if clinker:
         return clinker
 
+    # Before the table, whose "tak" would take "Takregel" and "Takläkt" and
+    # whose "golv" would take "Golvreglar".
+    if names_frame_member(name_lower):
+        return "stomme"
+
     mappings = {
         # Keramik/kakel checked BEFORE golv: "golvklinker" contains "golv", so
         # golv would otherwise steal it. Ceramic wall+floor tile share one
@@ -233,9 +315,10 @@ def normalize_component_name(name: str) -> str:
         # _names_bare_beam_or_column, checked on this row in the loop below.
         "stomme": ["stomme", "stomsystem", "stålstomme", "stålbalk",
                    "stålpelare", "stålbjälke", "limträ", "limträbalk",
-                   "kl-trä", "klträ", "korslimmat", "massivträ", "träbalk",
+                   "kl-trä", "klträ", "korslimmat", "träbalk",
                    "träpelare", "betongbalk", "betongpelare", "bjälklag",
-                   "håldäck", "takbalk", "bärbalk"],
+                   "håldäck", "takbalk", "bärbalk", "lättbalk", "masonitebalk",
+                   "i-balk"],
         "betongvägg": ["betongvägg", "betong", "concrete"],
         "fönster": ["fönster", "window", "fönsterbyte", "energiglas"],
         "tak": ["tak", "roof", "takpannor", "takbeläggning", "yttertak",
@@ -301,8 +384,9 @@ def normalize_component_name(name: str) -> str:
         if key == "stomme" and _names_bare_beam_or_column(name_lower):
             return key
 
-    # Studs belong to the wall they are in; unqualified, that is an interior
-    # wall, where nearly every renovation meets them.
+    # A name that mentions studs only after its head ("Gips på reglar") is the
+    # surface on them, and the surface is the wall they stand in. A stud named
+    # as the thing itself was taken by names_frame_member above.
     if names_stud(name_lower):
         return "innervägg"
 
@@ -353,7 +437,19 @@ def resolve_category(name: str, declared_category: str = "") -> str:
     """
     cat = canonical_category(declared_category)
     if cat in VALID_CATEGORIES:
+        # A stud or a structural board declared as the part it stands in. Intake
+        # used to file "Reglar" under innervägg, and every saved project still
+        # carries that: the wall is right as context and wrong as a material,
+        # because the comparable rows (sawn timber, steel studs, OSB) are all in
+        # stomme. A wall that merely stands on studs ("Gipsvägg med stålreglar")
+        # is not a frame member and keeps its declared category.
+        if cat in _FRAME_HOST_CATEGORIES and names_frame_member(name):
+            return "stomme"
         return cat
     return normalize_component_name(name)
+
+
+# Declared categories a frame member is commonly filed under by mistake.
+_FRAME_HOST_CATEGORIES = {"innervägg", "yttervägg", "tak", "golv"}
 
 

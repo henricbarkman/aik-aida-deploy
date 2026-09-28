@@ -289,7 +289,39 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
         ("diskbänk", ["diskbänk", "diskho"]),
         ("bänkskiva", ["bänkskiv"]),
     ],
+    # Same five keys as EPD_SUBCATEGORY_KEYWORDS["stomme"] in
+    # build_epd_alternatives, read in Swedish (HENRIC-3290). Steel before
+    # timber, because "Stålreglar" ends in the timber family's bare "reglar",
+    # and a named product family before the stud words for the same reason.
+    # "betong" has no EPD family: precast frame is not compared yet, but a
+    # listing of it must still not be offered for a timber stud, which is what
+    # the strict narrowing in search_listings_for_component relies on.
+    "stomme": [
+        ("konstruktionsskiva", ["osb", "plywood", "spånskiv", "kryssfan",
+                                "konstruktionsskiv", "råspont"]),
+        ("limträ", ["limträ", "kl-trä", "klträ", "korslimmat", "massivträ",
+                    "lvl", "kerto", "fanerträ", "lättbalk", "masonitebalk",
+                    "i-balk"]),
+        ("betong", ["betongbalk", "betongpelare", "håldäck", "bjälklag",
+                    "klinkerbalk", "lecabalk", "armering"]),
+        ("konstruktionsstål", ["stålbalk", "stålpelare", "stålbjälke",
+                               "vkr", "kkr", re.compile(r"\b(?:hea|heb|ipe|upe|unp)\s*\d")]),
+        ("stålregel", ["stålregel", "stålreglar", "stålprofil", "hattprofil",
+                       "c-profil", "u-profil", "z-profil", "stålstomme"]),
+        # "läkt" as a pattern: a bare substring is inside every "fläkt".
+        ("virke", ["regel", "reglar", "virke", re.compile(r"(?<![sf])läkt"),
+                   "glespanel", "syll", "träbalk", "träpelare", "takstol",
+                   "konstruktionsträ"]),
+    ],
 }
+
+# Categories whose reuse matches must share the component's subcategory, not
+# just rank it first. Within sanitet a toilet search may still show a washbasin
+# further down; within stomme a stud search must never show a hollow-core slab,
+# because the one is 0.1 kg CO2e per metre and the other a tonne of concrete.
+# A stomme component with no subcategory gets no listings, mirroring the EPD
+# side, which asks for the material instead of guessing.
+STRICT_SUBCATEGORY_CATEGORIES: frozenset[str] = frozenset({"stomme"})
 
 
 def _normalize_to_aida_subcategory(category: str, text: str) -> str:
@@ -430,10 +462,12 @@ CATEGORY_EXCLUSIONS: dict[str, tuple[str, ...]] = {
     "isolering": ("glasparti",),
     # An awning shades a window, it does not replace one. A window sill has
     # its own subcategory and is not a window either.
-    "fönster": ("markis", "persienn", "gardin"),
-    # Frames, rails and hardware cannot substitute a door leaf.
+    # "regel" is a bolt here ("Fönsterregel"), 2026-09-28.
+    "fönster": ("markis", "persienn", "gardin", "regel"),
+    # Frames, rails and hardware cannot substitute a door leaf. "regel" added
+    # 2026-09-28: a "Dörregel" is the bolt, and it stopped reading as a stud.
     "dörr": ("karm", "skena", "handtag", "beslag", "trycke", "dörrstopp",
-             "gångjärn", "tröskel"),
+             "gångjärn", "tröskel", "regel"),
     # A drawer or a cabinet above the fridge is not a cooling appliance.
     "kylanläggning": ("låda", "överskåp", "underskåp"),
 }
@@ -457,14 +491,24 @@ def _normalize_to_aida_category(title: str, description: str = "") -> str:
     # Structural frame elements (beams, columns, slabs) are load-bearing stomme,
     # not renovation finish materials. "Lättklinkerbalk" contains "klinker" and
     # would otherwise be miscategorized as golv/kakel and offered as a floor
-    # reuse option. Skip them so they aren't matched to finish components. Uses
-    # compound forms only — bare "balk" would hit "balkong" and bare "pelare"
-    # would hit "duschpelare" (a shower tower, a legit sanitet fixture).
+    # reuse option. Uses compound forms only — bare "balk" would hit "balkong"
+    # and bare "pelare" would hit "duschpelare" (a shower tower, a legit
+    # sanitet fixture).
+    #
+    # Until 2026-09-28 these returned "", which kept them out of the finish
+    # categories but also out of reach: stomme had no alternatives step to meet
+    # them in. They are stomme now, which keeps the same protection (a frame
+    # listing never lands in golv or kakel) and lets a stud or a beam component
+    # find them. Studs, battens and structural boards are read with the
+    # component side's own function, so a listing and a component that both say
+    # "Reglar 45x95" land in one category (HENRIC-3290). Measured the same day:
+    # the live inventory holds no such listing yet, so no current match moves.
     _structural = ("klinkerbalk", "betongbalk", "stålbalk", "limträbalk",
                    "håldäck", "bjälklag", "armeringsjärn", "betongpelare",
                    "stålpelare", "limträpelare")
-    if any(t in text for t in _structural):
-        return ""
+    from aida.data.climate_data import names_frame_member
+    if any(t in text for t in _structural) or names_frame_member(text):
+        return "stomme"
 
     if _is_non_building(title):
         return ""
@@ -521,9 +565,11 @@ def _normalize_to_aida_category(title: str, description: str = "") -> str:
             "isolering", "mineralull", "glasull", "stenull", "cellplast",
             "eps", "xps", "cellulosa", "ljudisolerande",
         ]),
+        # "reglar" moved out 2026-09-28: a listing of studs is stomme, read by
+        # names_frame_member above. A wall listing that names them after its
+        # head ("Gipsvägg med reglar") still lands here on "gips".
         ("innervägg", [
-            "gipsskiva", "gips", "väggskiva", "byggskiva",
-            "reglar", "innervägg",
+            "gipsskiva", "gips", "väggskiva", "byggskiva", "innervägg",
         ]),
         ("yttervägg", ["fasadskiva", "fasadplatta", "puts", "fasad"]),
         # Cooker hoods moved to vitvaror below, so this list must no longer
@@ -750,6 +796,9 @@ def search_listings_for_component(
         return []
 
     target_subcategory = component_subcategory(component_name, target_category)
+    strict = target_category in STRICT_SUBCATEGORY_CATEGORIES
+    if strict and not target_subcategory:
+        return []
 
     primary: list[PalatsListing] = []
     secondary: list[PalatsListing] = []
@@ -759,7 +808,7 @@ def search_listings_for_component(
             continue
         if target_subcategory and listing.subcategory == target_subcategory:
             primary.append(listing)
-        else:
+        elif not strict:
             secondary.append(listing)
 
     return primary + secondary

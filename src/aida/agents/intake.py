@@ -59,6 +59,7 @@ Regler:
 - Unit ska vara m2, st, eller lm (löpmeter)
 - Category ska vara en av: golv, kakel, innervägg, yttervägg, fasadskikt, betongvägg, tak, fönster, dörr, isolering, belysning, ventilation, hiss, kylanläggning, sanitet, vitvaror, storköksutrustning, vvs, farg, el, radiator, fast_inredning, stomme
   - stomme: bärande stomme, alltså balkar, pelare och bjälklag i stål, limträ, KL-trä eller betong. Bärande väggar är inte stomme.
+    Reglar (trä eller stål), läkt, syll, konstruktionsvirke och konstruktionsskivor (OSB, plywood, spånskiva) är också stomme, även när de sitter i en innervägg. Skriv dimensionen i namnet ("Reglar 45x95", "Stålreglar 70 mm", "OSB-skiva 12 mm") och räkna reglar i lm (antal × längd), skivor i m2. Saknas dimension eller längd för reglar: fråga efter den i clarification_needed, och gissa den inte.
   - kakel: kaklad/klinkad yta (våtrumsvägg, -golv, kakel/klinker). Välj kakel framför golv/innervägg när ytan är keramisk.
   - fasadskikt vs yttervägg: välj `fasadskikt` när bara byggnadens yttre beklädnad byts eller renoveras (fasadpanel, träfasad, fasadskivor). Välj `yttervägg` när hela väggkonstruktionen byggs eller byts, alltså inklusive stomme och isolering. Vid tvekan i en ombyggnad: `fasadskikt`, eftersom en renovering oftast rör skiktet och inte hela väggen. Ren ommålning av befintlig panel är `farg`.
   - vvs: rör, stambyte, avlopp. farg: målning/ommålning. el: elkabel/elinstallation. radiator: radiator/värmeelement.

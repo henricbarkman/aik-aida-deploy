@@ -68,7 +68,7 @@ def get_client() -> anthropic.Anthropic:
 # thinks less than it did on Opus 5.
 DEFAULT_MODEL = "anthropic/claude-opus-5.5"
 
-# Adaptive-thinking effort levels (Opus 5.5 / Sonnet 5). These replace the old
+# Adaptive-thinking effort levels (Opus 5.5 / Sonnet 5.5). These replace the old
 # budget_tokens scheme, which returns 400 on both. Prior budget -> effort:
 #   LOW (1024) -> medium · STANDARD (5000) -> high · DEEP (10000) -> high.
 # "high" is already strong; bump the correctness steps (routing, baseline) to
@@ -91,7 +91,7 @@ REASONING_MAX_TOKENS = 16000
 # Must stay in sync with PRICING_MODEL in data/pricing_provider.py: that module
 # passes PRICING_EFFORT to call_model, and an id missing from this set silently
 # drops both thinking and effort instead of erroring.
-_ADAPTIVE_MODELS = {"anthropic/claude-opus-5.5", "anthropic/claude-sonnet-5"}
+_ADAPTIVE_MODELS = {"anthropic/claude-opus-5.5", "anthropic/claude-sonnet-5.5"}
 
 
 def _thinking_request(model: str, effort: str | None) -> dict:

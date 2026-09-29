@@ -17,7 +17,7 @@ from aida.name_match import best_token_match, match_key
 
 logger = logging.getLogger(__name__)
 
-PRICING_MODEL = "anthropic/claude-sonnet-5"
+PRICING_MODEL = "anthropic/claude-sonnet-5.5"
 # Pricing stays on Sonnet (cheap, web-search heavy, not the CO2 correctness
 # path). Adaptive thinking + effort replaces the deprecated budget_tokens.
 # Keep this id listed in api_client._ADAPTIVE_MODELS — otherwise PRICING_EFFORT

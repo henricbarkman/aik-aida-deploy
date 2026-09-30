@@ -41,6 +41,8 @@ import logging
 from pathlib import Path
 from statistics import median
 
+from aida.data.aggregat import CLASS_SUBCATEGORY, FLOW_UNIT
+
 logger = logging.getLogger(__name__)
 
 EPD_DATA_PATH = Path(__file__).parent / "epd_alternatives.json"
@@ -122,6 +124,16 @@ _WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
     ("ventilation", "aggregat", "kg"): (
         "aggregat-EPD:er per kg spänner över alla storlekar, och ett "
         "kg-värde ger inget styckvärde utan aggregatets vikt"
+    ),
+    # The two size classes and the airflow key (aggregat.py) are counted from the
+    # same rows. The apartment class is withheld for the reason badrumsinredning
+    # and förvaring are: every one of its eight EPDs is Flexit's Nordic range.
+    # The building class (Kampmann 7, Flexit ProNordic 6, Salda 2) and the
+    # airflow key (the same 15) stay under the dominance ceiling.
+    ("ventilation", "aggregat_lägenhet", "st"): (
+        "alla 8 EPD:er för lägenhetsaggregat kommer från en och samma "
+        "leverantör (Flexit), så ett typvärde vore deras sortiment och inte "
+        "ett typiskt val"
     ),
     # HENRIC-3290 del 3, counted per group rather than per owner string: the
     # dominance test's _owner_key keeps Saint-Gobain's national subsidiaries
@@ -458,7 +470,23 @@ def _group_rows(epds: list[dict]) -> dict[tuple[str, str, str], Rows]:
         else:
             sub = ""
         grouped.setdefault((cat, sub, unit), []).append((float(gwp), e))
+        if (cat, sub, unit) == ("ventilation", "aggregat", "st"):
+            _add_aggregat_keys(grouped, float(gwp), e)
     return grouped
+
+
+def _add_aggregat_keys(grouped: dict[tuple[str, str, str], Rows], gwp: float,
+                       e: dict) -> None:
+    """Count an air handling unit a second time, in its size class, and a third,
+    per m3/h of its airflow, when the catalog row carries them (aggregat.py
+    says where each came from). The per-piece key it is also in stays withheld;
+    these two are what the baseline uses instead."""
+    klass = e.get("aggregat_class")
+    if klass in CLASS_SUBCATEGORY:
+        grouped.setdefault(("ventilation", CLASS_SUBCATEGORY[klass], "st"), []).append((gwp, e))
+    flow = e.get("airflow_m3h")
+    if isinstance(flow, (int, float)) and flow > 0:
+        grouped.setdefault(("ventilation", "aggregat", FLOW_UNIT), []).append((gwp / flow, e))
 
 
 def _in_scope(row: dict, scope_codes: frozenset[str]) -> bool:
@@ -505,7 +533,8 @@ def _compute_typvärden(
         return {}
 
     result: dict[tuple[str, str, str], dict] = {}
-    for key, rows in _group_rows(epds).items():
+    grouped = _group_rows(epds)
+    for key, rows in grouped.items():
         if key in _WITHHELD_KEYS:
             continue
         cat, sub, _unit = key
@@ -537,7 +566,57 @@ def _compute_typvärden(
             "min_samples": min_required,
             "min_samples_europe": _scope_floor(min_required),
         }
+        if key == ("ventilation", "aggregat", FLOW_UNIT):
+            # The flows the per-m3/h value was measured over, so a component
+            # outside them can be told its number is an extrapolation.
+            flows = [e["airflow_m3h"] for _, e in used]
+            result[key]["airflow_min"] = min(flows)
+            result[key]["airflow_max"] = max(flows)
+            # All per-piece aggregat EPDs, so the row can say how many state no
+            # flow and are left out.
+            result[key]["sample_size_per_piece"] = len(
+                grouped.get(("ventilation", "aggregat", "st"), []))
+        elif cat == "ventilation" and sub in CLASS_SUBCATEGORY.values():
+            flows = [e["airflow_m3h"] for _, e in used
+                     if isinstance(e.get("airflow_m3h"), (int, float))]
+            if len(flows) >= min_required:
+                result[key]["airflow_median"] = float(median(flows))
+    _class_values_from_flow(result)
     return result
+
+
+def _class_values_from_flow(result: dict[tuple[str, str, str], dict]) -> None:
+    """A size class's per-piece value is a unit of the class's middle size,
+    counted with the per-airflow typvärde. In place.
+
+    The upper-half median is this module's answer to one bias: EPDs come from
+    climate-conscious makers, so the upper half approximates the conventional
+    choice. Inside an aggregat class the spread is not that. It is size: the
+    building class runs from Flexit's 1 000 m3/h ProNordic (1 210 kg) to
+    Kampmann's 20 000 m3/h unit, and its upper half is the big units, 11 050
+    kg/st against a class median of 2 783. That number would describe a school's
+    main unit and nothing smaller. So size takes the median of the flows the
+    class's EPDs state (not the upper half: size is not a climate choice), and
+    the conventional-choice uplift comes in through the per-m3/h value, which
+    is an upper-half median over the same EPDs and where the spread is product
+    choice (rotary against plate exchanger, 0.49 to 1.33). The per-piece
+    upper-half median stays in the payload as `upper_half_per_piece`.
+
+    A class whose EPDs state too few flows keeps its per-piece upper-half
+    median (the apartment class, were it ever published: Flexit's Nordic EPDs
+    state none, and their spread, 270 to 564 kg, is narrow).
+    """
+    per_flow = result.get(("ventilation", "aggregat", FLOW_UNIT))
+    if not per_flow:
+        return
+    for sub in CLASS_SUBCATEGORY.values():
+        entry = result.get(("ventilation", sub, "st"))
+        if not entry or "airflow_median" not in entry:
+            continue
+        entry["upper_half_per_piece"] = entry["baseline_co2e_per_unit"]
+        entry["per_m3h"] = per_flow["baseline_co2e_per_unit"]
+        entry["baseline_co2e_per_unit"] = round(
+            per_flow["baseline_co2e_per_unit"] * entry["airflow_median"], 1)
 
 
 _TYPVÄRDEN: dict[tuple[str, str, str], dict] | None = None
@@ -608,6 +687,11 @@ def get_baseline_typvärde(category: str, unit: str, subcategory: str = "") -> d
     if _TYPVÄRDEN is None:
         _TYPVÄRDEN = _compute_typvärden()
 
+    # An aggregat size class is its own key and nothing else: a miss must not
+    # fall through to ventilation/st, which is ducts and terminals.
+    if category == "ventilation" and subcategory in CLASS_SUBCATEGORY.values():
+        return _TYPVÄRDEN.get((category, subcategory, unit))
+
     # Split subtypes first, so a golv/avjämning miss never reaches the
     # subtype-preferred fallback below (the floor covering's aggregate).
     split_units = _SPLIT_SUBCATEGORIES.get(category, {}).get(subcategory)
@@ -662,6 +746,72 @@ def member_typvärde(category: str, name: str, unit: str,
     bridged["geometry"] = label
     bridged["per_m3"] = m3_data["baseline_co2e_per_unit"]
     return bridged
+
+
+def aggregat_typvärde(name: str, usage_context: str = "", quantity: float = 1) -> dict:
+    """A, B or C for one air handling unit counted per piece (aggregat.py).
+
+    Returns a dict with:
+      method  "luftflöde" | "klass" | "uppskattning"
+      payload the typvärde per PIECE for this unit (the usual typvärde keys,
+              min/max/full_median in kg per piece too), or None under C
+      and, per method: airflow_m3h, airflow_source, per_m3h, extrapolated
+      (A); klass, class_why and flow_note (B: why a flow the text mentions
+      was not used, or ''); reason, klass and airflow_m3h (C), the reason a
+      sentence saying what is missing.
+
+    The alternatives step sizes its rows from this same answer, so the two
+    steps cannot read one component two ways.
+
+    `quantity` is the component's count: a flow read from the usage_context is
+    only taken for a single unit (aggregat.component_airflow).
+    """
+    from aida.data.aggregat import component_airflow, component_class
+
+    global _TYPVÄRDEN
+    if _TYPVÄRDEN is None:
+        _TYPVÄRDEN = _compute_typvärden()
+
+    flow, flow_where = component_airflow(name, usage_context, quantity)
+    per_flow = _TYPVÄRDEN.get(("ventilation", "aggregat", FLOW_UNIT))
+    if flow and per_flow:
+        payload = dict(per_flow)
+        for k in ("baseline_co2e_per_unit", "full_median", "min", "max"):
+            payload[k] = round(per_flow[k] * flow, 1)
+        return {
+            "method": "luftflöde",
+            "payload": payload,
+            "airflow_m3h": flow,
+            "airflow_source": flow_where,
+            "per_m3h": per_flow["baseline_co2e_per_unit"],
+            "extrapolated": not (per_flow["airflow_min"] <= flow <= per_flow["airflow_max"]),
+        }
+
+    klass, class_why = component_class(name, usage_context)
+    if klass:
+        sub = CLASS_SUBCATEGORY[klass]
+        hit = _TYPVÄRDEN.get(("ventilation", sub, "st"))
+        if hit:
+            no_flow = flow is None and flow_where != "inget luftflöde angivet"
+            return {"method": "klass", "payload": hit, "klass": klass,
+                    "class_why": class_why,
+                    "flow_note": flow_where if no_flow else ""}
+
+    if flow:
+        flow_part = "Katalogen saknar ett typvärde per luftflöde"
+    else:
+        flow_part = flow_where[:1].upper() + flow_where[1:]
+    if klass:
+        why = (withheld_reason("ventilation", CLASS_SUBCATEGORY[klass], "st")
+               or "katalogen har för få EPD:er för klassen")
+        reason = f"{flow_part}. Inget typvärde för {klass}saggregat: {why}"
+    else:
+        reason = f"{flow_part}, och {class_why}"
+    return {"method": "uppskattning", "payload": None, "reason": reason, "klass": klass,
+            "airflow_m3h": flow,
+            # Whether stating a flow would give a number: the row only asks for
+            # it when it would.
+            "flow_available": per_flow is not None}
 
 
 # Back-compat alias — old call sites used "median" terminology before we

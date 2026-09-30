@@ -30531,7 +30531,9 @@
     "reg_no": "EPD-IES-0025554:002",
     "uuid": "e8eff9bf-3a35-4428-6bf4-08ddec54af23",
     "source_registry": "environdec",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 10000,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -30544,7 +30546,9 @@
     "reg_no": "EPD-IES-0025669:002",
     "uuid": "be529693-10c3-4531-ac0a-08ddec3af1e7",
     "source_registry": "environdec",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 10000,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -30557,7 +30561,9 @@
     "reg_no": "EPD-IES-0025660:002",
     "uuid": "15bf4aab-70ae-4594-ae22-08ddeba0cac3",
     "source_registry": "environdec",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 15012,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -30570,7 +30576,9 @@
     "reg_no": "EPD-IES-0025570:002",
     "uuid": "7ad3b9cd-c928-4a52-ae7d-08ddec46410e",
     "source_registry": "environdec",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 16000,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -30583,7 +30591,9 @@
     "reg_no": "EPD-IES-0025664:002",
     "uuid": "ac47a5d8-bb1b-414a-0e2b-08ddebb0673b",
     "source_registry": "environdec",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 20000,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -30596,7 +30606,9 @@
     "reg_no": "EPD-IES-0025633:002",
     "uuid": "f36b859b-3d96-4f56-0e69-08ddeaaab18d",
     "source_registry": "environdec",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 6000,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -30609,7 +30621,9 @@
     "reg_no": "EPD-IES-0025579:002",
     "uuid": "02915456-9d6c-482c-e678-08ddec5b41b6",
     "source_registry": "environdec",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 9000,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -30984,7 +30998,8 @@
     "reg_no": "NEPD-7226-6608",
     "uuid": "6c7a3df5-600e-4f2f-88ef-10ef5cafc406",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "aggregat_class": "lägenhet"
   },
   {
     "category": "ventilation",
@@ -30997,7 +31012,8 @@
     "reg_no": "NEPD-7225-6609",
     "uuid": "b3bc2740-d814-456d-b879-416fb9b691e0",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "aggregat_class": "lägenhet"
   },
   {
     "category": "ventilation",
@@ -31010,7 +31026,8 @@
     "reg_no": "NEPD-7224-6610",
     "uuid": "ff64e9cf-d426-4b08-acfa-0c290d79334a",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "aggregat_class": "lägenhet"
   },
   {
     "category": "ventilation",
@@ -31023,7 +31040,8 @@
     "reg_no": "NEPD-11163-9191",
     "uuid": "63710a01-f908-4444-ba7c-ccf0b19f65df",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "aggregat_class": "lägenhet"
   },
   {
     "category": "ventilation",
@@ -31036,7 +31054,8 @@
     "reg_no": "NEPD-6159-5426-EN",
     "uuid": "caa1fb0f-9017-48f4-9f53-326f103b7a64",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "aggregat_class": "lägenhet"
   },
   {
     "category": "ventilation",
@@ -31049,7 +31068,8 @@
     "reg_no": "NEPD-6160-5425-EN",
     "uuid": "990acd58-1a9c-434c-b223-984005130681",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "aggregat_class": "lägenhet"
   },
   {
     "category": "ventilation",
@@ -31062,7 +31082,8 @@
     "reg_no": "NEPD-6161-5424-EN",
     "uuid": "428a94a0-724a-48ac-9aae-bfc13e89a738",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "aggregat_class": "lägenhet"
   },
   {
     "category": "ventilation",
@@ -31075,7 +31096,8 @@
     "reg_no": "NEPD-9539-9190",
     "uuid": "f512ce47-7d7b-4a08-ae2e-637904f9a479",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "aggregat_class": "lägenhet"
   },
   {
     "category": "ventilation",
@@ -31103,7 +31125,9 @@
     "reg_no": "NEPD-6949-6340",
     "uuid": "baa64d9c-59c8-4921-b2b8-325d0f3765ee",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 1950,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -31116,7 +31140,9 @@
     "reg_no": "NEPD-6948-6341",
     "uuid": "c613fe8e-af10-4403-b6fa-dcc5bdecad5a",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 1000,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -31129,7 +31155,9 @@
     "reg_no": "NEPD-7221-6617",
     "uuid": "26d782fa-327b-4870-83ae-f3d23aace672",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 1550,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -31142,7 +31170,9 @@
     "reg_no": "NEPD-7223-6615",
     "uuid": "00a5bf44-77ff-426d-8de7-2230fb9c1062",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 2500,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -31155,7 +31185,9 @@
     "reg_no": "NEPD-7222-6616",
     "uuid": "140cb309-836d-448b-9769-fb6cf4e080ff",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 2400,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -31168,7 +31200,9 @@
     "reg_no": "NEPD-6954-6330",
     "uuid": "0b559a34-6923-44b7-b372-4742aa42d636",
     "source_registry": "epd_norge",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 3700,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -31196,7 +31230,9 @@
     "reg_no": "EPD-IES-0030270:001",
     "uuid": "a94402a2-4c3e-4df4-b0c9-08de8b2b0689",
     "source_registry": "environdec",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 3000,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",
@@ -31209,7 +31245,9 @@
     "reg_no": "EPD-IES-0030272:001",
     "uuid": "a2bd4be6-db62-4050-4aea-08de8b2eaf7b",
     "source_registry": "environdec",
-    "subcategory": "aggregat"
+    "subcategory": "aggregat",
+    "airflow_m3h": 3000,
+    "aggregat_class": "byggnad"
   },
   {
     "category": "ventilation",

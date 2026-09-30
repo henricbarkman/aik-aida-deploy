@@ -327,6 +327,56 @@ def _split_subtype_rows(epds: list[dict], proj_comp, category: str) -> list[dict
             if (e.get("subcategory", "") if e.get("subcategory", "") in splits else "") == sub]
 
 
+def _aggregat_size_rows(rows: list[dict], proj_comp, category: str) -> tuple[list[dict], str]:
+    """Aggregat rows narrowed to units that can do this component's job, or
+    the reason there are none.
+
+    The baseline is sized (per airflow, or per size class), and a row per piece
+    is only an alternative to it if it is the same size. Unnarrowed, a school's
+    3 000 m3/h unit was offered apartment units of 270-564 kg as an 85-93 %
+    saving against its 3 720 kg baseline (found in review, 2026-09-30).
+
+    The size is the baseline's own reading (aggregat_typvärde), so the two
+    steps cannot disagree about one component. A flow keeps the rows whose own
+    nominal flow is at least as large: a smaller unit cannot ventilate the same
+    rooms, and a larger one is a real if heavier option. No margin is added
+    below the flow, since the EPDs give no ground for one. Rows without a
+    stated flow cannot be checked and are left out, apartment units included.
+    Without a flow, a size class keeps the rows of that class, also when the
+    class's typvärde is withheld. With neither, the rows are left as they were;
+    the baseline is then an estimate as well.
+    """
+    from aida.claims import format_value
+    from aida.data.epd_baseline_medians import aggregat_typvärde
+    from aida.data.palats_client import component_subcategory
+
+    if category != "ventilation" or proj_comp.unit != "st" or not rows:
+        return rows, ""
+    if component_subcategory(proj_comp.name, category) != "aggregat":
+        return rows, ""
+    size = aggregat_typvärde(proj_comp.name, proj_comp.usage_context, proj_comp.quantity)
+    flow, klass = size.get("airflow_m3h"), size.get("klass")
+    label = {"lägenhet": "lägenhetsaggregat", "byggnad": "byggnadsaggregat"}
+    if flow is None:
+        if not klass:
+            return rows, ""
+        sized = [e for e in rows if e.get("aggregat_class") == klass]
+        if sized:
+            return sized, ""
+        return [], f"Katalogen har inga EPD:er för {label[klass]}."
+    sized = [e for e in rows if (e.get("airflow_m3h") or 0) >= flow]
+    if sized:
+        return sized, ""
+    largest = max((e.get("airflow_m3h") or 0 for e in rows), default=0)
+    if not largest:
+        return [], "Ingen av katalogens EPD:er för ventilationsaggregat anger luftflöde."
+    return [], (
+        f"Katalogens största aggregat med angivet luftflöde klarar {format_value(largest)} m³/h, "
+        f"och komponenten behöver {format_value(flow)} m³/h. Ett mindre aggregat är inget "
+        f"alternativ, eftersom det inte ventilerar samma lokaler."
+    )
+
+
 # Words that name a stud or framing profile in an EPD. The innervägg bucket is
 # almost all plasterboard per m2, so without narrowing a "Reglar" component was
 # offered gypsum boards; a board is not an alternative to the frame it is
@@ -1094,7 +1144,11 @@ def _effective_baseline_co2e(
     typvärde (can't honestly recompute). Only the CO2e reference moves; cost
     stays as-is (no routed-category price source).
     """
-    from aida.data.epd_baseline_medians import get_baseline_typvärde, member_typvärde
+    from aida.data.epd_baseline_medians import (
+        aggregat_typvärde,
+        get_baseline_typvärde,
+        member_typvärde,
+    )
     from aida.data.palats_client import component_subcategory
     from aida.data.unit_conversion import typical_item_mass
 
@@ -1114,7 +1168,13 @@ def _effective_baseline_co2e(
         return bl_comp.co2e_kg
 
     subcat = component_subcategory(proj_comp.name, routed_category)
-    tv = get_baseline_typvärde(routed_category, proj_comp.unit, subcat)
+    if routed_category == "ventilation" and subcat == "aggregat" and proj_comp.unit == "st":
+        # Per airflow or size class, mirroring _apply_aggregat_typvärde in
+        # baseline.py; None (keep the stored baseline) when neither is known.
+        tv = aggregat_typvärde(proj_comp.name, proj_comp.usage_context,
+                               proj_comp.quantity)["payload"]
+    else:
+        tv = get_baseline_typvärde(routed_category, proj_comp.unit, subcat)
     # kg->st bridge, mirroring _apply_epd_median_fallback in baseline.py: a
     # count-denominated component whose routed category only has a kg typvärde.
     if not tv and proj_comp.unit == "st":
@@ -1782,6 +1842,9 @@ def find_alternatives(
         category_rows = _split_subtype_rows(category_rows, proj_comp, comp_key)
         if category_rows and not no_alt_reason:
             category_rows, no_alt_reason = _split_unit_reason(
+                category_rows, proj_comp, comp_key)
+        if category_rows and not no_alt_reason:
+            category_rows, no_alt_reason = _aggregat_size_rows(
                 category_rows, proj_comp, comp_key)
         epds_for_category = _select_epd_candidates(
             category_rows, proj_comp.unit, comp_key,

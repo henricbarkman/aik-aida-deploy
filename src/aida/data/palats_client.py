@@ -360,6 +360,12 @@ def _normalize_to_aida_subcategory(category: str, text: str) -> str:
         # under" is a parquet floor (found in review, del 3).
         from aida.data.climate_data import levelling_compound
         return "avjämning" if levelling_compound(text) else ""
+    if category == "ventilation" and _names_ventilation_part(text):
+        # A part for a unit is not a unit: "Ljuddämpare till aggregat" and
+        # "Spjäll aggregat LB01" are duct-side parts of tens of kg, and must
+        # not get an aggregat's baseline of thousands (found in review,
+        # 2026-09-30). Read from the head, like glasparti and avjämning.
+        return ""
     subcats = SUBCATEGORY_KEYWORDS.get(category)
     if not subcats:
         return ""
@@ -369,6 +375,21 @@ def _normalize_to_aida_subcategory(category: str, text: str) -> str:
             if keyword_hit(kw, text_lower):
                 return subcat
     return ""
+
+
+_VENTILATION_PART = re.compile(
+    r"(?:ljuddämpar|spjäll|filter|galler|huv|\w*lufts?don\b|\bdon\b)\w*(?=[\s,(:]|$)")
+
+
+def _names_ventilation_part(text: str) -> bool:
+    """True when a duct-side part is named before the unit it belongs to:
+    "Ljuddämpare till aggregat", "Nytt filter till aggregat LB01", "Byte av
+    filter i FTX-aggregat". A part word glued to the unit is the unit
+    ("Filteraggregat")."""
+    head, unit, _ = (text or "").lower().partition("aggregat")
+    if unit and head[-1:].isalnum():
+        head = re.sub(r"\w+$", "", head)   # the word "aggregat" ends is the unit's
+    return bool(_VENTILATION_PART.search(head))
 
 
 def keyword_hit(kw, text: str) -> bool:

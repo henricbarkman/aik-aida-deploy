@@ -317,6 +317,137 @@ def _apply_member_geometry(results: list[BaselineResult], project: Project,
         )
 
 
+def _apply_aggregat_typvärde(r: BaselineResult, comp) -> None:
+    """An air handling unit counted per piece (in-place): per airflow when the
+    flow is known, per size class when only the class is, and otherwise the
+    estimate, with the reason and what would give a number. aggregat.py has
+    the decision and how every fact behind it was read.
+
+    ventilation/aggregat/st has no typvärde of its own: its EPDs span 270 to
+    16 700 kg/st by unit size. So this replaces the generic path, which could
+    only say that.
+    """
+    from aida.claims import format_value
+    from aida.data.epd_baseline_medians import aggregat_typvärde
+
+    res = aggregat_typvärde(comp.name, comp.usage_context, comp.quantity)
+    data = res["payload"]
+    if data is None:
+        reason = res["reason"]
+        if res.get("flow_available"):
+            advice = ("Ange aggregatets luftflöde (m³/h) i chatten eller i namnet, "
+                      "så räknas baslinjen per luftflöde ur katalogens EPD:er.")
+        else:
+            advice = ""
+        note = (f" Ventilationsaggregat räknas per luftflöde eller per storleksklass, "
+                f"men här går ingetdera: {reason[:1].lower()}{reason[1:]}. "
+                f"Ventilationskategorins typvärde gäller kanaler och don och används "
+                f"inte. Siffran är därför en uppskattning.")
+        if advice:
+            note += f" {advice}"
+        if note.strip() not in (r.description or ""):
+            r.description = (r.description or "").rstrip() + note
+        r.basis = {
+            "kind": "saknar_typvärde",
+            "label": "Inget EPD-typvärde för aggregatet",
+            "subcategory": "aggregat",
+            "reason": f"{reason}. {advice}".strip(),
+        }
+        return
+
+    per_piece = data["baseline_co2e_per_unit"]
+    n = data["sample_size"]
+    material_note = (f" Antaget standardmaterial: {r.assumed_material}."
+                     if r.assumed_material else "")
+    # Same population statement as the generic path below.
+    geo_note = ""
+    if data.get("geo_scope") == "global":
+        geo_note = (f" Bara {data.get('sample_size_europe', 0)} europeiska EPD:er, "
+                    f"under golvet {data.get('min_samples_europe', '')}, så hela det "
+                    f"globala urvalet används.")
+    elif data.get("geo_scope") == "europa":
+        geo_note = (f" Urvalet är europeiska EPD:er (SE/Norden/EU), {n} av "
+                    f"{data.get('sample_size_global', n)}.")
+    if res["method"] == "luftflöde":
+        flow = res["airflow_m3h"]
+        per_m3h = res["per_m3h"]
+        n_all = data.get("sample_size_per_piece", n)
+        label = (f"EPD-typvärde per luftflöde, {format_value(per_m3h)} kg CO2e per m³/h "
+                 f"× {format_value(flow)} m³/h")
+        left_out = (f" De {n_all - n} aggregat-EPD:er som inte anger något nominellt "
+                    f"luftflöde ingår inte." if n_all > n else "")
+        span = (f" EPD:ernas flöden spänner {format_value(data['airflow_min'])} till "
+                f"{format_value(data['airflow_max'])} m³/h")
+        if res["extrapolated"]:
+            span += (f", och {format_value(flow)} m³/h ligger utanför, så värdet är "
+                     f"en extrapolering.")
+        else:
+            span += "."
+        text = (
+            f"Baslinje från EPD-typvärde per luftflöde: median av övre halvan av "
+            f"{n} aggregat-EPD:er (Environdec, EPD Norge), räknat per m³/h av "
+            f"nominellt luftflöde ({format_value(per_m3h)} kg CO2e per m³/h), × "
+            f"aggregatets {format_value(flow)} m³/h (ur {res['airflow_source']}) = "
+            f"{format_value(per_piece)} kg CO2e/st × {format_value(comp.quantity)} st."
+            f"{left_out}{span}{geo_note}{material_note} Per luftflöde skiljer "
+            f"EPD:erna en faktor {format_value(data['max'] / data['min'])}, per styck "
+            f"mycket mer eftersom storleken varierar, därför räknas det per "
+            f"luftflöde. Boverket saknar ventilationsaggregat."
+        )
+        extra = {"airflow_m3h": flow, "per_m3h": per_m3h,
+                 "extrapolated": res["extrapolated"]}
+    else:
+        klass = res["klass"]
+        flow_median = data.get("airflow_median")
+        where = res.get("class_why") or "komponenten"
+        label = f"EPD-typvärde, {klass}saggregat"
+        if flow_median:
+            label += f" ({format_value(flow_median)} m³/h)"
+            how = (f"ett aggregat av klassens mellanstorlek, median av de "
+                   f"{n} EPD:ernas nominella luftflöden ({format_value(flow_median)} m³/h), "
+                   f"× {format_value(data['per_m3h'])} kg CO2e per m³/h")
+        else:
+            how = f"median av övre halvan av klassens {n} EPD:er"
+        flow_note = res.get("flow_note") or ""
+        if flow_note:
+            flow_note = f" Luftflödet används inte: {flow_note}."
+        text = (
+            f"Baslinje från EPD-typvärde för {klass}saggregat (klassen ur {where}): "
+            f"{how} = {format_value(per_piece)} kg CO2e/st × "
+            f"{format_value(comp.quantity)} st. Klassens EPD:er spänner "
+            f"{format_value(data['min'])} till {format_value(data['max'])} kg CO2e/st "
+            f"beroende på storlek.{flow_note}{geo_note}{material_note} Ange aggregatets "
+            f"luftflöde (m³/h) "
+            f"i chatten eller i namnet för ett säkrare värde. Boverket saknar "
+            f"ventilationsaggregat."
+        )
+        extra = {"klass": klass, "airflow_median": flow_median}
+
+    r.co2e_kg = round(per_piece * comp.quantity, 1)
+    r.source = "Environdec EPD-typvärde"
+    r.boverket_product = ""
+    r.co2e_per_unit = per_piece
+    r.unit = comp.unit
+    r.quantity = comp.quantity
+    r.basis = {
+        "kind": "epd_typvärde",
+        "label": label,
+        "method": res["method"],
+        "level": "subtype",
+        "subcategory": data.get("subcategory", "aggregat"),
+        "requested_subtype": "",
+        "sample_size": n,
+        "full_median": data.get("full_median"),
+        "min": data.get("min"),
+        "max": data.get("max"),
+        "geo_scope": data.get("geo_scope", ""),
+        "sample_size_global": data.get("sample_size_global", n),
+        "sample_size_europe": data.get("sample_size_europe", 0),
+        **extra,
+    }
+    r.description = text
+
+
 def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) -> None:
     """Substitute LLM-uppskattning with EPD-typvärde where available (in-place).
 
@@ -371,6 +502,9 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
         # question ("byggt på ett idag byggnadstypiskt sätt"). So prefer that,
         # and keep the name-derived one as the fallback.
         subcategory = component_subcategory(comp.name, category)
+        if category == "ventilation" and subcategory == "aggregat" and comp.unit == "st":
+            _apply_aggregat_typvärde(r, comp)
+            continue
         material_subtype = subtype_from_material(category, r.assumed_material)
         # Except when the name already names a split subtype: an
         # "Avjämningsmassa" whose assumed material reads "flytspackel under

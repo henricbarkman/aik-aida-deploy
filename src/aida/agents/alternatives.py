@@ -250,8 +250,11 @@ def _epd_comparable(epd: dict) -> tuple[float, str]:
     # copy names (betongstomme; _element_mass_copy).
     # And a fifth (HENRIC-3366): a rug's or a curtain's per-m² row restated
     # per piece by the size the component's name states (_textile_rows).
+    # And a sixth (HENRIC-3371): a levelling compound's or a membrane's kg row
+    # restated per m² by its own datasheet's application rate (_coverage_rows).
     if unit == "m3" or epd.get("fu_basis") in ("areal_density", "profile_mass",
-                                               "element_mass", "piece_area"):
+                                               "element_mass", "piece_area",
+                                               "coverage"):
         fu_gwp = epd.get("gwp_per_functional_unit")
         fu_unit = epd.get("functional_unit")
         if fu_unit and isinstance(fu_gwp, (int, float)):
@@ -1105,6 +1108,91 @@ def _split_unit_reason(rows: list[dict], proj_comp, category: str) -> tuple[list
     return [], _unit_mismatch_reason(_SPLIT_LABELS.get(sub, sub), rows, proj_comp.unit)
 
 
+def _coverage_rows(rows: list[dict], proj_comp, category: str) -> tuple[list[dict], str]:
+    """A levelling compound or waterproofing in m²: the kg rows restated per
+    m² by each product's own datasheet rate, or the reason there are none
+    (HENRIC-3371). Any other component passes through unchanged.
+
+    Same kind of bridge as _bridge_profile_rows: the GWP is the EPD's, the kg
+    per m² is the maker's application rate (data/coverage.py, with the URL
+    and the sentence it came from) and, for levelling, the thickness the
+    component's name states. A row whose datasheet is not in the table is
+    left out, not given a borrowed rate. The catalog's native m² rows stay.
+    """
+    from aida.data import coverage
+
+    unit = (proj_comp.unit or "").strip().lower()
+    if unit not in _AREA_UNITS or not rows:
+        return rows, ""
+    levelling = category == "golv" and _component_subcategory(proj_comp, category) == "avjämning"
+    if not levelling and category != "tätskikt":
+        return rows, ""
+    native = [e for e in rows if _epd_comparable(e)[1] in _AREA_UNITS]
+    kg_rows = [e for e in rows if str(e.get("unit", "")).lower() == "kg"
+               and isinstance(e.get("gwp_a1a3"), (int, float))]
+    out = []
+    if levelling:
+        mm = coverage.thickness_mm(proj_comp.name)
+        if mm is None:
+            if native:
+                return native, ""
+            return [], (
+                "EPD:erna för avjämningsmassa anges per kg, och åtgången per m² "
+                "beror på skiktets tjocklek. Ange tjockleken i namnet, till "
+                "exempel \"Avjämning 10 mm\", så räknas varje produkt om med "
+                "åtgången i sitt tekniska datablad. Ange mängden i kg om tjockleken "
+                "inte är känd."
+            )
+        for e in kg_rows:
+            rate = coverage.levelling(e.get("reg_no"))
+            if not rate:
+                continue
+            kg = rate.kg_per_m2_mm * mm
+            out.append(_coverage_copy(
+                e, kg, unit,
+                f"åtgång {rate.kg_per_m2_mm:g} kg/m² per mm × {mm:g} mm = {kg:g} kg/m²",
+                rate))
+    else:
+        side = coverage.surface(proj_comp.name)
+        for e in kg_rows:
+            rate = coverage.membrane(e.get("reg_no"))
+            if not rate:
+                continue
+            if side == "vägg":
+                kg, where = rate.wall_kg_per_m2, "vägg"
+            else:
+                kg, where = rate.floor_kg_per_m2, "golv"
+            if rate.floor_kg_per_m2 == rate.wall_kg_per_m2:
+                note = f"åtgång {kg:g} kg/m²"
+            elif side is None:
+                note = (f"åtgång {kg:g} kg/m² på golv; namnet säger inte golv eller "
+                        f"vägg, och väggens åtgång är {rate.wall_kg_per_m2:g}")
+            else:
+                note = f"åtgång {kg:g} kg/m² på {where}"
+            out.append(_coverage_copy(e, kg, unit, note, rate))
+    if native or out:
+        return native + out, ""
+    label = "avjämningsmassa" if levelling else "tätskikt"
+    return [], (
+        f"EPD:erna för {label} anges per kg, och ingen av dem har ett tekniskt "
+        f"datablad med åtgång per m² inläst. Ange mängden i kg för att jämföra."
+    )
+
+
+def _coverage_copy(e: dict, kg_per_m2: float, unit: str, note: str, rate) -> dict:
+    """One kg row restated per m² by a datasheet rate (_coverage_rows)."""
+    bridged = dict(e)
+    bridged["gwp_per_functional_unit"] = round(e["gwp_a1a3"] * kg_per_m2, 4)
+    bridged["functional_unit"] = unit
+    bridged["fu_basis"] = "coverage"
+    bridged["fu_note"] = note
+    bridged["fu_note_own"] = True
+    bridged["kg_per_unit"] = round(kg_per_m2, 3)
+    bridged["coverage_url"] = rate.url
+    bridged["coverage_quote"] = rate.quote
+    return bridged
+
+
 def _row_key(epd: dict) -> tuple:
     """Identity for a catalog row. uuid where present, name+category otherwise."""
     return (epd.get("uuid") or "", epd.get("category", ""), epd.get("name", ""))
@@ -1452,6 +1540,16 @@ def _catalog_co2e(matched: dict, proj_comp, category: str) -> tuple[float | None
                 f"{matched.get('per_m2'):g} kg CO2e/m² × "
                 f"{matched.get('area_m2_per_unit'):g} m²/{comp_unit} "
                 f"(komponentens mått, {matched.get('fu_note')}) × "
+                f"{quantity:g} {comp_unit} = {co2e:g} kg."
+            )
+        if matched.get("fu_basis") == "coverage":
+            # The kg per m² is the maker's datasheet's, so the row names it
+            # and links the sheet (HENRIC-3371).
+            return co2e, (
+                f"CO2e räknat från EPD:ns deklarerade värde: "
+                f"{matched.get('gwp_a1a3'):g} kg CO2e/kg × "
+                f"{matched.get('kg_per_unit'):g} kg/m² ({matched.get('fu_note')}, "
+                f"enligt tekniskt datablad: {matched.get('coverage_url')}) × "
                 f"{quantity:g} {comp_unit} = {co2e:g} kg."
             )
         if matched.get("fu_basis") == "element_mass":
@@ -2585,6 +2683,9 @@ def find_alternatives(
         else:
             category_rows, no_alt_reason = _stomme_rows(epd_data, proj_comp, comp_key)
         category_rows = _split_subtype_rows(category_rows, proj_comp, comp_key)
+        if category_rows and not no_alt_reason:
+            category_rows, no_alt_reason = _coverage_rows(
+                category_rows, proj_comp, comp_key)
         if category_rows and not no_alt_reason:
             category_rows, no_alt_reason = _split_unit_reason(
                 category_rows, proj_comp, comp_key)

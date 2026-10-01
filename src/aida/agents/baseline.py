@@ -221,6 +221,10 @@ produkt ENBART när den faktiskt ÄR komponentens standardmaterial:
   "Hyvlat virke, u 16 %, barrträ", OSB-skiva matchar "OSB" (trä är trä). OK.
   Systemet räknar själv om ett kg-värde för trä och skivor till löpmeter eller m² ur
   tvärsnittet eller tjockleken i komponentens namn, så räkna inte om de raderna själv.
+  Detsamma gäller stålbalkar, stålpelare och stålreglar i löpmeter med en
+  standardprofil i namnet ("HEA 200", "VKR 100x100x5", "Stålregel 70"): vikten per
+  meter tas ur standardtabeller. Konstruktionsstål matchar "Konstruktionsstål, alla
+  sorter, 80 % primär råvara".
 - Mineralull som isolering matchar en mineralullsprodukt. OK.
 
 Låna ALDRIG en produkt av annan typ bara för att den delar basmaterial. Det ger en
@@ -440,6 +444,53 @@ def _price_baseline(results: list[BaselineResult], project: Project,
 _GEOMETRY_BOVERKET_CATEGORIES = {"Trävaror", "Byggskivor"}
 
 
+# Boverket's steel products a beam, a column or a stud is made of. Not plate,
+# fasteners or reinforcement: a weight per metre of a profile says nothing about
+# those, and the model has no business matching them to a member anyway.
+_STEEL_PROFILE_BOVERKET_PREFIXES = ("konstruktionsstål", "lättreglar av stål",
+                                    "galvaniserade stålprodukter")
+
+
+def _apply_profile_mass(r: BaselineResult, comp, product, extra: dict) -> bool:
+    """Redo a steel Boverket baseline per löpmeter from the profile's standard
+    weight per metre (in-place). True when the product is a steel profile
+    product, whether or not the name allowed the conversion.
+
+    The steel half of _apply_member_geometry (HENRIC-3363). Boverket declares
+    "Konstruktionsstål" per kg and a beam is counted in löpmeter; an HEA 200
+    weighs 42,3 kg per metre by EN 10365 (steel_profiles), so the figure per
+    metre is arithmetic, done here and written out in the row. A name without
+    a designation keeps the model's figure, labelled as resting on an assumed
+    weight per metre.
+    """
+    from aida.data.steel_profiles import profile_mass
+
+    if extra.get("category") != "Stål och andra metaller":
+        return False
+    if not (product.name or "").strip().lower().startswith(_STEEL_PROFILE_BOVERKET_PREFIXES):
+        return False
+    if comp.unit != "lm":
+        return True
+    profile, _ = profile_mass(comp.name)
+    if not profile:
+        note = (" Namnet anger ingen standardprofil, så omräkningen från kg bygger "
+                "på en antagen vikt per meter.")
+        if note.strip() not in (r.description or ""):
+            r.description = (r.description or "").rstrip() + note
+        return True
+    per_unit = round(product.co2e_per_unit * profile.kg_per_m, 4)
+    r.co2e_per_unit = per_unit
+    r.unit = comp.unit
+    r.quantity = comp.quantity
+    r.co2e_kg = round(per_unit * comp.quantity, 1)
+    r.description = (r.description or "").rstrip() + (
+        f" Omräknat ur komponentens profil: {product.co2e_per_unit} kg CO2e/kg "
+        f"(Boverket) × {profile.kg_per_m:g} kg/m ({profile.designation}, "
+        f"{profile.source}) = {per_unit} kg CO2e/lm."
+    )
+    return True
+
+
 def _apply_member_geometry(results: list[BaselineResult], project: Project,
                            boverket_products) -> None:
     """Redo a timber or board Boverket baseline per löpmeter or m2 (in-place).
@@ -472,6 +523,8 @@ def _apply_member_geometry(results: list[BaselineResult], project: Project,
             extra = json.loads(product.extra_json or "{}")
         except (json.JSONDecodeError, TypeError):
             continue
+        if _apply_profile_mass(r, comp, product, extra):
+            continue
         density = extra.get("density_kg_m3")
         if extra.get("category") not in _GEOMETRY_BOVERKET_CATEGORIES or not density:
             continue
@@ -494,6 +547,29 @@ def _apply_member_geometry(results: list[BaselineResult], project: Project,
             f"× {density:g} kg/m³ (Boverket) × {factor:.6f} m³/{comp.unit} = "
             f"{per_unit} kg CO2e/{comp.unit}."
         )
+
+
+def _geo_note(data: dict, n: int, where: str = "") -> str:
+    """Which population a typvärde rests on, and the true reason when it is the
+    global one. Until 2026-10-01 every global key said "only N European EPDs,
+    under the floor", also when N was 197 and the European bucket had been set
+    aside because one group held most of it (undertak/akustikplatta/m2)."""
+    scope = data.get("geo_scope")
+    if scope == "europa":
+        return (f" Urvalet är europeiska EPD:er (SE/Norden/EU), {n} av "
+                f"{data.get('sample_size_global', n)}{where}.")
+    if scope != "global":
+        return ""
+    n_eu = data.get("sample_size_europe", 0)
+    reason = data.get("scope_reason", "thin")
+    if reason == "dominated":
+        return (f" De {n_eu} europeiska EPD:erna kommer till största delen från en och "
+                f"samma koncern, så hela det globala urvalet används.")
+    if reason == "scope_free":
+        return (" Hela det globala urvalet används, så att golvtyperna och golvet "
+                "som helhet vilar på samma underlag.")
+    return (f" Bara {n_eu} europeiska EPD:er, under golvet "
+            f"{data.get('min_samples_europe', '')}, så hela det globala urvalet används.")
 
 
 def _apply_aggregat_typvärde(r: BaselineResult, comp) -> None:
@@ -539,14 +615,9 @@ def _apply_aggregat_typvärde(r: BaselineResult, comp) -> None:
     material_note = (f" Antaget standardmaterial: {r.assumed_material}."
                      if r.assumed_material else "")
     # Same population statement as the generic path below.
-    geo_note = ""
-    if data.get("geo_scope") == "global":
-        geo_note = (f" Bara {data.get('sample_size_europe', 0)} europeiska EPD:er, "
-                    f"under golvet {data.get('min_samples_europe', '')}, så hela det "
-                    f"globala urvalet används.")
-    elif data.get("geo_scope") == "europa":
-        geo_note = (f" Urvalet är europeiska EPD:er (SE/Norden/EU), {n} av "
-                    f"{data.get('sample_size_global', n)}.")
+    geo_note = _geo_note(data, n)
+    from aida.data.koncern import concentration_note
+    geo_note += concentration_note(data.get("concentration"))
     if res["method"] == "luftflöde":
         flow = res["airflow_m3h"]
         per_m3h = res["per_m3h"]
@@ -622,6 +693,7 @@ def _apply_aggregat_typvärde(r: BaselineResult, comp) -> None:
         "geo_scope": data.get("geo_scope", ""),
         "sample_size_global": data.get("sample_size_global", n),
         "sample_size_europe": data.get("sample_size_europe", 0),
+        "concentration": data.get("concentration"),
         **extra,
     }
     r.description = text
@@ -648,11 +720,13 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
     from aida.data.epd_baseline_medians import (
         _SPLIT_SUBCATEGORIES,
         get_baseline_typvärde,
+        lookup_withheld_reason,
         member_typvärde,
         split_subcategory_miss,
         subtype_from_material,
         withheld_reason,
     )
+    from aida.data.koncern import concentration_note
     from aida.data.palats_client import component_subcategory
     from aida.data.unit_conversion import typical_item_mass
 
@@ -718,6 +792,7 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
                     # Read by _validate_baseline, which range-checks a value
                     # resting on an assumed mass (a published one it does not).
                     "bridge": "mass",
+                    "concentration": kg_data.get("concentration"),
                 }
                 mass_note = (
                     f" Omräknat kg→st via antagen typisk vikt {mass} kg/st "
@@ -731,10 +806,18 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
             bridged = member_typvärde(category, comp.name, comp.unit, subcategory)
             if bridged:
                 typvärde_data = bridged
-                mass_note = (
-                    f" Omräknat från {bridged['per_m3']} kg CO2e/m³ via "
-                    f"komponentens {bridged['geometry']}."
-                )
+                # A steel profile is bridged from kg by its standard weight per
+                # metre (HENRIC-3363), timber and boards from m3.
+                if "per_kg" in bridged:
+                    mass_note = (
+                        f" Omräknat från {bridged['per_kg']} kg CO2e/kg via "
+                        f"komponentens {bridged['geometry']}."
+                    )
+                else:
+                    mass_note = (
+                        f" Omräknat från {bridged['per_m3']} kg CO2e/m³ via "
+                        f"komponentens {bridged['geometry']}."
+                    )
 
         if not typvärde_data:
             if split_subcategory_miss(category, comp.unit, subcategory):
@@ -758,12 +841,15 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
                     "subcategory": subcategory,
                     "reason": why[0].upper() + why[1:],
                 }
-            elif withheld_reason(category, subcategory, comp.unit):
-                # Enough EPDs, deliberately not published (one supplier's
-                # range, los_inredning/förvaring; a mis-read unit, hiss/st).
-                # Same reasoning as above: a reader who can see the catalog
-                # rows would otherwise assume the estimate is their median.
-                why = withheld_reason(category, subcategory, comp.unit)
+            elif lookup_withheld_reason(category, comp.unit, subcategory):
+                # Enough EPDs, deliberately not published (one company
+                # group's range, los_inredning/förvaring; a mis-read unit,
+                # hiss/st). Same reasoning as above: a reader who can see the
+                # catalog rows would otherwise assume the estimate is their
+                # median. Looked up along get_baseline_typvärde's own
+                # fallback, so a vinyl floor in st is told that golv/st is
+                # withheld rather than nothing.
+                why = lookup_withheld_reason(category, comp.unit, subcategory)
                 key = f"{category}/{subcategory}" if subcategory else category
                 note = (f" Inget EPD-typvärde för {key}: {why}. "
                         f"Siffran är därför en uppskattning.")
@@ -807,24 +893,16 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
         geo_scope = typvärde_data.get("geo_scope", "")
         n_global = typvärde_data.get("sample_size_global", n)
         n_europe = typvärde_data.get("sample_size_europe", 0)
-        if geo_scope == "europa":
-            geo_note = (
-                f" Urvalet är europeiska EPD:er (SE/Norden/EU), {n} av "
-                f"{n_global} i kategorin."
-            )
-        elif geo_scope == "global":
-            geo_note = (
-                f" Bara {n_europe} europeiska EPD:er, under golvet "
-                f"{typvärde_data.get('min_samples_europe', '')}, så hela det globala "
-                f"urvalet används."
-            )
-        else:
-            geo_note = ""
+        geo_note = _geo_note(typvärde_data, n, " i kategorin")
 
         material_note = (
             f" Antaget standardmaterial: {r.assumed_material}."
             if r.assumed_material else ""
         )
+        # Who is behind the number, on every row (HENRIC-3368): the largest
+        # company groups and their counts, and a plain warning when the key
+        # rests on two groups' ranges.
+        conc_note = concentration_note(typvärde_data.get("concentration"))
 
         r.co2e_kg = new_co2e
         r.source = "Environdec EPD-typvärde"
@@ -846,6 +924,7 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
             "sample_size_global": n_global,
             "sample_size_europe": n_europe,
             "bridge": typvärde_data.get("bridge", ""),
+            "concentration": typvärde_data.get("concentration"),
         }
         # assumed_material is deliberately NOT cleared. Before 2026-09-01 this
         # assignment replaced the whole description, and the standard material
@@ -855,7 +934,7 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
             f"Baslinje från EPD-typvärde: median av övre halvan av "
             f"{n} EPD:er (Environdec, EPD Norge) i kategorin {cat_label} "
             f"({baseline_per_unit} kg CO2e/{comp.unit}) × {comp.quantity} {comp.unit}."
-            f"{material_note}{scope_note}{geo_note}{mass_note} "
+            f"{material_note}{scope_note}{geo_note}{conc_note}{mass_note} "
             f"Övre halvan används för att approximera 'standardval utan "
             f"klimathänsyn' — full median ({full_med}) hade underskattat "
             f"konventionellt val pga selection bias i EPD-databasen. "

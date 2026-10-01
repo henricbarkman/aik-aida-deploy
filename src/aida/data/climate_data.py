@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import re
 
+from aida.data.steel_profiles import names_steel_profile
+
 # Reasoning templates per alternative type
 REASONING = {
     "reuse": "Återbruk eliminerar nästan all tillverkningsrelaterad klimatpåverkan. Kvarvarande CO2e kommer främst från transport och eventuell renovering av materialet.",
@@ -356,6 +358,9 @@ _FURNITURE_EXCEPTIONS = (
     "kopplingsskåp", "säkringsskåp", "fördelningsskåp", "mätarskåp",
     "centralskåp", "fläktskåp", "brandskåp", "slangskåp", "serverskåp",
     "rackskåp", "nätverksskåp", "spiskåp",
+    # A fume cupboard is a ventilated lab installation, not storage. The
+    # intake probe for HENRIC-3367 named one in a chemistry-room scenario.
+    "dragskåp",
     "spegelskåp", "badrumsskåp", "tvättställsskåp", "köksskåp", "bänkskåp",
     "överskåp", "underskåp", "högskåp", "diskbänksskåp", "diskskåp",
     "duschskärm", "badkarsskärm", "solskärm", "bildskärm", "datorskärm",
@@ -386,6 +391,39 @@ _FURNITURE_PART_TAILS = ("hållare", "fäste", "konsol", "underrede", "stativ",
 _RUG_FORMS = ("matta", "mattan", "mattor", "mattorna")
 _RUG_PREFIXES = ("", "ry", "rya", "tras", "gång", "dörr", "bad", "badrums",
                  "lek", "ull", "sisal", "jute", "bomulls", "plysch")
+
+
+# Storage that the name itself calls built in, HENRIC-3367. A cabinet, a shelf
+# or a wardrobe can be joinery fixed to the building, and then it is
+# fast_inredning; named without such a word it is loose storage. Only the
+# storage kind is read this way: a chair or a desk is never built in, and
+# "platsbyggd" already makes anything fixed through the priority tokens.
+#
+# Read up to the first word that introduces something else: "Förvaringsskåp
+# med inbyggd belysning" is a loose cabinet with a lamp in it. A comma does
+# not stop the reading, so "Instrumentskåp, väggmonterade" (the intake's own
+# wording in the probe) is built in.
+#
+# Bare "fast" is not a built-in word: it starts "fastighet", and "Bokhylla
+# med fasta hyllplan" is a bookcase whose shelves do not move. It counts only
+# as the first word of the name ("Fasta skåp") or with monterad/inredning.
+_BUILT_IN_RE = re.compile(
+    r"\b(?:platsbygg|inbygg|fastmonter|väggmonter|väggfast|vägghängd|vägghängt)\w*"
+    r"|^fasta?\s"
+    r"|\bfasta?\s+(?:monter\w*|inredning)")
+_BUILT_IN_STOP_RE = re.compile(r"\s(?:med|inkl|inklusive|samt|utan|till|för)\b")
+
+
+def names_built_in(text: str) -> bool:
+    """True when the name says the thing is built in or fixed to the wall.
+
+    "Platsbyggd garderob", "Inbyggda verktygsskåp", "Fast monterade skåp" and
+    "Instrumentskåp, väggmonterade" are; "Förvaringsskåp", "Fastighetsskåp",
+    "Bokhylla med fasta hyllplan" and "Skåp med inbyggd belysning" are not.
+    """
+    text = text.lower().strip()
+    head = _BUILT_IN_STOP_RE.split(text, maxsplit=1)[0]
+    return bool(_BUILT_IN_RE.search(head))
 
 
 def furniture_subcategory(text: str) -> str:
@@ -626,11 +664,20 @@ def normalize_component_name(name: str) -> str:
     # whose "golv" would take "Golvreglar".
     if names_frame_member(name_lower):
         return "stomme"
+    # A steel section named by its designation alone ("HEA 200", "VKR
+    # 100x100x5") had no category; with "Stålbalk" in front it was stomme
+    # (HENRIC-3363).
+    if names_steel_profile(name_lower):
+        return "stomme"
 
     # After the frame reader, so "Massivträ" stays timber while "Massivträbord"
     # is a table, and before the table below, whose "golv" would take
     # "Golvskärm" and whose "matta" would take a rug.
-    if furniture_subcategory(name_lower):
+    kind = furniture_subcategory(name_lower)
+    if kind:
+        # Built-in storage is joinery (HENRIC-3367): "Inbyggda verktygsskåp".
+        if kind == "förvaring" and names_built_in(name_lower):
+            return "fast_inredning"
         return "los_inredning"
 
     # After the furniture reader, so "Ljudabsorberande bordsskärm" stays a
@@ -698,7 +745,11 @@ def normalize_component_name(name: str) -> str:
                    "kl-trä", "klträ", "korslimmat", "träbalk",
                    "träpelare", "betongbalk", "betongpelare", "bjälklag",
                    "håldäck", "takbalk", "bärbalk", "lättbalk", "masonitebalk",
-                   "i-balk"],
+                   "i-balk",
+                   # Precast slab words a name can carry without "bjälklag"
+                   # (HENRIC-3362).
+                   "plattbärlag", "massivplatta", "kanalplatta", "spännbalk",
+                   "hd/f"],
         "betongvägg": ["betongvägg", "betong", "concrete"],
         "fönster": ["fönster", "window", "fönsterbyte", "energiglas"],
         "tak": ["tak", "roof", "takpannor", "takbeläggning", "yttertak",
@@ -828,14 +879,23 @@ def resolve_category(name: str, declared_category: str = "") -> str:
             return "stomme"
         # A chair or a desk declared as fixed interior, which is what an intake
         # did before los_inredning existed. It then met countertops and mirror
-        # cabinets. Storage is left alone: a wardrobe or a cabinet can be
-        # built in, and then the declared category is right. So is anything
-        # the name itself calls built in ("Platsbyggd soffa"): the name-based
-        # reading has to agree before the declaration is overruled.
+        # cabinets. Anything the name itself calls built in ("Platsbyggd
+        # soffa") keeps the declaration: the name-based reading has to agree
+        # before the declaration is overruled.
+        #
+        # Storage too since HENRIC-3367. A wardrobe or a cabinet can be built
+        # in, so here the name decides both ways: "Förvaringsskåp" declared
+        # fixed met kitchen cabinets and worktops and is loose storage, while
+        # "Platsbyggd garderob" or "Inbyggda skåp" stays fixed, and is moved
+        # there even when declared loose.
+        kind = furniture_subcategory(name)
         if (cat == "fast_inredning"
-                and furniture_subcategory(name) in _NEVER_FIXED_KINDS
+                and (kind in _NEVER_FIXED_KINDS or kind == "förvaring")
                 and normalize_component_name(name) == "los_inredning"):
             return "los_inredning"
+        if (cat == "los_inredning" and kind == "förvaring"
+                and normalize_component_name(name) == "fast_inredning"):
+            return "fast_inredning"
         # HENRIC-3290 del 3: the same shape three more times. An intake that
         # predates a category filed its members under the part they sit in or
         # on. Each override needs the name-based reading to agree, so a

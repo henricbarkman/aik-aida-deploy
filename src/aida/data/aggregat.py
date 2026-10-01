@@ -57,8 +57,8 @@ threshold: a boundary nobody drew in the data would be invented here.
     the series is sold for both.
 
 All eight lägenhet units are Flexit, so that class is computed and withheld
-(epd_baseline_medians._WITHHELD_KEYS), the same call as badrumsinredning and
-förvaring. A lägenhetsaggregat without a flow falls to C and the row says why.
+by the dominance rule (epd_baseline_medians._compute_with_withheld), like
+badrumsinredning and förvaring. A lägenhetsaggregat without a flow falls to C and the row says why.
 """
 
 from __future__ import annotations

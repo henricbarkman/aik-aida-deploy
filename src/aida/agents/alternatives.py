@@ -241,7 +241,15 @@ def _epd_comparable(epd: dict) -> tuple[float, str]:
     """
     unit = str(epd.get("unit", "")).lower()
     gwp = epd.get("gwp_a1a3", 0)
-    if unit == "m3" or epd.get("fu_basis") == "areal_density":
+    # A third bridge since HENRIC-3363, and the same kind as the m3 one: a
+    # steel row per kg restated per metre of the component's own profile,
+    # whose weight per metre is a standard table's (steel_profiles). Only on
+    # copies made for one component; no catalog row carries it.
+    # And a fourth (HENRIC-3362): a precast concrete row per kg restated per
+    # m², m³ or metre of the element by a weight per unit whose source the
+    # copy names (betongstomme; _element_mass_copy).
+    if unit == "m3" or epd.get("fu_basis") in ("areal_density", "profile_mass",
+                                               "element_mass"):
         fu_gwp = epd.get("gwp_per_functional_unit")
         fu_unit = epd.get("functional_unit")
         if fu_unit and isinstance(fu_gwp, (int, float)):
@@ -399,6 +407,10 @@ _STUD_FAMILIES = ("virke", "stålregel")
 # epd_baseline_medians._GEOMETRY_BRIDGE_SUBCATEGORIES for why steel is not.
 _SOLID_FAMILIES = {"virke", "limträ", "konstruktionsskiva"}
 
+# Families declared per kg whose rows can be restated per metre of a member,
+# from the weight per metre of its named standard profile (HENRIC-3363).
+_STEEL_FAMILIES = {"konstruktionsstål", "stålregel"}
+
 # How each family is named in a reason, in Swedish.
 _FAMILY_LABELS = {
     "virke": "sågat virke", "limträ": "limträ, KL-trä och fanerträ",
@@ -449,6 +461,96 @@ def _bridge_member_rows(rows: list[dict], proj_comp) -> list[dict]:
     return out
 
 
+# The shape a konstruktionsstål row declares: open sections (I, H, U, angles,
+# merchant bars) or hollow sections. A hollow-section EPD is no alternative to
+# an HEA beam, nor a beam EPD to a VKR column: swapping one for the other is a
+# structural redesign, not a choice of supplier. Read from the name first.
+_HOLLOW_ROW_RE = re.compile(r"hollow|\btubes?\b|\bpipes?\b")
+_OPEN_ROW_RE = re.compile(r"\bbeams?\b|i-section|h-beam|\bangles?\b|\bchannels?\b|merchant bar")
+# Rows whose name states no shape, placed by what the EPD itself says the
+# product is (technology description and applicability, data.environdec.com,
+# read 2026-10-01). (owner, product name or "" for any, shape):
+#   kardemir: "hot-rolled ... IPE, NPI, NPU, HEA, HEB, angles"
+#   kocaer: "structural steel profiles" rolled from steel billet
+#   jindal ("Average Structural Steel Product" only): hot rolled from billets
+#     and blooms, applicability "the channels are ideal for frames ..."
+#   melewar: "pipe forming or roll forming ... structural hollow sections"
+# Every other shape-less row is left out of a profile's comparison: heavy plate
+# (SIMAXX, SIQUAL 0577), fabricated members of any section (GOLDBECK, Chenxin,
+# Grædstrup), a light-gauge framing system (CINTAC Metalcon) and a scrap-route
+# "Structural Steel" with no product description (review 2026-10-01: the
+# first version let every one of them meet both shapes).
+_ROW_SHAPE_BY_OWNER = (
+    ("kardemir", "", "open"),
+    ("kocaer", "", "open"),
+    ("jindal", "average structural steel product", "open"),
+    ("melewar", "", "hollow"),
+)
+
+
+def _row_shapes(row: dict) -> set[str]:
+    """{"open"}, {"hollow"}, both, or none for a konstruktionsstål row."""
+    name = str(row.get("name") or "").lower()
+    shapes = set()
+    if _HOLLOW_ROW_RE.search(name):
+        shapes.add("hollow")
+    if _OPEN_ROW_RE.search(name):
+        shapes.add("open")
+    if not shapes:
+        owner = str(row.get("owner") or "").lower().replace("̇", "")
+        shapes = {shape for who, product, shape in _ROW_SHAPE_BY_OWNER
+                  if who in owner and product in name}
+    return shapes
+
+
+def _fits_profile_shape(row: dict, profile) -> bool:
+    """True when a konstruktionsstål row declares the profile's own shape."""
+    if profile.family != "konstruktionsstål":
+        return True
+    shape = "hollow" if profile.designation.startswith(("VKR", "KKR")) else "open"
+    return shape in _row_shapes(row)
+
+
+def _bridge_profile_rows(rows: list[dict], proj_comp) -> tuple[list[dict], str]:
+    """Copies of the steel family's kg rows restated per metre of THIS profile.
+
+    The steel twin of _bridge_member_rows (HENRIC-3363). "Stålbalk HEA 200" in
+    lm is 42,3 kg per metre (EN 10365), so a mill's 0,74 kg CO2e/kg is 31,3 per
+    metre of that beam. The weight comes from steel_profiles' standard tables
+    and the designation from the name; no designation, no copies, and the
+    second value is the Swedish reason (or "" when the name names no profile).
+    Rows of the profile's own family only, so a stud's 0,59 kg/m never meets
+    a beam mill's figure, and of its own shape (_fits_profile_shape).
+    """
+    from aida.data.steel_profiles import profile_mass
+
+    if proj_comp.unit.strip().lower() not in _LENGTH_UNITS:
+        return [], ""
+    profile, why = profile_mass(proj_comp.name)
+    if not profile:
+        return [], why
+    unit = proj_comp.unit.strip().lower()
+    out = []
+    for e in rows:
+        gwp = e.get("gwp_a1a3")
+        # The innervägg profile rows a stud also sees carry no stomme family;
+        # all of them are steel studs (see _stomme_rows).
+        family = e.get("subcategory") or "stålregel"
+        if (e.get("unit") != "kg" or family != profile.family
+                or not isinstance(gwp, (int, float)) or not _fits_profile_shape(e, profile)):
+            continue
+        bridged = dict(e)
+        bridged["gwp_per_functional_unit"] = round(gwp * profile.kg_per_m, 4)
+        bridged["functional_unit"] = unit
+        bridged["fu_basis"] = "profile_mass"
+        bridged["fu_note"] = profile.label
+        bridged["kg_per_m"] = profile.kg_per_m
+        bridged["profile"] = profile.designation
+        bridged["profile_source"] = profile.source
+        out.append(bridged)
+    return out, ""
+
+
 def _stomme_rows(epd_data: dict[str, list[dict]], proj_comp,
                  category: str) -> tuple[list[dict], str]:
     """Rows a frame member can be compared against, or the reason there are none.
@@ -470,7 +572,9 @@ def _stomme_rows(epd_data: dict[str, list[dict]], proj_comp,
     - lm / m2: native rows in that unit, plus the solid families' m3 rows
       bridged by the member's own section or thickness. Native m2 rows are left
       out: every one declares a board or element at a thickness its name does
-      not state, so it cannot be set against "OSB-skiva 12 mm".
+      not state, so it cannot be set against "OSB-skiva 12 mm". In lm also the
+      steel families' kg rows, bridged by the weight per metre of a standard
+      profile the name states ("HEA 200", "C-regel 70"; HENRIC-3363).
     - kg / m3: native rows in that unit.
     """
     from aida.data.climate_data import names_stud
@@ -514,8 +618,17 @@ def _stomme_rows(epd_data: dict[str, list[dict]], proj_comp,
     label = _FAMILY_LABELS.get(family, family)
     if not pool:
         return [], f"Katalogen har inga EPD:er för {label}, så ingen jämförelse görs."
+    if family == "betong":
+        return _concrete_rows(pool, proj_comp)
 
     unit = proj_comp.unit.strip().lower()
+    if unit in _COUNT_UNITS and family == "konstruktionsstål":
+        return [], (
+            f"Komponenten är angiven i styck, och en balk eller pelare i styck "
+            f"säger inget om längd eller profil. EPD:erna för {label} anges per kg. "
+            f"Ange profilen (till exempel HEA 200 eller VKR 100x100x5) och antal "
+            f"löpmeter (antal × längd) så kan de jämföras."
+        )
     if unit in _COUNT_UNITS:
         return [], (
             f"Komponenten är angiven i styck, och en regel eller balk i styck "
@@ -530,12 +643,29 @@ def _stomme_rows(epd_data: dict[str, list[dict]], proj_comp,
     else:
         klass = _unit_class(unit)
         native = [e for e in pool if klass is not None and _epd_comparable(e)[1] in klass]
-    rows = native + _bridge_member_rows(pool, proj_comp)
+    profile_rows, profile_why = _bridge_profile_rows(pool, proj_comp)
+    rows = native + _bridge_member_rows(pool, proj_comp) + profile_rows
     if rows:
         return rows, ""
 
     units = sorted({str(e.get("unit", "")) for e in pool})
     declared = ", ".join(units)
+    steel = any(e.get("subcategory") in _STEEL_FAMILIES for e in pool)
+    if unit in _LENGTH_UNITS and steel:
+        # A steel member in löpmeter whose profile could not be read. Said
+        # with what would make it comparable, the way a stud without a
+        # section is: the designation, from which the standard table gives
+        # the weight per metre (HENRIC-3363), or the quantity in kg.
+        why = profile_why or (
+            "Vikten per meter beror på profilen, och namnet anger ingen "
+            "standardprofil.")
+        return [], (
+            f"Katalogen har {len(pool)} EPD:er för {label}, men de anges per "
+            f"{declared} och komponenten i {proj_comp.unit}. {why} Ange profilen "
+            f"i namnet, till exempel \"HEA 200\", \"IPE 200\", \"VKR 100x100x5\" "
+            f"eller \"Stålregel 70\", så räknas vikten per meter ur standardtabellen, "
+            f"eller ange mängden i kg."
+        )
     if unit in _LENGTH_UNITS and any(e.get("subcategory") in _SOLID_FAMILIES for e in pool):
         return [], (
             f"EPD:erna för {label} anges per {declared}. För att räkna om till "
@@ -554,6 +684,195 @@ def _stomme_rows(epd_data: dict[str, list[dict]], proj_comp,
         f"vikt per meter eller m² som beror på profilen, så ingen jämförelse görs. "
         f"Ange mängden i kg för att jämföra, eller läs baslinjen som den står."
     )
+
+
+def _units_text(rows: list[dict]) -> str:
+    """"7 per kg och 1 per m3", for a reason that says what the catalog has."""
+    counts: dict[str, int] = {}
+    for e in rows:
+        unit = str(e.get("unit", ""))
+        counts[unit] = counts.get(unit, 0) + 1
+    parts = [f"{n} per {u}" for u, n in sorted(counts.items())]
+    return parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " och " + parts[-1]
+
+
+def _element_mass_copy(e: dict, kg_per_unit: float, unit: str, note: str,
+                       source: str, own: bool = False) -> dict:
+    """A precast row per kg restated per unit of the element (HENRIC-3362).
+
+    Same kind of bridge as _bridge_profile_rows: the GWP is the EPD's, the mass
+    per unit is named with where it comes from. `own` marks a mass the EPD
+    states for its own product rather than one read from the component."""
+    bridged = dict(e)
+    bridged["gwp_per_functional_unit"] = round(e["gwp_a1a3"] * kg_per_unit, 4)
+    bridged["functional_unit"] = unit
+    bridged["fu_basis"] = "element_mass"
+    bridged["fu_note"] = note
+    bridged["fu_note_own"] = own
+    bridged["kg_per_unit"] = round(kg_per_unit, 2)
+    bridged["mass_source"] = source
+    return bridged
+
+
+def _volume_copy(e: dict, factor: float, unit: str, note: str) -> dict:
+    """A solid element's m3 row restated per m² or metre by the component's
+    own thickness or section, like _bridge_member_rows does for timber."""
+    bridged = dict(e)
+    bridged["gwp_per_functional_unit"] = round(e["gwp_a1a3"] * factor, 4)
+    bridged["functional_unit"] = unit
+    bridged["fu_basis"] = "dimension"
+    bridged["fu_note"] = note
+    return bridged
+
+
+def _concrete_rows(pool: list[dict], proj_comp) -> tuple[list[dict], str]:
+    """Rows a precast concrete component can be compared against, or the reason
+    there are none (HENRIC-3362). `pool` is the catalog's betong family.
+
+    Per element kind (betongstomme.element_kind): a hollow-core slab meets
+    hollow-core slabs, a solid slab solid slabs, a beam or column beams and
+    columns. The EPDs are mostly per tonne, so the unit decides the rest:
+
+    - kg: the kind's kg rows as declared.
+    - m3: the kind's m3 rows; for solid slabs and beams also the kg rows at
+      2 500 kg/m³ (solid concrete, Svensk Betong). Not for hollow-core, whose
+      weight per m³ depends on its voids.
+    - m2, solid slab: the thickness in the name times the m3 rows, and times
+      2 500 kg/m³ for the kg rows.
+    - m2, hollow-core: rows whose own EPD states a thickness within 5 mm of the
+      component's, per m² as declared or by the weight per m² the EPD states;
+      and, when the name states the slab's weight ("290 kg/m2"), every kg row
+      by that weight. Never a weight derived from the thickness: Svensk Betong
+      gives 255-330 kg/m² for a 200 mm slab, depending on the maker's profile.
+    - lm, beam: the section in the name, the same way as m2 for a solid slab.
+    - anything else: a reason that says what to state.
+    """
+    from aida.data import betongstomme as bs
+
+    name = proj_comp.name
+    unit = proj_comp.unit.strip().lower()
+    if bs.is_reinforcement(name):
+        return [], ("Armering är stål och inget betongelement, och katalogen har "
+                    "inga EPD:er för armeringsstål, så ingen jämförelse görs.")
+    if bs.is_lightweight(name):
+        return [], ("Katalogens betong-EPD:er gäller element av vanlig betong. "
+                    "Lättklinker är lättballastbetong, som väger mindre per m³, så "
+                    "ingen jämförelse görs.")
+    if bs.is_cast_in_place(name):
+        return [], ("Katalogen har EPD:er för prefabricerade betongelement "
+                    "(håldäck, massiva bjälklag, balkar och pelare), inte för "
+                    "platsgjuten betong, så ett platsgjutet bjälklag jämförs inte "
+                    "med dem.")
+    kind = bs.element_kind(name)
+    if not kind:
+        return [], ("Namnet säger inte vilket sorts betongelement det är, och "
+                    "håldäck, massiva bjälklag och balkar jämförs bara med sin "
+                    "egen sort. Skriv till exempel \"Håldäck 200 mm\", "
+                    "\"Massivbjälklag 200 mm\" eller \"Betongbalk 300x500\".")
+    label = bs.KIND_LABELS[kind]
+    rows = [e for e in pool if bs.element_kind(e.get("name", "")) == kind]
+    if not rows:
+        return [], f"Katalogen har inga EPD:er för {label}, så ingen jämförelse görs."
+    have = f"Katalogen har {len(rows)} EPD:er för {label}, {_units_text(rows)}."
+    kg_rows = [e for e in rows if e.get("unit") == "kg"
+               and isinstance(e.get("gwp_a1a3"), (int, float))]
+    m3_rows = [e for e in rows if e.get("unit") == "m3"
+               and isinstance(e.get("gwp_a1a3"), (int, float))]
+    solid = kind in (bs.MASSIV, bs.BALK)
+    density_note = f"{bs.SOLID_DENSITY_KG_M3:g} kg/m³ massiv betong"
+
+    if unit == "kg":
+        return kg_rows, "" if kg_rows else f"{have} Ingen av dem anges per kg."
+    if unit == "m3":
+        out = list(m3_rows)
+        if solid:
+            out += [_element_mass_copy(e, bs.SOLID_DENSITY_KG_M3, "m3", density_note,
+                                       bs.SOLID_DENSITY_SOURCE) for e in kg_rows]
+        if out:
+            return out, ""
+        return [], (f"{have} Ett håldäcks vikt per m³ beror på hålen, så EPD:erna "
+                    f"per kg räknas inte om till m³. Ange mängden i kg.")
+
+    if unit in _AREA_UNITS:
+        if kind == bs.BALK:
+            return [], (f"{have} Balkar och pelare räknas i löpmeter med tvärsnittet "
+                        f"i namnet (till exempel \"Betongbalk 300x500\"), i m³ "
+                        f"eller i kg, inte i m².")
+        thickness = bs.slab_thickness_mm(name)
+        if kind == bs.MASSIV:
+            if not thickness:
+                return [], (f"{have} För att räkna om till m² behövs bjälklagets "
+                            f"tjocklek i namnet, till exempel \"Massivbjälklag "
+                            f"200 mm\". Ange den så jämförs de.")
+            t_mm, how = thickness
+            t_m = t_mm / 1000
+            out = [_volume_copy(e, t_m, unit, how) for e in m3_rows]
+            out += [_element_mass_copy(
+                e, t_m * bs.SOLID_DENSITY_KG_M3, unit,
+                f"{how} × {density_note}", bs.SOLID_DENSITY_SOURCE) for e in kg_rows]
+            return out, "" if out else f"{have} Ingen av dem går att räkna om till m²."
+        # Hollow-core.
+        # A row whose EPD states its own thickness and weight is compared at
+        # its own weight: the alternative is that maker's slab. Others only
+        # by the weight the name states, as if they weighed the same.
+        out = []
+        stated = bs.stated_kg_per_m2(name)
+        t_mm = thickness[0] if thickness else None
+        for e in rows:
+            own_t = e.get("element_thickness_mm")
+            same = (t_mm is not None and isinstance(own_t, (int, float))
+                    and abs(own_t - t_mm) <= bs.THICKNESS_TOLERANCE_MM)
+            if e.get("unit") in _AREA_UNITS:
+                if same:
+                    out.append(e)
+            elif e.get("unit") != "kg" or e not in kg_rows:
+                continue
+            elif same and isinstance(e.get("element_kg_per_m2"), (int, float)):
+                out.append(_element_mass_copy(
+                    e, e["element_kg_per_m2"], unit,
+                    f"EPD:ns egen vikt {e['element_kg_per_m2']:g} kg/m² vid "
+                    f"{own_t:g} mm", e.get("element_facts_source", ""), own=True))
+            elif stated:
+                out.append(_element_mass_copy(
+                    e, stated, unit, f"vikt {stated:g} kg/m² enligt namnet",
+                    "komponentens namn"))
+        if out:
+            return out, ""
+        if not thickness:
+            return [], (f"{have} Ett håldäck per m² går bara att jämföra med håldäck "
+                        f"av samma tjocklek. Ange tjockleken i namnet, till exempel "
+                        f"\"Håldäck 200 mm\" eller \"HD/F 120/20\", och gärna vikten "
+                        f"per m² från leverantören (\"Håldäck 200 mm, XXX kg/m2\").")
+        return [], (f"{have} Ingen av dem gäller ett håldäck på {t_mm:g} mm per m². "
+                    f"EPD:erna per kg går inte att räkna om utan håldäckets vikt per "
+                    f"m², och den följer inte av tjockleken: {bs.hdf_weight_text(t_mm)}. "
+                    f"Ange leverantörens vikt per m² efter tjockleken i namnet, i "
+                    f"formen \"Håldäck {t_mm:g} mm, XXX kg/m2\", eller mängden i kg, "
+                    f"så jämförs de.")
+
+    if unit in _LENGTH_UNITS:
+        if kind != bs.BALK:
+            return [], (f"{have} Ett bjälklag räknas i m² med tjockleken i namnet "
+                        f"(till exempel \"Håldäck 200 mm\"), inte i löpmeter.")
+        section = bs.beam_section_mm(name)
+        if not section:
+            return [], (f"{have} För att räkna om till löpmeter behövs tvärsnittet i "
+                        f"namnet, till exempel \"Betongbalk 300x500\". Ange det så "
+                        f"jämförs de.")
+        w, h = section
+        area = (w / 1000) * (h / 1000)
+        how = f"tvärsnitt {w:g}×{h:g} mm"
+        out = [_volume_copy(e, area, unit, how) for e in m3_rows]
+        out += [_element_mass_copy(e, area * bs.SOLID_DENSITY_KG_M3, unit,
+                                   f"{how} × {density_note}", bs.SOLID_DENSITY_SOURCE)
+                for e in kg_rows]
+        return out, "" if out else f"{have} Ingen av dem går att räkna om till löpmeter."
+
+    what = ("tvärsnittet och antal löpmeter (till exempel \"Betongbalk 300x500\")"
+            if kind == bs.BALK else
+            "tjockleken och antal m² (till exempel \"Håldäck 200 mm\")")
+    return [], (f"{have} Komponenten är angiven i {proj_comp.unit}, som inte säger hur "
+                f"mycket betong det är. Ange {what}, eller mängden i kg.")
 
 
 # Category keys that are not words, as a reader should see them.
@@ -1063,7 +1382,28 @@ def _catalog_co2e(matched: dict, proj_comp, category: str) -> tuple[float | None
     if gwp <= 0:
         return None, "EPD:n saknar ett användbart klimatvärde"
     if units_comparable(epd_unit, comp_unit):
-        return round(gwp * quantity, 1), ""
+        co2e = round(gwp * quantity, 1)
+        if matched.get("fu_basis") == "profile_mass":
+            # The weight per metre is the one figure here that is not the
+            # EPD's, so the row says which it is and where it comes from.
+            return co2e, (
+                f"CO2e räknat från EPD:ns deklarerade värde: "
+                f"{matched.get('gwp_a1a3'):g} kg CO2e/kg × "
+                f"{matched.get('kg_per_m'):g} kg/m ({matched.get('profile')}, "
+                f"{matched.get('profile_source')}) × {quantity:g} {comp_unit} = "
+                f"{co2e:g} kg."
+            )
+        if matched.get("fu_basis") == "element_mass":
+            # Same reason: the mass per unit is not the EPD's figure (or is
+            # the EPD's own, which the source then says).
+            return co2e, (
+                f"CO2e räknat från EPD:ns deklarerade värde: "
+                f"{matched.get('gwp_a1a3'):g} kg CO2e/kg × "
+                f"{matched.get('kg_per_unit'):g} kg/{comp_unit} "
+                f"({matched.get('fu_note')}; {matched.get('mass_source')}) × "
+                f"{quantity:g} {comp_unit} = {co2e:g} kg."
+            )
+        return co2e, ""
     if normalize_unit(epd_unit) == "kg" and normalize_unit(comp_unit) == "st":
         sub = _component_subcategory(proj_comp, category)
         mass = typical_item_mass(category, sub) if category else None
@@ -1162,8 +1502,13 @@ def _format_epd_list(epds: list[dict]) -> str:
             gwp_str += f" \u2192 {fu_gwp} kg CO2e/{fu_unit}"
             # A frame member's bridge rests on the component's own dimension,
             # so the model can say which section the per-metre figure is for.
-            if epd.get("fu_note"):
+            if epd.get("fu_note") and epd.get("fu_note_own"):
+                gwp_str += f" ({epd['fu_note']})"
+            elif epd.get("fu_note"):
                 gwp_str += f" (komponentens {epd['fu_note']})"
+        elif isinstance(epd.get("element_thickness_mm"), (int, float)):
+            # A hollow-core row per m² is per m² at its own thickness.
+            gwp_str += f" (tjocklek {epd['element_thickness_mm']:g} mm enligt EPD:n)"
 
         source = epd.get("source_registry", "environdec")
         source_tag = f" [{source}]" if source != "environdec" else ""

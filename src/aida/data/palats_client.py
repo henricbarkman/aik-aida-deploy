@@ -289,21 +289,32 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
     # build_epd_alternatives, read in Swedish (HENRIC-3290). Steel before
     # timber, because "Stålreglar" ends in the timber family's bare "reglar",
     # and a named product family before the stud words for the same reason.
-    # "betong" has no EPD family: precast frame is not compared yet, but a
-    # listing of it must still not be offered for a timber stud, which is what
-    # the strict narrowing in search_listings_for_component relies on.
+    # "betong" got its EPD family 2026-10-01 (HENRIC-3362); a listing of it
+    # must still never be offered for a timber stud, which is what the strict
+    # narrowing in search_listings_for_component relies on.
     "stomme": [
         ("konstruktionsskiva", ["osb", "plywood", "spånskiv", "kryssfan",
                                 "konstruktionsskiv", "råspont"]),
         ("limträ", ["limträ", "kl-trä", "klträ", "korslimmat", "massivträ",
                     "lvl", "kerto", "fanerträ", "lättbalk", "masonitebalk",
                     "i-balk"]),
-        ("betong", ["betongbalk", "betongpelare", "håldäck", "bjälklag",
+        # "bjälklag" not after "trä": a "Träbjälklag" is joists, not concrete.
+        # The HD/F and plattbärlag words since HENRIC-3362, when the family got
+        # catalog rows (alternatives._concrete_rows).
+        ("betong", ["betongbalk", "betongpelare", "håldäck", "hålbjälklag",
+                    re.compile(r"(?<!trä)bjälklag"), "plattbärlag", "massivplatt",
+                    "kanalplatt", "spännbalk",
+                    re.compile(r"\bhd\s*/\s*f\b|\bhd\s*/?\s*f\s*\d{2,3}\s*/\s*\d{2}\b"),
                     "klinkerbalk", "lecabalk", "armering"]),
         ("konstruktionsstål", ["stålbalk", "stålpelare", "stålbjälke",
-                               "vkr", "kkr", re.compile(r"\b(?:hea|heb|ipe|upe|unp)\s*\d")]),
+                               "vkr", "kkr", re.compile(r"\b(?:hea|heb|ipe|upe|unp)\s*\d"),
+                               # EN 10365's own spelling, "HE 200 A" (HENRIC-3363).
+                               re.compile(r"\bhe\s*\d{3,4}\s*[ab]\b")]),
+        # "C-regel" and "CF 70" added with HENRIC-3363: "C-regel 70" ended in
+        # the timber family's bare "regel" and was read as virke.
         ("stålregel", ["stålregel", "stålreglar", "stålprofil", "hattprofil",
-                       "c-profil", "u-profil", "z-profil", "stålstomme"]),
+                       "c-profil", "u-profil", "z-profil", "stålstomme",
+                       "c-regel", "c-reglar", re.compile(r"\bcf\s*-?\s*\d")]),
         # "läkt" as a pattern: a bare substring is inside every "fläkt".
         ("virke", ["regel", "reglar", "virke", re.compile(r"(?<![sf])läkt"),
                    "glespanel", "syll", "träbalk", "träpelare", "takstol",
@@ -527,7 +538,11 @@ def _normalize_to_aida_category(title: str, description: str = "") -> str:
                    "håldäck", "bjälklag", "armeringsjärn", "betongpelare",
                    "stålpelare", "limträpelare")
     from aida.data.climate_data import names_frame_member
-    if any(t in text for t in _structural) or names_frame_member(text):
+    from aida.data.steel_profiles import names_steel_profile
+    # A steel section named by its designation alone ("IPE 200 6 m", "VKR
+    # 100x100x5"), read the way the component side reads it (HENRIC-3363).
+    if (any(t in text for t in _structural) or names_frame_member(text)
+            or names_steel_profile(text)):
         return "stomme"
 
     # Loose furniture, HENRIC-3290 del 2. Before the non-building guard, which

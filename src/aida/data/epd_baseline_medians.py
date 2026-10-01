@@ -42,6 +42,13 @@ from pathlib import Path
 from statistics import median
 
 from aida.data.aggregat import CLASS_SUBCATEGORY, FLOW_UNIT
+from aida.data.koncern import (
+    DOMINANCE_CEILING,
+    collapse_plants,
+    concentration,
+    dominance_reason,
+    owner_group,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +68,12 @@ _MIN_SAMPLES = 5
 # holds a misclassified steel sheet. Default stays 5 for everything else.
 _MIN_SAMPLES_OVERRIDE: dict[tuple[str, str], int] = {
     ("sanitet", "toalett"): 4,
+    # Precast concrete frame, 2026-10-01 (HENRIC-3362): the other way, a
+    # higher floor. One key per unit across hollow-core, solid slabs and beams
+    # (their per-kg values overlap: 0.06-0.19, 0.08-0.36, 0.14-0.64), which is
+    # only a typical value with a sample to match. kg had 17 products at the
+    # first build; m3 and m2 one or two each, and five would not be enough.
+    ("stomme", "betong"): 15,
 }
 
 # Categories that mix structurally different product types in the same bucket
@@ -81,15 +94,13 @@ _SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror", "fast_inrednin
 # stay in the catalog and are still offered as alternatives.
 _ST_ONLY_CATEGORIES = {"fast_inredning", "los_inredning"}
 
-# Keys that clear the sample floor but are not published, each with its reason.
-# Only for a key that would be NEW; the keys already published while dominated
-# are recorded in test_typvarde_dominans.KNOWN_DOMINANCE instead.
-#
-# badrumsinredning/st, 2026-09-14: 8 rows, 5 of them Sonas bathrooms (0.62) --
-# one product family in five sizes. Whether a typvärde that is mostly one
-# supplier's line may be published at all is a decision Henric has open (golv/st,
-# Kingspan), and a new key should not pre-empt it. A bathroom-cabinet component
-# gets an LLM estimate until more makers declare one, or until that is decided.
+# Keys that clear the sample floor but are not published for a reason the data
+# cannot state by itself, each with its reason. A key that is one company
+# group's range is NOT listed here: the dominance rule in _compute_with_withheld
+# finds those and words the reason (koncern.dominance_reason). Until 2026-10-01
+# five such keys were listed by hand (badrumsinredning, förvaring, the apartment
+# aggregat class, and HENRIC-3290's avjämning, bafflar and bärverk), and the
+# rule now withholds every one of them on its own count.
 #
 # ventilation/aggregat/st, 2026-09-28: 24 rows, but they span 270 to 16 700 kg
 # CO2e/st, a factor of sixty, and the spread is unit SIZE, not maker: Flexit's
@@ -100,19 +111,7 @@ _ST_ONLY_CATEGORIES = {"fast_inredning", "los_inredning"}
 # airflow field to scale by (Flexit's names do not state it). The rows stay in
 # the catalog as alternatives; the baseline gets an estimate that can read the
 # size from the description, and the row says why (split_subcategory_miss).
-#
-# los_inredning/förvaring/st, 2026-09-28: 51 rows, 40 of them AJ Produkter
-# (0.78), and three other makers with more than one row. A storage component
-# would be measured against one mail-order catalogue's lockers and shelving.
-# Same call as badrumsinredning: hold back rather than publish one supplier's
-# range. The rows stay in the catalog as alternatives.
 _WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
-    ("fast_inredning", "badrumsinredning", "st"): "Sonas bathrooms 5 av 8 rader",
-    ("los_inredning", "förvaring", "st"): (
-        "40 av 51 EPD:er för förvaring kommer från en och samma leverantör "
-        "(AJ Produkter), så ett typvärde vore deras sortiment och inte ett "
-        "typiskt val"
-    ),
     ("ventilation", "aggregat", "st"): (
         "EPD:erna spänner 270 till 16 700 kg CO2e/st beroende på aggregatets "
         "storlek (luftflöde), så inget enskilt typvärde per styck stämmer"
@@ -124,34 +123,6 @@ _WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
     ("ventilation", "aggregat", "kg"): (
         "aggregat-EPD:er per kg spänner över alla storlekar, och ett "
         "kg-värde ger inget styckvärde utan aggregatets vikt"
-    ),
-    # The two size classes and the airflow key (aggregat.py) are counted from the
-    # same rows. The apartment class is withheld for the reason badrumsinredning
-    # and förvaring are: every one of its eight EPDs is Flexit's Nordic range.
-    # The building class (Kampmann 7, Flexit ProNordic 6, Salda 2) and the
-    # airflow key (the same 15) stay under the dominance ceiling.
-    ("ventilation", "aggregat_lägenhet", "st"): (
-        "alla 8 EPD:er för lägenhetsaggregat kommer från en och samma "
-        "leverantör (Flexit), så ett typvärde vore deras sortiment och inte "
-        "ett typiskt val"
-    ),
-    # HENRIC-3290 del 3, counted per group rather than per owner string: the
-    # dominance test's _owner_key keeps Saint-Gobain's national subsidiaries
-    # apart, so it sees avjämning/kg at 0.18 when one group declares 48 of 60.
-    ("golv", "avjämning", "kg"): (
-        "48 av 60 EPD:er för avjämningsmassa kommer från en och samma koncern "
-        "(Saint-Gobain, Weber), så ett typvärde vore deras sortiment och inte "
-        "ett typiskt val"
-    ),
-    ("undertak", "baffel", "m2"): (
-        "24 av 32 EPD:er för bafflar och akustiköar kommer från en och samma "
-        "leverantör (Ecophon), så ett typvärde vore deras sortiment och inte "
-        "ett typiskt val"
-    ),
-    ("undertak", "bärverk", "lm"): (
-        "31 av 35 EPD:er för undertakets bärverk kommer från en och samma "
-        "leverantör (Rockfon Chicago Metallic), så ett typvärde vore deras "
-        "sortiment och inte ett typiskt val"
     ),
     # hiss/st, 2026-09-30 (handover review C5). Six whole-elevator EPDs
     # (Schindler 5500 3.33, FUJITEC ELSIA 9.09, TK EOX 13.4, TK endura MRL
@@ -171,8 +142,33 @@ _WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
 
 
 def withheld_reason(category: str, subcategory: str, unit: str) -> str:
-    """Why a key that clears the sample floor is not published, or ''."""
-    return _WITHHELD_KEYS.get((category, subcategory, unit), "")
+    """Why a key that clears the sample floor is not published, or ''.
+
+    Either a reason above, or the dominance rule's (_compute_with_withheld)."""
+    key = (category, subcategory, unit)
+    if key in _WITHHELD_KEYS:
+        return _WITHHELD_KEYS[key]
+    _ensure_cache()
+    return (_DOMINATED or {}).get(key, "")
+
+
+def lookup_withheld_reason(category: str, unit: str, subcategory: str = "") -> str:
+    """withheld_reason for the key get_baseline_typvärde would have answered
+    from, following the same fallbacks: a golv subtype too thin to publish
+    falls back to the category key, and when THAT is withheld (golv/st, one
+    supplier's raised access floors) the row should say so."""
+    if category == "ventilation" and subcategory in CLASS_SUBCATEGORY.values():
+        return withheld_reason(category, subcategory, unit)
+    split_units = _SPLIT_SUBCATEGORIES.get(category, {}).get(subcategory)
+    if split_units:
+        return withheld_reason(category, subcategory if unit in split_units else "", unit)
+    if category in _SUBTYPE_PREFERRED_CATEGORIES and subcategory:
+        if get_baseline_typvärde(category, unit, subcategory):
+            return ""
+        return (withheld_reason(category, subcategory, unit)
+                or withheld_reason(category, "", unit))
+    keyed = _SUBCATEGORIZED_CATEGORIES | _MATERIAL_SUBCATEGORIZED_CATEGORIES
+    return withheld_reason(category, subcategory if category in keyed else "", unit)
 
 # Categories where a subtype is PREFERRED but the category aggregate is still a
 # legitimate answer. Different from _SUBCATEGORIZED_CATEGORIES above: there, a
@@ -266,6 +262,13 @@ _MATERIAL_SUBCATEGORIZED_CATEGORIES = {"stomme", "undertak"}
 # metre is a property of the profile that no name like "Stålregel 70" states.
 _GEOMETRY_BRIDGE_SUBCATEGORIES = {"virke", "limträ", "konstruktionsskiva"}
 
+# ...but a STANDARD profile's weight per metre is a property no name has to
+# state beyond the designation: EN 10365 fixes an HEA 200 at 42,3 kg/m, and a
+# hollow section's or a thin-sheet stud's weight is in its tables. Those
+# families' kg values are bridged by that weight (_profile_typvärde,
+# steel_profiles; HENRIC-3363).
+_PROFILE_BRIDGE_SUBCATEGORIES = {"konstruktionsstål", "stålregel"}
+
 # Still excluded wholesale: no subcategory taxonomy defined, too heterogeneous
 # to aggregate meaningfully.
 _HETEROGENEOUS_CATEGORIES = {"storköksutrustning"}
@@ -323,22 +326,21 @@ def _scope_floor(min_required: int) -> int:
 
 # A European bucket where one supplier holds this share or more is that
 # supplier's product line, not a category value, so the full bucket is used.
-# Same ceiling as test_typvarde_dominans. With the scope on, fasadskikt/m2 was
-# 65% Saint-Gobain Sweden (Weber renders) among its 49 European rows; the full
-# bucket of 55 stays under 0.6.
-_SCOPE_DOMINANCE_CEILING = 0.6
+# Same ceiling as the publication rule below (koncern.DOMINANCE_CEILING). With
+# the scope on, fasadskikt/m2 was 65% Saint-Gobain Sweden (Weber renders) among
+# its 49 European rows.
+_SCOPE_DOMINANCE_CEILING = DOMINANCE_CEILING
 
 
 def _top_owner_share(rows: Rows) -> float:
-    """Largest single owner's share, owners grouped on their first word
-    (lowercased), so "Saint-Gobain Sweden AB" and "Saint-Gobain Finland Oy"
-    count as one supplier."""
+    """Largest company group's share (koncern.owner_group). Until 2026-10-01
+    owners were grouped on their first word, which joined "Saint-Gobain
+    Sweden AB" and "Saint-Gobain Ecophon AB" but not Gyproc or Weber-Sodamco."""
     if not rows:
         return 0.0
     counts: dict[str, int] = {}
     for _, e in rows:
-        words = (e.get("owner") or "?").lower().split()
-        k = words[0] if words else "?"
+        k = owner_group(e.get("owner"))
         counts[k] = counts.get(k, 0) + 1
     return max(counts.values()) / len(rows)
 
@@ -521,12 +523,17 @@ def _select_scope(
     about which population was used, never about which was asked for, for the
     same reason `level` exists: a fallback that reads as the thing it fell back
     from is the claim this module is here not to make.
+
+    Each bucket has its plant duplicates folded first (koncern.collapse_plants),
+    so floors and shares count products, not factories. Folded after the geo
+    filter, so a product's European bucket holds only its European plants.
     """
     if scope_codes is not None:
-        scoped = [r for r in rows if _in_scope(r[1], scope_codes)]
+        scoped = collapse_plants([r for r in rows if _in_scope(r[1], scope_codes)])
         if (len(scoped) >= (min_required if scope_floor is None else scope_floor)
                 and _top_owner_share(scoped) < _SCOPE_DOMINANCE_CEILING):
             return scoped, GEO_SCOPE_EUROPE
+    rows = collapse_plants(rows)
     if len(rows) >= min_required:
         return rows, GEO_SCOPE_GLOBAL
     return None, GEO_SCOPE_GLOBAL
@@ -543,13 +550,28 @@ def _compute_typvärden(
 
     Each entry has: baseline_co2e_per_unit, sample_size, full_median, min, max,
     subcategory, level, geo_scope, sample_size_global, sample_size_europe,
-    min_samples.
+    min_samples, concentration (koncern.concentration of the population used).
+    """
+    return _compute_with_withheld(scope_codes)[0]
+
+
+def _compute_with_withheld(
+    scope_codes: frozenset[str] | None = DEFAULT_GEO_SCOPE,
+) -> tuple[dict[tuple[str, str, str], dict], dict[tuple[str, str, str], str]]:
+    """The typvärden, and the keys withheld because one company group holds
+    DOMINANCE_CEILING or more of the products behind them, with the reason.
+
+    The rule replaced a hand list (HENRIC-3368, 2026-10-01). Before it, a
+    dominated key was withheld only if someone noticed: five were listed in
+    _WITHHELD_KEYS one at a time, and four more (golv/st 100% Kingspan, among
+    them) were published while a test recorded them as known.
     """
     epds = _load_epd_data()
     if not epds:
-        return {}
+        return {}, {}
 
     result: dict[tuple[str, str, str], dict] = {}
+    dominated: dict[tuple[str, str, str], str] = {}
     grouped = _group_rows(epds)
     for key, rows in grouped.items():
         if key in _WITHHELD_KEYS:
@@ -560,7 +582,26 @@ def _compute_typvärden(
                                     _scope_floor(min_required))
         if used is None:
             continue
+        conc = concentration(used)
+        why = dominance_reason(conc)
+        if why:
+            dominated[key] = why
+            continue
         values = [gwp for gwp, _ in used]
+        all_products = collapse_plants(rows)
+        europe_products = collapse_plants(
+            [r for r in rows if _in_scope(r[1], EUROPE_GEO_CODES)])
+        # Why a global key is global, so the row can say the true reason:
+        # "thin" (too few European products), "dominated" (enough, but one
+        # group's range, see _select_scope) or "scope_free" (golv, by design).
+        scope_reason = ""
+        if scope == GEO_SCOPE_GLOBAL and scope_codes is not None:
+            if _scope_codes_for(cat, scope_codes) is None:
+                scope_reason = "scope_free"
+            elif len(europe_products) < _scope_floor(min_required):
+                scope_reason = "thin"
+            else:
+                scope_reason = "dominated"
         result[key] = {
             "baseline_co2e_per_unit": round(_upper_half_median(values), 2),
             "sample_size": len(values),
@@ -578,10 +619,17 @@ def _compute_typvärden(
             # "16 europeiska av 20" or "bara 3 europeiska, alla 39 används"
             # instead of a bare n that hides which of the two it is.
             "geo_scope": scope,
-            "sample_size_global": len(rows),
-            "sample_size_europe": sum(1 for _, e in rows if _in_scope(e, EUROPE_GEO_CODES)),
+            # Counted in products, plant duplicates folded, like sample_size.
+            "sample_size_global": len(all_products),
+            "sample_size_europe": len(europe_products),
+            "scope_reason": scope_reason,
             "min_samples": min_required,
             "min_samples_europe": _scope_floor(min_required),
+            # Who is behind the number: the largest group and the second,
+            # with counts, so every row can say how concentrated it is.
+            "concentration": conc,
+            # EPD rows folded into another plant's product (0 when none).
+            "plant_rows_folded": sum(e.get("plants", 1) - 1 for _, e in used),
         }
         if key == ("ventilation", "aggregat", FLOW_UNIT):
             # The flows the per-m3/h value was measured over, so a component
@@ -599,7 +647,7 @@ def _compute_typvärden(
             if len(flows) >= min_required:
                 result[key]["airflow_median"] = float(median(flows))
     _class_values_from_flow(result)
-    return result
+    return result, dominated
 
 
 def _class_values_from_flow(result: dict[tuple[str, str, str], dict]) -> None:
@@ -637,6 +685,14 @@ def _class_values_from_flow(result: dict[tuple[str, str, str], dict]) -> None:
 
 
 _TYPVÄRDEN: dict[tuple[str, str, str], dict] | None = None
+# Keys withheld by the dominance rule, with the reason; filled with _TYPVÄRDEN.
+_DOMINATED: dict[tuple[str, str, str], str] | None = None
+
+
+def _ensure_cache() -> None:
+    global _TYPVÄRDEN, _DOMINATED
+    if _TYPVÄRDEN is None or _DOMINATED is None:
+        _TYPVÄRDEN, _DOMINATED = _compute_with_withheld()
 
 
 # Swedish material names -> EPD subtype key, for the subtype-preferred
@@ -700,9 +756,7 @@ def get_baseline_typvärde(category: str, unit: str, subcategory: str = "") -> d
     max, subcategory and level — or None if no usable typvärde exists. Cached
     lazily on first call.
     """
-    global _TYPVÄRDEN
-    if _TYPVÄRDEN is None:
-        _TYPVÄRDEN = _compute_typvärden()
+    _ensure_cache()
 
     # An aggregat size class is its own key and nothing else: a miss must not
     # fall through to ventilation/st, which is ducts and terminals.
@@ -747,6 +801,8 @@ def member_typvärde(category: str, name: str, unit: str,
 
     if category not in _MATERIAL_SUBCATEGORIZED_CATEGORIES:
         return None
+    if subcategory in _PROFILE_BRIDGE_SUBCATEGORIES:
+        return _profile_typvärde(category, name, unit, subcategory)
     if subcategory not in _GEOMETRY_BRIDGE_SUBCATEGORIES:
         return None
     geometry = member_volume_per_unit(name, unit)
@@ -762,6 +818,38 @@ def member_typvärde(category: str, name: str, unit: str,
             bridged[key] = round(m3_data[key] * factor, 4)
     bridged["geometry"] = label
     bridged["per_m3"] = m3_data["baseline_co2e_per_unit"]
+    return bridged
+
+
+def _profile_typvärde(category: str, name: str, unit: str,
+                      subcategory: str) -> dict | None:
+    """The kg typvärde of a steel family, per löpmeter of THIS profile.
+
+    The steel half of member_typvärde (HENRIC-3363): "Stålbalk HEA 200" is
+    42,3 kg per metre by EN 10365, so the konstruktionsstål/kg value times
+    42,3 is its value per metre. The weight comes from steel_profiles' tables,
+    the designation from the name, and a profile of the other family (a stud's
+    weight against the beam mills' median) gives None.
+
+    Returns the kg payload rescaled, with `geometry` naming the profile and its
+    weight and source, `per_kg` the unscaled value, or None.
+    """
+    from aida.data.steel_profiles import profile_mass
+
+    if (unit or "").strip().lower() not in ("lm", "m", "meter", "löpmeter"):
+        return None
+    profile, _ = profile_mass(name)
+    if not profile or profile.family != subcategory:
+        return None
+    kg_data = get_baseline_typvärde(category, "kg", subcategory)
+    if not kg_data:
+        return None
+    bridged = dict(kg_data)
+    for key in ("baseline_co2e_per_unit", "full_median", "min", "max"):
+        if isinstance(kg_data.get(key), (int, float)):
+            bridged[key] = round(kg_data[key] * profile.kg_per_m, 4)
+    bridged["geometry"] = f"profil {profile.label}"
+    bridged["per_kg"] = kg_data["baseline_co2e_per_unit"]
     return bridged
 
 
@@ -785,9 +873,7 @@ def aggregat_typvärde(name: str, usage_context: str = "", quantity: float = 1) 
     """
     from aida.data.aggregat import component_airflow, component_class
 
-    global _TYPVÄRDEN
-    if _TYPVÄRDEN is None:
-        _TYPVÄRDEN = _compute_typvärden()
+    _ensure_cache()
 
     flow, flow_where = component_airflow(name, usage_context, quantity)
     per_flow = _TYPVÄRDEN.get(("ventilation", "aggregat", FLOW_UNIT))
@@ -833,9 +919,7 @@ def aggregat_typvärde(name: str, usage_context: str = "", quantity: float = 1) 
 
 def list_available_categories() -> list[tuple[str, str, str, int]]:
     """List all (category, subcategory, unit, sample_size) with a typvärde."""
-    global _TYPVÄRDEN
-    if _TYPVÄRDEN is None:
-        _TYPVÄRDEN = _compute_typvärden()
+    _ensure_cache()
     return sorted(
         [(cat, sub, unit, data["sample_size"])
          for (cat, sub, unit), data in _TYPVÄRDEN.items()],

@@ -142,6 +142,9 @@ class EPDDetail:
     # interpreted at all, let alone compared: 0.46 kg CO2e/m2 is meaningless
     # until you know whether that is 45 mm or 250 mm.
     flow_description: str = ""
+    # True when the declaration has no A1-A3 module and the A1-A3 values are
+    # the sum of its A1, A2 and A3 modules (_parse_epd_detail).
+    a1a3_summed: bool = False
 
 
 class EnvirondecClient:
@@ -514,6 +517,9 @@ class EnvirondecClient:
         gwp_ghg = None
         bare_total = None
         modules: dict[str, float] = {}
+        # A1, A2 and A3 one by one, per indicator, for declarations that carry
+        # no A1-A3 module (see the sum after the loop).
+        split: dict[str, dict[str, float]] = {}
 
         for result in data.get("LCIAResults", {}).get("LCIAResult", []):
             ref = result.get("referenceToLCIAMethodDataSet", {})
@@ -556,6 +562,42 @@ class EnvirondecClient:
                 if is_fossil and module:
                     modules[module] = value
 
+                if module in ("A1", "A2", "A3"):
+                    kind = ("fossil" if is_fossil else "total" if is_total
+                            else "biogenic" if is_biogenic else "luluc" if is_luluc
+                            else "ghg" if is_ghg else None)
+                    if kind:
+                        split.setdefault(kind, {})[module] = value
+
+        # Some declarations publish A1, A2 and A3 as three modules and no A1-A3
+        # total: Mapei's "Ultraplan Fast Track" (NEPD-9011) and Sto's two
+        # StoCrete levelling compounds (NEPD-8923, -8924) in EPD Norge. Read as
+        # before they had no GWP at all and left the build without a log line
+        # (HENRIC-3369). A1-A3 is by definition the sum of the three, so the
+        # sum is the same quantity on the same basis; it is taken only when all
+        # three are declared, and `a1a3_summed` says it was summed.
+        def _summed(kind: str) -> float | None:
+            parts = split.get(kind, {})
+            if all(m in parts for m in ("A1", "A2", "A3")):
+                return parts["A1"] + parts["A2"] + parts["A3"]
+            return None
+
+        a1a3_summed = False
+        if gwp_fossil is None and _summed("fossil") is not None:
+            gwp_fossil = _summed("fossil")
+            a1a3_summed = True
+        if a1a3_summed:
+            # The other indicators the same way, so the consistency check
+            # (total = fossil + biogenic + luluc) sees one basis, not a mix.
+            if gwp_total is None:
+                gwp_total = _summed("total")
+            if gwp_biogenic is None:
+                gwp_biogenic = _summed("biogenic")
+            if gwp_luluc is None:
+                gwp_luluc = _summed("luluc")
+            if gwp_ghg is None:
+                gwp_ghg = _summed("ghg")
+
         # A declaration that carries both a split GWP-total and the bare form
         # keeps the split one; the bare value only fills an otherwise empty
         # total, which is the only case it exists for.
@@ -579,6 +621,7 @@ class EnvirondecClient:
             gwp_luluc_a1a3=gwp_luluc,
             gwp_ghg_a1a3=gwp_ghg,
             flow_description=self._reference_flow_description(data),
+            a1a3_summed=a1a3_summed,
         )
 
     def _extract_reference_flow(self, data: dict) -> tuple[str, float | None]:

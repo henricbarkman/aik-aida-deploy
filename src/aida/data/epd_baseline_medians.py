@@ -656,12 +656,32 @@ def _compute_with_withheld(
             result[key]["sample_size_per_piece"] = len(
                 grouped.get(("ventilation", "aggregat", "st"), []))
         elif cat == "ventilation" and sub in CLASS_SUBCATEGORY.values():
-            flows = [e["airflow_m3h"] for _, e in used
-                     if isinstance(e.get("airflow_m3h"), (int, float))]
-            if len(flows) >= min_required:
-                result[key]["airflow_median"] = float(median(flows))
+            flowed = [e for _, e in used
+                      if isinstance(e.get("airflow_m3h"), (int, float))]
+            if len(flowed) >= min_required:
+                result[key]["airflow_median"] = _median_per_group(flowed)
+                result[key]["airflow_median_groups"] = len(
+                    {owner_group(e.get("owner")) for e in flowed})
     _class_values_from_flow(result)
     return result, dominated
+
+
+def _median_per_group(rows: list[dict]) -> float:
+    """The class's middle size, each company group's series counted once: the
+    median of each group's stated flows, then the median of those.
+
+    A plain median over the EPDs lets the maker that declares the most sizes
+    set the class's size. Swegon declared nine GOLD/SILVER sizes (#800) and
+    the building class's median moved from 3 700 to 6 000 m3/h, 4 588 to 7 380
+    kg, without any building getting bigger. Same idea as folding a product's
+    factories into one (koncern.collapse_plants, #795): a typical unit is a
+    choice between makers, not between one maker's catalogue pages. Demi's
+    decision, HENRIC-3369; Henric can ask for the plain median back.
+    """
+    by_group: dict[str, list[float]] = {}
+    for e in rows:
+        by_group.setdefault(owner_group(e.get("owner")), []).append(float(e["airflow_m3h"]))
+    return float(median(median(flows) for flows in by_group.values()))
 
 
 def _class_values_from_flow(result: dict[tuple[str, str, str], dict]) -> None:

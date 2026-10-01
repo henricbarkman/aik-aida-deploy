@@ -48,8 +48,11 @@ Airflow. Only a flow the EPD itself states for the declared unit counts.
   - S&P's PURECLASS 800 CL states a "constant representative operating point
     of 700 m3/h" for its school scenario, the same kind of figure as Swegon's
     design flow. NASHIRA S (residential, "airflow rates of up to 150 m3/h")
-    states only a maximum and is not in the catalog (HENRIC-3369). SABIK
-    states no flow ("its reference flow rate", no number).
+    states only a maximum, so it counts in its class and not per flow
+    (HENRIC-3369). SABIK states no flow ("its reference flow rate", no number).
+  - Systemair's 20 SAVE units and Vallox's 16 (HENRIC-3369) state no flow in
+    the dataset, nor in the one document of each kind read in full (the SAVE
+    VTR 300/B PDF; Environdec's page for Vallox 096 MV).
   - Flexit's eight Nordic units state no flow ("please visit our webpage"),
     Acetec's EPD is a weighted average of a series from 36 to 3 960 m3/h, and
     Zehnder's is declared per kg. None of them enters the flow typvärde.
@@ -80,7 +83,13 @@ threshold: a boundary nobody drew in the data would be invented here.
     1 476 m3/h (004/005), is above ProNordic L110R's 1 000. The 011/012 EPD
     states no flow; it is a size of the same series, between 007/008 (2 340)
     and 014/020 (5 040).
-  - S&P SABIK: lägenhet, "Range of domestic MVHR units".
+  - S&P SABIK: lägenhet, "Range of domestic MVHR units". NASHIRA S:
+    lägenhet, "Double-flow VMC for homes".
+  - Systemair SAVE: lägenhet, "residential air handling unit" in every one.
+  - Vallox MV and TSK Multi MV: lägenhet, the living-comfort text ("the
+    structures of your house"; 096 MV "suited for small and medium-sized
+    apartments"). MyVallox CFi says "homes and other buildings" and is left
+    out of both, like Acetec.
   - S&P PURECLASS 800 CL is neither: a non-ducted unit for one room, "in
     schools, offices, hotels". A building unit's alternatives must not be a
     classroom's, and a flat's must not be a school's, so it counts only where
@@ -88,10 +97,11 @@ threshold: a boundary nobody drew in the data would be invented here.
   - Acetec is left out of both: the declared unit is the series average, and
     the series is sold for both.
 
-All lägenhet units but SABIK are Flexit (8 of 9), so that class is computed and
-withheld by the dominance rule (epd_baseline_medians._compute_with_withheld),
-like badrumsinredning and förvaring. A lägenhetsaggregat without a flow falls
-to C and the row says why.
+Until HENRIC-3369 all lägenhet units but SABIK were Flexit (8 of 9), and the
+dominance rule withheld the class. With Systemair's SAVE, Vallox and NASHIRA it
+has four makers, Systemair the largest at about half, and is published. None of
+its EPDs states a flow, so its value is the per-piece upper-half median
+(_class_values_from_flow keeps it when the class states too few flows).
 """
 
 from __future__ import annotations
@@ -174,6 +184,54 @@ EPD_FACTS: dict[str, EpdFact] = {
     # Zehnder. Declared per kg of unit; the flow (max 374 m3/h) is the
     # reference product's, not the declared unit's.
     "EPD-IES-0032015": EpdFact(None, None, "declared per kg; Residential ventilation, maximum airflow 374 m3/h"),
+    # UAB Systemair, SAVE (HENRIC-3369). EPD Norge, generated with the NPCR 030
+    # EPD generator. The dataset and the PDF (VTR 300/B read in full) call each a
+    # "residential air handling unit" and state no airflow.
+    "NEPD-7165-6570": EpdFact(None, "lägenhet", "SAVE VSC 100: residential air handling unit; no flow stated"),
+    "NEPD-7301-6569": EpdFact(None, "lägenhet", "SAVE VSC 200: residential air handling unit; no flow stated"),
+    "NEPD-7302-6571": EpdFact(None, "lägenhet", "SAVE VSC 300: residential air handling unit; no flow stated"),
+    "NEPD-8063-7703": EpdFact(None, "lägenhet", "SAVE VSR 150/B: residential air handling unit; no flow stated"),
+    "NEPD-7303-6572": EpdFact(None, "lägenhet", "SAVE VSR 200/B: residential air handling unit; no flow stated"),
+    "NEPD-7296-6564": EpdFact(None, "lägenhet", "SAVE VSR 300: residential air handling unit; no flow stated"),
+    "NEPD-7300-6568": EpdFact(None, "lägenhet", "SAVE VSR 400: residential air handling unit; no flow stated"),
+    "NEPD-7295-6563": EpdFact(None, "lägenhet", "SAVE VSR 500: residential air handling unit; no flow stated"),
+    "NEPD-7294-6561": EpdFact(None, "lägenhet", "SAVE VSR 700: residential air handling unit; no flow stated"),
+    "NEPD-7166-6562": EpdFact(None, "lägenhet", "SAVE VTC 200-1: residential air handling unit; no flow stated"),
+    "NEPD-7297-6565": EpdFact(None, "lägenhet", "SAVE VTC 300: residential air handling unit; no flow stated"),
+    "NEPD-7298-6566": EpdFact(None, "lägenhet", "SAVE VTC 500: residential air handling unit; no flow stated"),
+    "NEPD-6360-5625-EN": EpdFact(None, "lägenhet", "SAVE VTR 100/B: residential air handling unit; no flow stated"),
+    "NEPD-6359-5626-EN": EpdFact(None, "lägenhet", "SAVE VTR 150/B: residential air handling unit; no flow stated"),
+    "NEPD-6365-5620-EN": EpdFact(None, "lägenhet", "SAVE VTR 150/K: residential air handling unit; no flow stated"),
+    "NEPD-6367-5618-EN": EpdFact(None, "lägenhet", "SAVE VTR 250/B: residential air handling unit; no flow stated"),
+    "NEPD-6366-5619-EN": EpdFact(None, "lägenhet", "SAVE VTR 275/B: residential air handling unit; no flow stated"),
+    "NEPD-6364-5621-EN": EpdFact(None, "lägenhet", "SAVE VTR 300/B: residential air handling unit; no flow stated"),
+    "NEPD-6363-5622-EN": EpdFact(None, "lägenhet", "SAVE VTR 500: residential air handling unit; no flow stated"),
+    "NEPD-6362-5623-EN": EpdFact(None, "lägenhet", "SAVE VTR 700: residential air handling unit; no flow stated"),
+    # Vallox Oy (not part of Zehnder Group: its 2024 list of companies has only
+    # Enervent in Finland). MV and TSK Multi MV: the dataset's own application
+    # text is the living-comfort one ("the structures of your house"), and
+    # Environdec's page for 096 MV says "suited for small and medium-sized
+    # apartments". No flow in the dataset.
+    "EPD-IES-0010356": EpdFact(None, "lägenhet", "Vallox 096 MV: comfort of living, 'your house'; no flow stated"),
+    "EPD-IES-0010357": EpdFact(None, "lägenhet", "Vallox 110 MV: comfort of living, 'your house'; no flow stated"),
+    "EPD-IES-0011397": EpdFact(None, "lägenhet", "Vallox 125 MV: comfort of living, 'your house'; no flow stated"),
+    "EPD-IES-0010358": EpdFact(None, "lägenhet", "Vallox 145 MV: comfort of living, 'your house'; no flow stated"),
+    "EPD-IES-0010359": EpdFact(None, "lägenhet", "Vallox 245 MV: comfort of living, 'your house'; no flow stated"),
+    "EPD-IES-0009030": EpdFact(None, "lägenhet", "Vallox 51 MV: comfort of living, 'your house'; no flow stated"),
+    "EPD-IES-0010355": EpdFact(None, "lägenhet", "Vallox 99 MV: comfort of living, 'your house'; no flow stated"),
+    "EPD-IES-0010360": EpdFact(None, "lägenhet", "Vallox TSK Multi 50 MV: comfort of living, 'your house'; no flow stated"),
+    "EPD-IES-0010361": EpdFact(None, "lägenhet", "Vallox TSK Multi 80 MV: comfort of living, 'your house'; no flow stated"),
+    # MyVallox CFi: "ventilation for homes and other buildings", so both, and
+    # left out of both classes like Acetec. No flow stated.
+    "EPD-IES-0025180": EpdFact(None, None, "MyVallox 119 CFi: homes and other buildings; no flow stated"),
+    "EPD-IES-0029384": EpdFact(None, None, "MyVallox 125 CFi: homes and other buildings; no flow stated"),
+    "EPD-IES-0025182": EpdFact(None, None, "MyVallox 149 CFi: homes and other buildings; no flow stated"),
+    "EPD-IES-0029385": EpdFact(None, None, "MyVallox 245 CFi: homes and other buildings; no flow stated"),
+    "EPD-IES-0029386": EpdFact(None, None, "MyVallox 245 CFi VKL: homes and other buildings; no flow stated"),
+    "EPD-IES-0029335": EpdFact(None, None, "MyVallox 51 CFi: homes and other buildings; no flow stated"),
+    "EPD-IES-0029383": EpdFact(None, None, "MyVallox 99 CFi: homes and other buildings; no flow stated"),
+    # S&P NASHIRA S: "Double-flow VMC for homes"; states only a maximum.
+    "EPD-IES-0017092": EpdFact(None, "lägenhet", "NASHIRA S: double-flow VMC for homes; only a maximum flow (up to 150 m3/h) stated"),
 }
 
 

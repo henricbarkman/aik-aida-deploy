@@ -302,11 +302,21 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
     # among ducts at 280 kg/st) and Swegon's series name, which carries no
     # ventilation word ("Swegon GOLD/ SILVER C RX 004/ 005", "GOLD RX 012").
     # A pattern, not "gold": a gold-coloured fitting is not a unit.
+    #
+    # 2026-10-01 (HENRIC-3369): three residential series whose EPD names carry
+    # no ventilation word either: Systemair's "SAVE VTR 300/B" (VTR, VSR, VTC,
+    # VSC), Vallox's "Vallox 096 MV", "MyVallox 119 CFi" and "Vallox TSK Multi
+    # 50 MV", and S&P's "NASHIRA S". Patterns on the series, not the maker:
+    # Vallox also declares roof fans ("Vallox Exxeo 150 Roof fan") and cooker
+    # hoods, and those are not units.
     "ventilation": [
         ("aggregat", ["air handling", "air-handling", "luftbehandling",
                       "ventilation unit", "heat recovery unit",
                       "heat recovery ventilation",
                       re.compile(r"\b(?:gold|silver\s?c)(?:\s*/\s*silver\s?c)?\s+rx\b"),
+                      re.compile(r"\bsave\s+v[st][rc]\b"),
+                      re.compile(r"\b(?:my)?vallox\s+(?:\d{2,3}\b|tsk\b)"),
+                      re.compile(r"\bnashira\b"),
                       re.compile(r"\bahu\b"), re.compile(r"\bftx\b"),
                       re.compile(r"aggregat(?!es?\b)")]),
     ],

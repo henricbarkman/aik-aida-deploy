@@ -171,6 +171,10 @@ GROUPS: list[tuple[str, tuple[str, ...], str]] = [
      ("sealed air",),
      "Sealed Air FY2024 Exhibit 21 (sec.gov): 'Sealed Air S.r.l. Italy'; "
      "private under CD&R since 2026-04-09."),
+    ("Sika",
+     ("sika", "marlon tørmørtel"),
+     "sika.com media release 2025: Sika acquires Marlon Tørmørtel A/S; "
+     "marlon.dk: part of Sika Danmark A/S from 2025-10-01. HENRIC-3369."),
 ]
 # Checked and NOT joined (2026-10-01): Hunton Fiber AS (Skog Holding) and
 # Huntonit AS (Byggma ASA); Optima Products Ltd (Optima Contracting) and RP
@@ -186,6 +190,11 @@ GROUPS: list[tuple[str, tuple[str, ...], str]] = [
 # Svevik Industri AB (press release 2022-06-22). No other company of these
 # groups declares in the catalog's ventilation rows, so no entry is needed;
 # none of them is joined with Kampmann, Flexit, Salda or Zehnder.
+# HENRIC-3369 (2026-10-01): Systemair (UAB Systemair) and Vallox are not
+# joined. Vallox is not in Zehnder either; Zehnder's 2024 list has Enervent
+# as its only Finnish company. Levelling compounds: Mira Byggeprodukter A/S
+# belongs to Fenrisulven Holding (Ole Romer), not to Saint-Gobain; Kiilto is
+# family-owned; Bostik (Arkema), Sto and Sakret stand alone in these rows.
 
 _LEGAL_SUFFIXES = re.compile(
     r"\b(ab|a/s|as|oy|oyj|ltd|limited|gmbh|sa|inc|bv|nv|srl|spa|aps|plc|corp|co"

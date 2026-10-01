@@ -179,6 +179,13 @@ GROUPS: list[tuple[str, tuple[str, ...], str]] = [
 # (Patino Group) and Lammhults; Vedum and Ballingslöv International; Flexit
 # (family-owned) and any other ventilation maker in the catalog. Chalkis LTD
 # against CHALKIS S.A. could not be settled and is left apart.
+# Air handling units, HENRIC-3386: Swegon Group AB is one of Investment AB
+# Latour's wholly owned business areas (Latour year-end report 2025), S&P
+# Sistemas de Ventilación is the Soler & Palau Ventilation Group (private;
+# Pluggit, Exhausto, Fantech, Ventur among its brands), Acetec AB belongs to
+# Svevik Industri AB (press release 2022-06-22). No other company of these
+# groups declares in the catalog's ventilation rows, so no entry is needed;
+# none of them is joined with Kampmann, Flexit, Salda or Zehnder.
 
 _LEGAL_SUFFIXES = re.compile(
     r"\b(ab|a/s|as|oy|oyj|ltd|limited|gmbh|sa|inc|bv|nv|srl|spa|aps|plc|corp|co"

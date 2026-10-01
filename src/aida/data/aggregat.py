@@ -1,6 +1,6 @@
 """Air handling units: airflow and size class, per EPD and per component.
 
-The 24 aggregat EPDs in the catalog span 270 to 16 700 kg CO2e/st, and the
+The 35 aggregat EPDs in the catalog span 270 to 24 500 kg CO2e/st, and the
 spread is unit size (PR #752). A per-piece typvärde therefore describes no unit,
 and ventilation/aggregat/st stays withheld. Decided 2026-09-30 (Demi, Till dig
 d-20260928-082148-e12ed7), in falling order:
@@ -36,9 +36,31 @@ Airflow. Only a flow the EPD itself states for the declared unit counts.
     from 1.24 to 0.99 kg CO2e per m3/h.
   - Salda's two EPDs are multiple-product EPDs whose results are for a
     representative unit, AmberAir Compact S-R-3000, stated at 3000 m3/h.
+  - Swegon's GOLD/SILVER C RX EPDs (2024) state two flows for the
+    representative size: "Airflow max." in the product table and a "Design
+    airflow rate" (100 %) in the B6 use scenario, run at the annual average SFP
+    of all RX units sold, 1.6 kW/(m3/s). The design flow is used: it is the
+    flow the declaration itself sizes the unit for, and the maximum is the
+    capacity at the highest SFP, the figure ProNordic's choice above already
+    turns down. The maximum would move Swegon's eight rows from 0.76-1.33 to
+    0.48-0.83 kg CO2e per m3/h. The older 011/012 EPD (S-P-05063, 2022) has no
+    use scenario and states no flow.
+  - S&P's PURECLASS 800 CL states a "constant representative operating point
+    of 700 m3/h" for its school scenario, the same kind of figure as Swegon's
+    design flow. NASHIRA S (residential, "airflow rates of up to 150 m3/h")
+    states only a maximum and is not in the catalog (HENRIC-3369). SABIK
+    states no flow ("its reference flow rate", no number).
   - Flexit's eight Nordic units state no flow ("please visit our webpage"),
     Acetec's EPD is a weighted average of a series from 36 to 3 960 m3/h, and
     Zehnder's is declared per kg. None of them enters the flow typvärde.
+
+Declared unit. Swegon's ILCD datasets give the reference flow as a Mass
+property equal to the unit's weight (266 to 3 920 kg) while the PDF declares
+"1 finished product", and the results are per unit. Read as a mass, the build
+divided 24 500 kg CO2e by 3 920 kg and filed a per-kg row. `piece_mass_kg`
+records the declared unit's weight as the PDF states it; the build keeps such
+a row per piece only when the dataset's mass equals it, so a new version with
+another weight is not taken on trust (HENRIC-3386).
 
 Class. From the EPD's own statement of where the unit is used, not from a
 threshold: a boundary nobody drew in the data would be invented here.
@@ -53,12 +75,23 @@ threshold: a boundary nobody drew in the data would be invented here.
     1 000 m3/h at SFP 1.5) and eight times the only unit an EPD calls
     residential with a stated flow (Zehnder, "Residential ventilation",
     maximum 374 m3/h). Not a boundary, a position between two stated points.
+  - Swegon GOLD/SILVER C RX states no application either ("designed for
+    comfort ventilation") and is placed the same way: its smallest design flow,
+    1 476 m3/h (004/005), is above ProNordic L110R's 1 000. The 011/012 EPD
+    states no flow; it is a size of the same series, between 007/008 (2 340)
+    and 014/020 (5 040).
+  - S&P SABIK: lägenhet, "Range of domestic MVHR units".
+  - S&P PURECLASS 800 CL is neither: a non-ducted unit for one room, "in
+    schools, offices, hotels". A building unit's alternatives must not be a
+    classroom's, and a flat's must not be a school's, so it counts only where
+    its flow does.
   - Acetec is left out of both: the declared unit is the series average, and
     the series is sold for both.
 
-All eight lägenhet units are Flexit, so that class is computed and withheld
-by the dominance rule (epd_baseline_medians._compute_with_withheld), like
-badrumsinredning and förvaring. A lägenhetsaggregat without a flow falls to C and the row says why.
+All lägenhet units but SABIK are Flexit (8 of 9), so that class is computed and
+withheld by the dominance rule (epd_baseline_medians._compute_with_withheld),
+like badrumsinredning and förvaring. A lägenhetsaggregat without a flow falls
+to C and the row says why.
 """
 
 from __future__ import annotations
@@ -78,6 +111,10 @@ class EpdFact:
     airflow_m3h: float | None
     klass: str | None
     evidence: str
+    # The declared unit is one finished unit of this weight, as the EPD's PDF
+    # states it, although the ILCD dataset gives the reference flow as a Mass.
+    # None for every EPD whose dataset already says pieces.
+    piece_mass_kg: float | None = None
 
 
 # Keyed by registration number without the version suffix (":002"), so a new
@@ -113,6 +150,25 @@ EPD_FACTS: dict[str, EpdFact] = {
     "NEPD-6160-5425-EN": EpdFact(None, "lägenhet", "Nordic S3: no flow stated; apartments, houses, villas"),
     "NEPD-6161-5424-EN": EpdFact(None, "lägenhet", "Nordic S4: no flow stated; apartments, houses, villas"),
     "NEPD-9539-9190": EpdFact(None, "lägenhet", "Nordic S7 SW: no flow stated; apartments, houses, villas"),
+    # Swegon Group AB, GOLD/SILVER C RX (HENRIC-3386). PDF: "Declared unit 1
+    # finished product"; the ILCD gives a Mass equal to the unit's weight.
+    # Flow: the B6 scenario's "Design airflow rate" (100 %) in m3/s x 3600, at
+    # the annual average SFP 1.6 kW/(m3/s). PDFs read from Swegon's site and
+    # its Baltic distributor (ecowise.lv); Environdec's library no longer
+    # serves them, its data hub does.
+    "EPD-IES-0013087": EpdFact(1476, "byggnad", "GOLD RX 005: Design airflow rate 0.41 m3/s (max 0.65), SFP 1.6; 266 kg; comfort ventilation, placed by flow", 266),
+    "EPD-IES-0013088": EpdFact(2340, "byggnad", "GOLD RX 008: Design airflow rate 0.65 m3/s (max 1), SFP 1.6; 344 kg; comfort ventilation, placed by flow", 344),
+    "EPD-IES-0005063": EpdFact(None, "byggnad", "GOLD RX 012, S-P-05063 (2022): no flow and no use scenario; 488 kg; a size of the series between 007/008 and 014/020", 488),
+    "EPD-IES-0013089": EpdFact(5040, "byggnad", "GOLD RX 020: Design airflow rate 1.40 m3/s (max 2.1), SFP 1.6; 679 kg; comfort ventilation, placed by flow", 679),
+    "EPD-IES-0013090": EpdFact(6840, "byggnad", "GOLD RX 030: Design airflow rate 1.9 m3/s (max 3.2), SFP 1.6; 861 kg; comfort ventilation, placed by flow", 861),
+    "EPD-IES-0013091": EpdFact(10800, "byggnad", "GOLD RX 040: Design airflow rate 3 m3/s (max 5), SFP 1.6; 1254 kg; comfort ventilation, placed by flow", 1254),
+    "EPD-IES-0013092": EpdFact(14040, "byggnad", "GOLD RX 060: Design airflow rate 3.9 m3/s (max 6.5), SFP 1.6; 1534 kg; comfort ventilation, placed by flow", 1534),
+    "EPD-IES-0013343": EpdFact(19440, "byggnad", "GOLD RX 080: Design airflow rate 5.4 m3/s (max 9.5), SFP 1.6; 2482 kg; comfort ventilation, placed by flow", 2482),
+    "EPD-IES-0013344": EpdFact(31680, "byggnad", "GOLD RX 120: Design airflow rate 8.80 m3/s (max 14.0), SFP 1.6; 3920 kg; comfort ventilation, placed by flow", 3920),
+    # S&P Sistemas de Ventilación (Soler & Palau). Declared per unit in the
+    # dataset itself (Number of pieces).
+    "EPD-IES-0013020": EpdFact(None, "lägenhet", "SABIK 350: no flow stated ('its reference flow rate'); Range of domestic MVHR units"),
+    "EPD-IES-0025462": EpdFact(700, None, "PURECLASS 800 CL: 'constant representative operating point of 700 m3/h'; non-ducted room unit for schools, offices, hotels"),
     # Acetec AB. Weighted average of the EvoAir A series, 36-3 960 m3/h.
     "EPD-IES-0033292": EpdFact(None, None, "weighted average over a series from 36 to 3 960 m3/h, residential and larger buildings"),
     # Zehnder. Declared per kg of unit; the flow (max 374 m3/h) is the

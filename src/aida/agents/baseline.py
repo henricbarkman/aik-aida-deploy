@@ -724,6 +724,8 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
         member_typvärde,
         split_subcategory_miss,
         subtype_from_material,
+        textile_typvärde,
+        textile_typvärde_unit,
         withheld_reason,
     )
     from aida.data.koncern import concentration_note
@@ -819,7 +821,21 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
                         f"komponentens {bridged['geometry']}."
                     )
 
+        # m2 -> st for a rug or a curtain, from the size its name states
+        # (HENRIC-3366). Same kind of bridge: the size is the component's own.
+        if not typvärde_data and comp.unit in ("st", "styck"):
+            bridged = textile_typvärde(category, comp.name, comp.unit, subcategory)
+            if bridged:
+                typvärde_data = bridged
+                mass_note = (
+                    f" Omräknat från {bridged['per_m2']} kg CO2e/m² via "
+                    f"komponentens mått, {bridged['geometry']}."
+                )
+
         if not typvärde_data:
+            # A rug's or a curtain's value is kept per m², so that is the key
+            # whose reason applies, whatever unit the component is in.
+            reason_unit = textile_typvärde_unit(category, comp.unit, subcategory)
             if split_subcategory_miss(category, comp.unit, subcategory):
                 # The category has a typvärde, just not for this kind of
                 # product, and the estimate below is not that number. Said in
@@ -841,7 +857,7 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
                     "subcategory": subcategory,
                     "reason": why[0].upper() + why[1:],
                 }
-            elif lookup_withheld_reason(category, comp.unit, subcategory):
+            elif lookup_withheld_reason(category, reason_unit, subcategory):
                 # Enough EPDs, deliberately not published (one company
                 # group's range, los_inredning/förvaring; a mis-read unit,
                 # hiss/st). Same reasoning as above: a reader who can see the
@@ -849,7 +865,7 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
                 # median. Looked up along get_baseline_typvärde's own
                 # fallback, so a vinyl floor in st is told that golv/st is
                 # withheld rather than nothing.
-                why = lookup_withheld_reason(category, comp.unit, subcategory)
+                why = lookup_withheld_reason(category, reason_unit, subcategory)
                 key = f"{category}/{subcategory}" if subcategory else category
                 note = (f" Inget EPD-typvärde för {key}: {why}. "
                         f"Siffran är därför en uppskattning.")

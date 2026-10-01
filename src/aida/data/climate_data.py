@@ -320,9 +320,10 @@ def compound_units(title: str) -> list[str]:
 #
 # akustik is the loose kind only (desk, floor and free-standing screens). A
 # wall absorber or an acoustic ceiling panel is fixed to the building and is
-# not in this category. textil has no EPD rows today (the catalog's "curtain"
-# hits are curtain walls and shutters), so a curtain gets the honest "no
-# comparable products" rather than somebody else's number.
+# not in this category. Rugs (matta) and curtains (gardin) are two kinds, not
+# one "textil" (HENRIC-3366): a rug is 3 to 30 kg CO2e/m2 and a curtain fabric
+# 1 to 4, and neither replaces the other. Both are compared per m2, with the
+# piece's size read from the name (aida.data.textil).
 _FURNITURE_TAILS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("akustik", ("skärmvägg", "skärm", "rumsavdelare")),
     ("soffa", ("soff", "fåtölj", "schäslong", "divan")),
@@ -339,7 +340,7 @@ _FURNITURE_TAILS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("kontorsstol", ("kontorsstol", "kontorstol", "arbetsstol",
                      "skrivbordsstol", "datorstol")),
     ("stol", ("stol", "pall", "taburett", "sittbänk")),
-    ("textil", ("gardin", "draperi")),
+    ("gardin", ("gardin", "draperi")),
 )
 
 # Compounds that END in a furniture word and are something else. Checked first,
@@ -429,7 +430,7 @@ def names_built_in(text: str) -> bool:
 def furniture_subcategory(text: str) -> str:
     """The loose-furniture subcategory `text` names, or "".
 
-    One of akustik, soffa, förvaring, bord, kontorsstol, stol, textil. Reads the head of
+    One of akustik, soffa, förvaring, bord, kontorsstol, stol, matta, gardin. Reads the head of
     the name the way names_frame_member does ("Kontorsstol med armstöd" is a
     chair, "Bord och stolar" a table), and returns "" for anything whose head
     is not furniture ("Bordsskiva", "Kylskåp", "Toalettstol", "Plastmatta").
@@ -449,7 +450,7 @@ def furniture_subcategory(text: str) -> str:
     for w in words:
         for form in _RUG_FORMS:
             if w.endswith(form) and w[:-len(form)] in _RUG_PREFIXES:
-                return "textil"
+                return "matta"
         for sub, tails in _FURNITURE_TAILS:
             if any(compound_tail(w, t) for t in tails):
                 return sub
@@ -925,6 +926,7 @@ _CEILING_HOST_CATEGORIES = {"tak", "innervägg", "isolering"}
 _WATERPROOFING_HOST_CATEGORIES = {"kakel", "golv", "innervägg", "isolering"}
 
 # Furniture kinds that are never fixed interior (see resolve_category).
-_NEVER_FIXED_KINDS = {"stol", "kontorsstol", "bord", "soffa", "akustik", "textil"}
+_NEVER_FIXED_KINDS = {"stol", "kontorsstol", "bord", "soffa", "akustik", "matta",
+                      "gardin"}
 
 

@@ -94,6 +94,13 @@ _SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror", "fast_inrednin
 # stay in the catalog and are still offered as alternatives.
 _ST_ONLY_CATEGORIES = {"fast_inredning", "los_inredning"}
 
+# The exception: loose textiles are bought per piece and declared per m² (carpet
+# by the roll, curtain fabric), and a rug's size varies more than its make. So
+# their typvärde is per m², and a piece is counted by the size its name states
+# (textile_typvärde; HENRIC-3366).
+_PER_M2_SUBCATEGORIES = frozenset({("los_inredning", "matta"),
+                                   ("los_inredning", "gardin")})
+
 # Keys that clear the sample floor but are not published for a reason the data
 # cannot state by itself, each with its reason. A key that is one company
 # group's range is NOT listed here: the dominance rule in _compute_with_withheld
@@ -113,7 +120,7 @@ _ST_ONLY_CATEGORIES = {"fast_inredning", "los_inredning"}
 # size from the description, and the row says why (split_subcategory_miss).
 _WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
     ("ventilation", "aggregat", "st"): (
-        "EPD:erna spänner 270 till 16 700 kg CO2e/st beroende på aggregatets "
+        "EPD:erna spänner 270 till 24 500 kg CO2e/st beroende på aggregatets "
         "storlek (luftflöde), så inget enskilt typvärde per styck stämmer"
     ),
     # The kg key is empty today (one row). Withheld in advance anyway, because
@@ -447,15 +454,22 @@ def _group_rows(epds: list[dict]) -> dict[tuple[str, str, str], Rows]:
         if cat in _HETEROGENEOUS_CATEGORIES:
             continue
         if cat in _SUBCATEGORIZED_CATEGORIES:
-            # Fixtures (toilets, taps, luminaires, appliances) are counted or
-            # weighed — never area/volume. An m2/m3-declared EPD here is a
-            # misclassification (produced absurd phantoms like blandare/m2 =
-            # 1660), so only keep st and kg.
-            if unit not in ("st", "kg"):
-                continue
-            if cat in _ST_ONLY_CATEGORIES and unit != "st":
-                continue
             sub = _epd_subcategory(cat, e)
+            if (cat, sub) in _PER_M2_SUBCATEGORIES:
+                # Rugs and curtains (HENRIC-3366): per m², the unit every one
+                # of their EPDs is declared in. A piece has no size until the
+                # component's name gives one (textile_typvärde).
+                if unit != "m2":
+                    continue
+            else:
+                # Fixtures (toilets, taps, luminaires, appliances) are counted
+                # or weighed — never area/volume. An m2/m3-declared EPD here is
+                # a misclassification (produced absurd phantoms like
+                # blandare/m2 = 1660), so only keep st and kg.
+                if unit not in ("st", "kg"):
+                    continue
+                if cat in _ST_ONLY_CATEGORIES and unit != "st":
+                    continue
             if not sub:
                 continue  # unclassified item in a heterogeneous category
         elif cat in _SUBTYPE_PREFERRED_CATEGORIES:
@@ -851,6 +865,47 @@ def _profile_typvärde(category: str, name: str, unit: str,
     bridged["geometry"] = f"profil {profile.label}"
     bridged["per_kg"] = kg_data["baseline_co2e_per_unit"]
     return bridged
+
+
+def textile_typvärde(category: str, name: str, unit: str,
+                     subcategory: str) -> dict | None:
+    """The m² typvärde of a rug or a curtain, per piece of THIS size.
+
+    "Matta 2x3 m" in st is 6 m² a piece (aida.data.textil.piece_area_m2), so
+    the matta/m2 value times 6 is its value per piece (HENRIC-3366). The size
+    comes from the name only; no size, or no published m² value, gives None.
+
+    Returns the m² payload rescaled, with `geometry` naming the size and
+    `per_m2` the unscaled value, or None.
+    """
+    from aida.data.textil import piece_area_m2
+
+    if (category, subcategory) not in _PER_M2_SUBCATEGORIES:
+        return None
+    if (unit or "").strip().lower() not in ("st", "styck"):
+        return None
+    area, label = piece_area_m2(name)
+    if not area:
+        return None
+    m2_data = get_baseline_typvärde(category, "m2", subcategory)
+    if not m2_data:
+        return None
+    bridged = dict(m2_data)
+    for key in ("baseline_co2e_per_unit", "full_median", "min", "max"):
+        if isinstance(m2_data.get(key), (int, float)):
+            bridged[key] = round(m2_data[key] * area, 4)
+    bridged["geometry"] = label
+    bridged["per_m2"] = m2_data["baseline_co2e_per_unit"]
+    return bridged
+
+
+def textile_typvärde_unit(category: str, unit: str, subcategory: str) -> str:
+    """The unit a rug's or a curtain's typvärde is kept in ("m2"), whatever unit
+    the component is given in; `unit` for every other product. So a withheld
+    reason is looked up on the key that would have answered."""
+    if (category, subcategory) in _PER_M2_SUBCATEGORIES:
+        return "m2"
+    return unit
 
 
 def aggregat_typvärde(name: str, usage_context: str = "", quantity: float = 1) -> dict:

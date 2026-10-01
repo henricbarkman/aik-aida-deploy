@@ -248,8 +248,10 @@ def _epd_comparable(epd: dict) -> tuple[float, str]:
     # And a fourth (HENRIC-3362): a precast concrete row per kg restated per
     # m², m³ or metre of the element by a weight per unit whose source the
     # copy names (betongstomme; _element_mass_copy).
+    # And a fifth (HENRIC-3366): a rug's or a curtain's per-m² row restated
+    # per piece by the size the component's name states (_textile_rows).
     if unit == "m3" or epd.get("fu_basis") in ("areal_density", "profile_mass",
-                                               "element_mass"):
+                                               "element_mass", "piece_area"):
         fu_gwp = epd.get("gwp_per_functional_unit")
         fu_unit = epd.get("functional_unit")
         if fu_unit and isinstance(fu_gwp, (int, float)):
@@ -885,7 +887,7 @@ _FURNITURE_LABELS = {
     "bord": "bord och skrivbord",
     "förvaring": "förvaring (skåp, hyllor, garderober)",
     "soffa": "soffor och fåtöljer", "akustik": "fristående skärmar",
-    "textil": "gardiner och mattor",
+    "matta": "mattor", "gardin": "gardiner",
 }
 
 
@@ -918,6 +920,8 @@ def _furniture_rows(epd_data: dict[str, list[dict]], proj_comp) -> tuple[list[di
     pool = [e for e in epd_data.get("los_inredning", []) if e.get("subcategory") == sub]
     if not pool:
         return [], f"Katalogen har inga EPD:er för {label}, så ingen jämförelse med nyköp görs."
+    if sub in ("matta", "gardin"):
+        return _textile_rows(pool, proj_comp, label)
 
     unit = proj_comp.unit.strip().lower()
     if unit in _COUNT_UNITS:
@@ -933,6 +937,54 @@ def _furniture_rows(epd_data: dict[str, list[dict]], proj_comp) -> tuple[list[di
     return [], (
         f"EPD:erna för {label} anges per {declared}, och komponenten i "
         f"{proj_comp.unit}. Ange antalet i styck så jämförs de."
+    )
+
+
+def _textile_rows(pool: list[dict], proj_comp, label: str) -> tuple[list[dict], str]:
+    """Rows a rug or a curtain can be compared against, or the reason there are
+    none (HENRIC-3366). `pool` is the kind's own rows, all declared per m².
+
+    - m2: the rows as declared.
+    - st: copies restated per piece by the size the name states ("Matta 2x3 m"
+      is 6 m² a piece, aida.data.textil.piece_area_m2). No size, no copies: a
+      rug in st says nothing about how much rug it is, and the reason asks for
+      the size or the quantity in m².
+    """
+    from aida.data.textil import piece_area_m2
+
+    per_m2 = [e for e in pool if _epd_comparable(e)[1] == "m2"]
+    unit = proj_comp.unit.strip().lower()
+    example = ("\"Matta 2x3 m\"" if label == "mattor" else "\"Gardin 140x250 cm\"")
+    if unit in _AREA_UNITS:
+        if per_m2:
+            return per_m2, ""
+        return [], f"Katalogen har inga EPD:er för {label} per m²."
+    if unit in _COUNT_UNITS:
+        # `why` is the area's label when there is an area, the reason when not.
+        area, why = piece_area_m2(proj_comp.name)
+        if area:
+            out = []
+            for e in per_m2:
+                gwp, _ = _epd_comparable(e)
+                bridged = dict(e)
+                bridged["gwp_per_functional_unit"] = round(gwp * area, 4)
+                bridged["functional_unit"] = unit
+                bridged["fu_basis"] = "piece_area"
+                bridged["fu_note"] = why
+                bridged["area_m2_per_unit"] = area
+                bridged["per_m2"] = gwp
+                out.append(bridged)
+            return out, ""
+        return [], (
+            f"EPD:erna för {label} anges per m², och komponenten i styck. "
+            + (why + " " if why else "Namnet anger ingen storlek. ")
+            + f"Ange storleken i namnet med enhet, till exempel {example}, "
+            f"eller mängden i m²."
+        )
+    return [], (
+        f"EPD:erna för {label} anges per m², och komponenten i {proj_comp.unit}. "
+        f"Ange mängden i m², eller antal i styck med storleken i namnet, till "
+        f"exempel {example}."
     )
 
 
@@ -1393,6 +1445,15 @@ def _catalog_co2e(matched: dict, proj_comp, category: str) -> tuple[float | None
                 f"{matched.get('profile_source')}) × {quantity:g} {comp_unit} = "
                 f"{co2e:g} kg."
             )
+        if matched.get("fu_basis") == "piece_area":
+            # The area per piece is the component's own size, not the EPD's.
+            return co2e, (
+                f"CO2e räknat från EPD:ns deklarerade värde: "
+                f"{matched.get('per_m2'):g} kg CO2e/m² × "
+                f"{matched.get('area_m2_per_unit'):g} m²/{comp_unit} "
+                f"(komponentens mått, {matched.get('fu_note')}) × "
+                f"{quantity:g} {comp_unit} = {co2e:g} kg."
+            )
         if matched.get("fu_basis") == "element_mass":
             # Same reason: the mass per unit is not the EPD's figure (or is
             # the EPD's own, which the source then says).
@@ -1595,8 +1656,15 @@ def _validate_alternatives(
     quantity: float = 0,
     category: str | None = None,
     unit: str = "",
+    dropped: list[str] | None = None,
 ) -> list[Alternative]:
     """Filter out alternatives with data quality issues.
+
+    ``dropped``, when given, collects a Swedish clause per filtered row that
+    is not about the baseline (a part, not a complete system; no figure), so
+    a component left with nothing can say what happened to its candidates.
+    The worse-than-baseline filter is explained from the pool itself
+    (_filtered_pool_reason), which also covers rows the model left out.
 
     Removes:
     - Alternatives with co2e_kg <= 0 (unrealistic for building materials)
@@ -1629,6 +1697,8 @@ def _validate_alternatives(
                 "Filtered alternative '%s' for %s: co2e_kg=%s (unrealistic)",
                 alt.name, component_name, alt.co2e_kg,
             )
+            if dropped is not None and alt.alternative_type != "info":
+                dropped.append(f"{alt.name} saknar ett klimatvärde över noll")
             continue
 
         # Reuse rows are built from a Palats listing with a deterministic CO2e
@@ -1649,6 +1719,9 @@ def _validate_alternatives(
                 "Filtered alternative '%s' for %s: component part, not complete system",
                 alt.name, component_name,
             )
+            if dropped is not None:
+                dropped.append(f"{alt.name} är en del av en byggdel (membran eller "
+                               f"underlag), inte en hel byggdel")
             continue
 
         # B2) Drop climate_optimized options that don't actually beat the
@@ -1997,17 +2070,58 @@ def _palats_candidates(
             "Palats: %d matching listings for %r, showing the first %d",
             len(unique), component_name, _MAX_PALATS_PER_COMPONENT,
         )
-    return unique[:_MAX_PALATS_PER_COMPONENT], None
+    unique = unique[:_MAX_PALATS_PER_COMPONENT]
+
+    # A reused frame member's climate figure is its transport, derived from
+    # the weight the name gives (stomme_reuse, HENRIC-3364). Without that
+    # weight there is no figure, and a default would be a number with no
+    # basis: 2 kg CO2e per metre of stud is more than a new stud. The
+    # listings are named in an info row instead, with the reason.
+    if category == "stomme":
+        from aida.data.stomme_reuse import family_label, reuse_figure
+
+        figure = reuse_figure(component_name, project_unit)
+        if figure.per_unit is None:
+            label = family_label(target_subcat)
+            one = len(unique) == 1
+            listed = "; ".join(
+                f"{listing.title}" + (f" ({listing.url})" if listing.url else "")
+                for listing, _ in unique)
+            logger.info("Palats: %d stomme listings for %r without a climate "
+                        "figure: %s", len(unique), component_name, figure.note)
+            return [], Alternative(
+                name=f"{component_name}: återbruk på Palats utan klimatsiffra",
+                co2e_kg=0,
+                cost_sek=0,
+                source="[Palats] palats.app",
+                reasoning=(
+                    f"Palats har {'1 annons' if one else f'{len(unique)} annonser'} "
+                    f"med {label} som matchar {component_name.lower()}: {listed}. "
+                    f"Klimatvärdet för återbruket är transporten, och den räknas ur "
+                    f"vikten, som inte går att få fram här: "
+                    f"{figure.note[:1].lower()}{figure.note[1:]}. "
+                    f"{'Annonsen visas' if one else 'Annonserna visas'} därför utan "
+                    "klimatsiffra och kan inte väljas som alternativ i tabellen."
+                ),
+                alternative_type="info",
+            )
+    return unique, None
 
 
 def _reuse_figures(
     listing, coverage: float | None, quantity: float, project_unit: str, category: str,
-) -> tuple[float, float, str, bool]:
+    component_name: str = "",
+) -> tuple[float | None, float, str, bool]:
     """(total_co2e, total_cost, detail, cost_is_per_article) for a listing.
 
     The numbers the table needs, computed once and used both in the prompt
     (so the model reasons about the same figures the row will carry) and in
     the Alternative built from the model's answer.
+
+    A frame member (stomme) has no set figure: it is derived from the
+    component's name (stomme_reuse), and total_co2e is None when the name does
+    not give the weight. _palats_candidates turns such a component's listings
+    into an info row before they get here.
 
     Pricing logic:
     - If project counts in "st" (fönster, dörr), Palats price * quantity
@@ -2018,11 +2132,24 @@ def _reuse_figures(
       2026-09-30 the per-article price was returned as the total, and a 45 m2
       floor was summed as costing 725 kr.
     """
-    from aida.data.palats_client import _DEFAULT_REUSE_CO2E, REUSE_CO2E_PER_UNIT
+    from aida.data.palats_client import (
+        _DEFAULT_REUSE_CO2E,
+        LOGIN_REQUIRED_NOTE,
+        REUSE_CO2E_PER_UNIT,
+        listing_requires_login,
+    )
 
-    co2e_per_unit = REUSE_CO2E_PER_UNIT.get(category, _DEFAULT_REUSE_CO2E)
+    stomme_note = ""
+    if category == "stomme":
+        from aida.data.stomme_reuse import reuse_figure
+
+        figure = reuse_figure(component_name, project_unit)
+        co2e_per_unit = figure.per_unit
+        stomme_note = figure.note
+    else:
+        co2e_per_unit = REUSE_CO2E_PER_UNIT.get(category, _DEFAULT_REUSE_CO2E)
     units_match = project_unit.lower() in ("st", "styck", "stk")
-    total_co2e = co2e_per_unit * quantity
+    total_co2e = co2e_per_unit * quantity if co2e_per_unit is not None else None
 
     if units_match and listing.price > 0:
         # Units match (both "st") — total is directly comparable.
@@ -2071,8 +2198,8 @@ def _reuse_figures(
     # says so: the number is a placeholder, not something derived for this
     # kind of product, and a reader comparing it with a new product's EPD
     # should know which of the two is the soft one.
-    default_note = ""
-    if category not in REUSE_CO2E_PER_UNIT:
+    default_note = stomme_note
+    if category not in REUSE_CO2E_PER_UNIT and category != "stomme":
         default_note = (
             f"Klimatvärdet för återbruket är en schablon ({_DEFAULT_REUSE_CO2E:g} "
             f"kg CO2e per {project_unit or 'enhet'}): kategorin saknar eget "
@@ -2080,14 +2207,22 @@ def _reuse_figures(
         )
 
     location_note = f"Plats: {listing.location}" if listing.location else ""
-    url_note = f"Se annons: {listing.url}" if listing.url else ""
+    # A seller without a public shop (Sola's furniture, HENRIC-3365) can only
+    # be linked to Palats' internal page, which shows a login form to anyone
+    # without an account. The row says so rather than pass it off as a link.
+    url_note = ""
+    if listing.url:
+        url_note = (f"Se annons ({LOGIN_REQUIRED_NOTE}): {listing.url}"
+                    if listing_requires_login(listing.url)
+                    else f"Se annons: {listing.url}")
     detail = " | ".join(p for p in [price_note, default_note, location_note, url_note] if p)
-    return round(total_co2e, 1), round(total_cost), detail, cost_is_estimate
+    total = round(total_co2e, 1) if total_co2e is not None else None
+    return total, round(total_cost), detail, cost_is_estimate
 
 
 def _reuse_alternative(
     listing, coverage: float | None, quantity: float, project_unit: str,
-    category: str, reasoning: str,
+    category: str, reasoning: str, component_name: str = "",
 ) -> Alternative:
     """Build the table row for a Palats listing.
 
@@ -2098,7 +2233,7 @@ def _reuse_alternative(
     asked to reproduce.
     """
     total_co2e, total_cost, detail, cost_is_estimate = _reuse_figures(
-        listing, coverage, quantity, project_unit, category,
+        listing, coverage, quantity, project_unit, category, component_name,
     )
     text = reasoning.strip()
     if detail:
@@ -2139,6 +2274,7 @@ def _reuse_alternative(
 
 def _format_palats_list(
     candidates: list[tuple], quantity: float, project_unit: str, category: str,
+    component_name: str = "",
 ) -> str:
     """The [Palats återbruk] rows of the unified prompt.
 
@@ -2149,7 +2285,7 @@ def _format_palats_list(
     lines = []
     for listing, coverage in candidates:
         total_co2e, _total_cost, detail, _per_article = _reuse_figures(
-            listing, coverage, quantity, project_unit, category,
+            listing, coverage, quantity, project_unit, category, component_name,
         )
         sub = f" | Subkategori: {listing.subcategory}" if listing.subcategory else ""
         lines.append(
@@ -2215,7 +2351,7 @@ def _add_palats_reuse(
             continue
         alternatives.append(_reuse_alternative(
             listing, coverage, quantity, project_unit, category,
-            _FALLBACK_REUSE_REASONING,
+            _FALLBACK_REUSE_REASONING, component_name,
         ))
         existing_names.add(listing.title.lower())
 
@@ -2504,9 +2640,10 @@ def find_alternatives(
         )
 
         # Validate data quality: filter zero CO2, component-only parts, flag prices
+        dropped: list[str] = []
         alternatives = _validate_alternatives(
             alternatives, eff_baseline_co2e, proj_comp.name, proj_comp.quantity,
-            category=comp_key, unit=proj_comp.unit,
+            category=comp_key, unit=proj_comp.unit, dropped=dropped,
         )
 
         # Palats had listings in the category but none of the asked-for type,
@@ -2567,7 +2704,15 @@ def find_alternatives(
                 co2e_kg=eff_baseline_co2e,
                 cost_sek=bl_comp.cost_sek,
                 source="N/A",
-                reasoning=(no_alt_reason or _refused_reason(refused)
+                # A pool that had rows says what became of them (HENRIC-3362
+                # follow-up): on stage "Håldäck 200 mm" had one comparable
+                # slab, above the baseline, and read "Inga alternativ
+                # identifierade" as if the catalog were empty.
+                reasoning=(no_alt_reason
+                           or _filtered_pool_reason(
+                               epds_for_category, proj_comp, comp_key,
+                               eff_baseline_co2e, dropped, refused)
+                           or _refused_reason(refused)
                            or "Inga alternativ identifierade."),
                 alternative_type="baseline",
             ))
@@ -2672,6 +2817,95 @@ def _alternatives_failed(baseline_components: list, failures: dict) -> UserFacin
         f"jämförelse där komponenter saknas ser ut som hela projektet. {retry}",
         status_code=status,
     )
+
+
+def _kg_text(value: float) -> str:
+    """4340.0 -> '4 340', 12.34 -> '12,3': a kg figure the way the table reads."""
+    if abs(value) >= 100:
+        return f"{round(value):,}".replace(",", " ")
+    return f"{round(value, 1):g}".replace(".", ",")
+
+
+def _filtered_pool_reason(
+    epds: list[dict], proj_comp, category: str | None, baseline_co2e: float | None,
+    dropped: list[str] | None = None, refused: list[str] | None = None,
+) -> str:
+    """Why a component whose candidate pool was NOT empty ends with nothing.
+
+    "" when the pool was empty: that case has its own messages (no_alt_reason
+    and the default sentence). Otherwise every pool row is figured the way the
+    row would have been (_catalog_co2e for this component), and the sentence
+    says how many there were, which were above the baseline, by how much, and
+    what else removed the rest. Never a bare "Inga alternativ identifierade".
+    """
+    if not epds:
+        return ""
+    figured: list[tuple[float, str]] = []
+    incomparable: list[str] = []
+    for e in epds:
+        co2e, note = _catalog_co2e(e, proj_comp, category or "")
+        if co2e is None:
+            incomparable.append(note)
+            continue
+        name = str(e.get("name") or "okänd produkt")
+        owner = str(e.get("owner") or "").strip()
+        figured.append((co2e, f"{name} ({owner})" if owner and owner.lower()
+                        not in name.lower() else name))
+    if not figured and refused:
+        # Nothing in the pool fits the component's unit and the model's rows
+        # were refused for exactly that: _refused_reason says it, with advice.
+        return ""
+    figured.sort()
+    base = baseline_co2e if isinstance(baseline_co2e, (int, float)) else None
+    over = [f for f in figured if base is not None and base > 0 and f[0] >= base]
+    under = [f for f in figured if f not in over]
+    n = len(figured)
+    parts: list[str] = []
+
+    if figured and not under:
+        lowest, name = over[0]
+        if n == 1:
+            parts.append(
+                f"Katalogen har 1 jämförbar EPD för komponenten, {name}, men den "
+                f"ligger över baslinjen ({_kg_text(lowest)} mot {_kg_text(base)} kg "
+                f"CO2e), så inget bättre alternativ finns i katalogen.")
+        else:
+            parts.append(
+                f"Katalogen har {n} jämförbara EPD:er för komponenten, men alla "
+                f"ligger över baslinjen (lägst {name}, {_kg_text(lowest)} mot "
+                f"{_kg_text(base)} kg CO2e), så inget bättre alternativ finns i "
+                f"katalogen.")
+    elif under:
+        lowest, name = under[0]
+        count = "1 jämförbar EPD" if n == 1 else f"{n} jämförbara EPD:er"
+        below = ("den ligger" if n == 1 else
+                 f"{len(under)} av dem ligger" if len(under) < n else "alla ligger")
+        against = (f" ({name}, {_kg_text(lowest)} mot {_kg_text(base)} kg CO2e)"
+                   if base else f" ({name}, {_kg_text(lowest)} kg CO2e)")
+        why = "; ".join(dict.fromkeys(dropped or []))
+        if why:
+            tail = f"men den togs bort: {why}." if len(under) == 1 else f"men de togs bort: {why}."
+        elif refused:
+            tail = ("men förslagen som kom tillbaka gick inte att koppla till "
+                    "katalogen (" + "; ".join(dict.fromkeys(refused)) + ").")
+        else:
+            tail = ("men analysen tog inte med den den här gången. Kör alternativen "
+                    "igen för att få den jämförd." if len(under) == 1 else
+                    "men analysen tog inte med någon av dem den här gången. Kör "
+                    "alternativen igen för att få dem jämförda.")
+        parts.append(f"Katalogen har {count} för komponenten, och {below} under "
+                     f"baslinjen{against}, {tail}")
+    if incomparable:
+        k = len(incomparable)
+        reasons = "; ".join(dict.fromkeys(incomparable))
+        lead = ("Ytterligare " if figured else "Katalogen har ")
+        noun = "1 EPD" if k == 1 else f"{k} EPD:er"
+        parts.append(f"{lead}{noun} för kategorin går inte att jämföra med "
+                     f"komponenten ({reasons}).")
+        if not figured and any("typisk vikt" in r for r in incomparable):
+            parts.append("Ange vilken sorts produkt det är (till exempel toalettstol "
+                         "eller handfat), eller mängden i kg, så kan de jämföras.")
+    return " ".join(parts)
 
 
 def _refused_reason(refused: list[str]) -> str:
@@ -2969,7 +3203,7 @@ Inga EPD:er tillgängliga för denna kategori. Föreslå inga nyinköp; rangordn
     if palats_candidates:
         prompt += f"""
 ÅTERBRUKSANNONSER PÅ PALATS FÖR DENNA KATEGORI ({len(palats_candidates)} st, redan filtrerade på produkttyp och lagersaldo):
-{_format_palats_list(palats_candidates, proj_comp.quantity, proj_comp.unit, category)}
+{_format_palats_list(palats_candidates, proj_comp.quantity, proj_comp.unit, category, proj_comp.name)}
 
 Ta med varje annons ovan i din rankade lista, med alternative_type "reuse" och source "[Palats] palats.app/listing/<id>". Använd CO2e- och prissiffrorna från raden. Skriv ett eget resonemang per annons: vad den är, hur den passar komponenten och behoven, vad täckningen betyder i praktiken, och vad som ska kontrolleras innan den räknas in. Utelämna en annons bara om den är uppenbart fel produkt för komponenten, och säg då varför i reasoning på ett av de andra alternativen.
 """
@@ -3039,7 +3273,7 @@ Inga återbruksannonser på Palats matchar denna komponent just nu, så listan b
             used_candidates.add(str(listing.id))
             results.append(_reuse_alternative(
                 listing, coverage, proj_comp.quantity, proj_comp.unit,
-                category, str(item.get("reasoning", "") or ""),
+                category, str(item.get("reasoning", "") or ""), proj_comp.name,
             ))
             continue
 
@@ -3138,7 +3372,7 @@ Inga återbruksannonser på Palats matchar denna komponent just nu, så listan b
         )
         results.append(_reuse_alternative(
             listing, coverage, proj_comp.quantity, proj_comp.unit,
-            category, _FALLBACK_REUSE_REASONING,
+            category, _FALLBACK_REUSE_REASONING, proj_comp.name,
         ))
 
     return results

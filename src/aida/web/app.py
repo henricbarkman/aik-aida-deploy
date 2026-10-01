@@ -2005,6 +2005,7 @@ select.cell-input { cursor: pointer; }
 .pick-qty { width: 56px; font: inherit; text-align: right; border: 1px solid var(--kk-gray-200); border-radius: 4px; padding: 1px 4px; }
 .pick-qty:focus { outline: none; border-color: var(--kk-dark-red); }
 a.palats-link { color: inherit; text-decoration: underline; }
+.palats-login-note { color: var(--kk-gray-500); white-space: nowrap; }
 .cell-remove { background: none; border: none; color: var(--kk-gray-500); cursor: pointer; font-size: 15px; line-height: 1; padding: 4px 6px; border-radius: 4px; font-family: inherit; }
 .cell-remove:hover:not(:disabled) { color: var(--kk-dark-red); background: var(--kk-gray-100); }
 .cell-remove:disabled { opacity: 0.3; cursor: not-allowed; }
@@ -4791,11 +4792,18 @@ function estimatedBadge(c) {
 // Only palats.app links are rendered: analyses round-trip through user-editable
 // rows, and an href is the one place an injected value would do more than
 // display wrongly.
+// Only /shop/<slug>/listing/<id> opens without an account. A seller with no
+// public shop (Sola's furniture, HENRIC-3365) is linked to /web/listing/<id>,
+// which shows a login form, and the row says so next to the link. Read from
+// the URL, as palats_client.listing_requires_login does, so rows saved before
+// the note existed get it too.
 function palatsSourceLabel(source, url) {
   const m = /listing\/([A-Za-z0-9_-]+)/.exec(source || '');
   const label = m ? 'annons #' + m[1] : String(source || '').replace('[Palats] ', '');
   if (typeof url === 'string' && /^https:\/\/palats\.app\//.test(url)) {
-    return '<a class="palats-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(label) + ' ↗</a>';
+    const link = '<a class="palats-link" href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(label) + ' ↗</a>';
+    if (/^https:\/\/palats\.app\/shop\//.test(url)) return link;
+    return link + ' <span class="palats-login-note">(kräver inloggning på Palats)</span>';
   }
   return esc(label);
 }

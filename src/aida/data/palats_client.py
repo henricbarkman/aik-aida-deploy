@@ -42,10 +42,37 @@ LOCATION_NAMES: dict[int, dict[str, str]] = {
 # (verified in a browser 2026-09-14 on listing 39999, "WC-stol"). The API does
 # not expose the slug, so it is mapped here by hand. A vendor missing from this
 # map gets the internal /web/listing/<id> URL, which requires a Palats account.
+#
+# Sola's furniture vendor ("Sola Byggåterbruk - Möbler",
+# ve_01ka8cx7zjvvjywhf717dzfzzk, location 4008) has no public shop, checked
+# 2026-10-01 (HENRIC-3365): /v2/vendors gives it isGlobalStoreConnected false
+# where byggmaterial has true; Karlstad's organisation (369) has one public
+# shop, mpExternalMpUrl "solabyggaterbruk-byggmaterial", and its public listing
+# endpoint (/v2/store/369/listings) carries 301 byggmaterial listings and none
+# of the 345 furniture ones; the shop URL for a furniture id renders "Kunde inte
+# hitta annonsen", and /web/listing/<id> redirects a logged-out browser to the
+# login form. To recheck: GET /api/v2/shop/organization?name=<slug> (public)
+# and isGlobalStoreConnected in /api/v2/vendors (logged in).
 SHOP_SLUGS: dict[str, str] = {
     "ve_01ka8cx0n1fckb4pyzv43gk3mf": "solabyggaterbruk-byggmaterial",
 }
 PALATS_WEB_URL = "https://palats.app"
+
+# Said next to every link that only opens for a Palats account, so a reader
+# without one is told before clicking rather than meeting a login form.
+LOGIN_REQUIRED_NOTE = "kräver inloggning på Palats"
+
+
+def listing_requires_login(url: str) -> bool:
+    """True when a listing link is not a public shop page.
+
+    Read from the URL, not the vendor, so the note can never disagree with
+    where the link actually goes: only /shop/<slug>/listing/<id> renders
+    without an account. No link at all is not a login link.
+    """
+    if not url:
+        return False
+    return not url.startswith(f"{PALATS_WEB_URL}/shop/")
 
 
 def listing_url(listing_id: str, vendor_id: str = "") -> str:
@@ -94,6 +121,11 @@ class PalatsListing:
     image_url: str
     url: str  # Direct link to listing on palats.app
     location: str  # Human-readable location name
+
+    @property
+    def requires_login(self) -> bool:
+        """The link opens Palats' login form for a reader without an account."""
+        return listing_requires_login(self.url)
 
 
 def _login() -> dict[str, str] | None:
@@ -264,9 +296,17 @@ SUBCATEGORY_KEYWORDS: dict[str, list[tuple[str, list[str]]]] = {
     # Norwegian "aggregat", "aggregatet", "FTX-aggregat" still match. An
     # aggregat is 270 to 16 700 kg CO2e/st, a duct or a diffuser tens, so a
     # component that names one must never be given the other's typvärde.
+    #
+    # 2026-10-01 (HENRIC-3386): "heat recovery ventilation" (S&P's "DOMESTIC
+    # HEAT RECOVERY VENTILATION SYSTEMS: SABIK", an apartment unit that sat
+    # among ducts at 280 kg/st) and Swegon's series name, which carries no
+    # ventilation word ("Swegon GOLD/ SILVER C RX 004/ 005", "GOLD RX 012").
+    # A pattern, not "gold": a gold-coloured fitting is not a unit.
     "ventilation": [
         ("aggregat", ["air handling", "air-handling", "luftbehandling",
                       "ventilation unit", "heat recovery unit",
+                      "heat recovery ventilation",
+                      re.compile(r"\b(?:gold|silver\s?c)(?:\s*/\s*silver\s?c)?\s+rx\b"),
                       re.compile(r"\bahu\b"), re.compile(r"\bftx\b"),
                       re.compile(r"aggregat(?!es?\b)")]),
     ],
@@ -892,7 +932,10 @@ def search_listings_for_component(
     return primary + secondary
 
 
-# Reuse CO2e assumptions (kg CO2e per unit) — transport and minor refurbishment only
+# Reuse CO2e assumptions (kg CO2e per unit) — transport and minor refurbishment only.
+# stomme is deliberately absent, and never takes _DEFAULT_REUSE_CO2E: a frame
+# member's figure is its transport, derived per component from the weight its
+# name gives and Boverket's A4 value (stomme_reuse, HENRIC-3364).
 REUSE_CO2E_PER_UNIT: dict[str, float] = {
     "golv": 0.5,      # m2
     "radiator": 5.0,  # st — heavy steel, got its own listing-side category

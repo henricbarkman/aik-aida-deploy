@@ -208,6 +208,13 @@ blir jämförelsen cirkulär och besparingen noll per definition. Nämner beskri
 önskat material, bortse från det och välj det byggnadstypiska. (Samma princip som NollCO2,
 där baslinjen räknas fram ur byggnadsparametrar innan projektet har projekterat något.)
 
+Undantaget är innertakets sort, som är en annan byggdel och inte ett materialval:
+undertaksplattor i bärverk, ett gipstak och ett putsat innertak jämförs var för sig, så
+baslinjen följer sorten i namnet. Ett gipstak ("Gipstak", "Nytt innertak av gips") är
+gipsskivor i ett lager i taket: matcha "Gipsskiva, standardskiva". Ett putsat innertak är
+puts på tak: matcha "Putsbruk C (CS II)" och skriv skikttjockleken du räknar med i
+beskrivningen. Byt aldrig ett gipstak eller putsat innertak mot ett akustikundertak.
+
 Välj det konventionella valet utan särskild klimathänsyn — inte det bästa tillgängliga,
 och inte det sämsta tänkbara.
 

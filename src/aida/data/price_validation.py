@@ -9,6 +9,7 @@ showing a reasonable estimate with a caveat.
 from __future__ import annotations
 
 import logging
+from typing import NamedTuple
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +45,21 @@ FALLBACK_MAX = 50_000   # SEK per unit — above this needs verification (except
 CLAMP_FACTOR = 3.0
 
 # Reasonable CO2e ranges per category in kg CO2e per unit (A1-A3).
+#
+# yttervägg, betongvägg and tak re-derived 2026-09-30 from the published
+# EPD typvärde table (epd_baseline_medians): at 40, 80 and 25 kg/m2 their own
+# typvärden (55.0, 110 and 35.1) sat above the range, so every such baseline
+# was stamped "Oväntat CO2e-värde" by construction. Each max now holds its
+# typvärde, and three times it holds the heaviest catalog row (175, 400, 56.3),
+# so a real declared product is at most flagged, never clamped.
+# test_baseline_clamp checks every published typvärde against its range.
 CO2_RANGES: dict[str, tuple[float, float, str]] = {
     "golv":          (2, 20, "m2"),
     "innervägg":     (1, 15, "m2"),
-    "yttervägg":     (5, 40, "m2"),
-    "betongvägg":    (10, 80, "m2"),
+    "yttervägg":     (5, 70, "m2"),
+    "betongvägg":    (10, 150, "m2"),
     "fönster":       (20, 150, "st"),
-    "tak":           (2, 25, "m2"),
+    "tak":           (2, 45, "m2"),
     "isolering":     (1, 15, "m2"),
     "dörr":          (15, 100, "st"),
     "belysning":     (1, 30, "st"),
@@ -211,14 +220,28 @@ def coerce_per_unit_as_total(
     return cost_sek, ""
 
 
-def validate_total_price(
+class PriceCheck(NamedTuple):
+    """validate_total_price's answer, with the one fact its note only implies.
+
+    ``replaced`` is True when the price was an extreme outlier and the total is
+    now the category range midpoint times the quantity: a number nobody found.
+    The caller must then stop attributing it to wherever the original came
+    from (a web search, a URL). A per-unit-as-total correction is not a
+    replacement: that total is still the found price, multiplied properly.
+    """
+    cost: float
+    note: str
+    replaced: bool
+
+
+def check_total_price(
     total_cost: float,
     quantity: float,
     category: str,
     *,
     is_estimate: bool = False,
     unit: str = "",
-) -> tuple[float, str]:
+) -> PriceCheck:
     """Validate a total price by deriving per-unit and checking range.
 
     If the per-unit price was clamped (extreme outlier), the returned total
@@ -226,11 +249,10 @@ def validate_total_price(
 
     First pass: detect per-unit-as-total bug and correct it before range
     validation, so the corrected value gets validated cleanly.
-
-    Returns (total_cost, note).
     """
     if total_cost <= 0 or quantity <= 0:
-        return total_cost, "Pris ej tillgängligt" if total_cost <= 0 else ""
+        return PriceCheck(total_cost, "Pris ej tillgängligt" if total_cost <= 0 else "",
+                          False)
 
     total_cost, coerce_note = coerce_per_unit_as_total(total_cost, quantity, category, unit)
 
@@ -238,7 +260,8 @@ def validate_total_price(
     validated_per_unit, note = validate_unit_price(
         per_unit, category, is_estimate=is_estimate, unit=unit)
 
-    if validated_per_unit != per_unit:
+    replaced = validated_per_unit != per_unit
+    if replaced:
         # Price was clamped — recalculate total
         total_cost = round(validated_per_unit * quantity)
 
@@ -248,27 +271,57 @@ def validate_total_price(
     elif coerce_note:
         note = coerce_note
 
-    return total_cost, note
+    return PriceCheck(total_cost, note, replaced)
 
 
-def validate_co2e(
+def validate_total_price(
+    total_cost: float,
+    quantity: float,
+    category: str,
+    *,
+    is_estimate: bool = False,
+    unit: str = "",
+) -> tuple[float, str]:
+    """(total_cost, note) from check_total_price, for callers that do not
+    carry a price's provenance. One that does should call check_total_price
+    and relabel the source when ``replaced`` is set."""
+    checked = check_total_price(total_cost, quantity, category,
+                                is_estimate=is_estimate, unit=unit)
+    return checked.cost, checked.note
+
+
+class CO2Check(NamedTuple):
+    """validate_co2e's answer, with what a caller needs to relabel a clamp.
+
+    When ``clamped`` is set the total is ``per_unit`` (the range midpoint)
+    times the quantity, and ``bounds`` is the (min, max, unit) range it came
+    from. The row's per-unit figure, basis and source then describe a number
+    that is no longer there, and have to be rewritten with it."""
+    total: float
+    note: str
+    clamped: bool
+    per_unit: float
+    bounds: tuple[float, float, str] | None
+
+
+def check_co2e(
     co2e_per_unit: float,
     quantity: float,
     category: str,
     unit: str = "",
-) -> tuple[float, str]:
+) -> CO2Check:
     """Validate CO2e value against expected range for the category.
 
-    Extreme outliers (beyond CLAMP_FACTOR × range) get clamped.
-    Returns (total_co2e, note).
+    Extreme outliers (beyond CLAMP_FACTOR × range) get clamped to the range
+    midpoint.
     """
     if co2e_per_unit <= 0 or quantity <= 0:
-        return co2e_per_unit * quantity, ""
+        return CO2Check(co2e_per_unit * quantity, "", False, co2e_per_unit, None)
 
     cat_key = category.lower().strip()
     bounds = _bounds(CO2_RANGES, cat_key, unit)
     if not bounds:
-        return co2e_per_unit * quantity, ""
+        return CO2Check(co2e_per_unit * quantity, "", False, co2e_per_unit, None)
 
     range_min, range_max, _unit = bounds
     midpoint = (range_min + range_max) / 2
@@ -279,15 +332,31 @@ def validate_co2e(
             "expected %s–%s)",
             cat_key, co2e_per_unit, midpoint, range_min, range_max,
         )
-        return round(midpoint * quantity, 1), "Justerat CO2e — beräknat värde var orimligt högt"
+        return CO2Check(round(midpoint * quantity, 1),
+                        "Justerat CO2e — beräknat värde var orimligt högt",
+                        True, midpoint, bounds)
     elif co2e_per_unit < range_min / CLAMP_FACTOR:
         logger.warning(
             "CO2e CLAMPED for %s: %.1f → %.1f kg CO2e/unit (extreme outlier, "
             "expected %s–%s)",
             cat_key, co2e_per_unit, midpoint, range_min, range_max,
         )
-        return round(midpoint * quantity, 1), "Justerat CO2e — beräknat värde var orimligt lågt"
+        return CO2Check(round(midpoint * quantity, 1),
+                        "Justerat CO2e — beräknat värde var orimligt lågt",
+                        True, midpoint, bounds)
     elif co2e_per_unit < range_min or co2e_per_unit > range_max:
-        return co2e_per_unit * quantity, "Oväntat CO2e-värde — verifiera"
+        return CO2Check(co2e_per_unit * quantity, "Oväntat CO2e-värde — verifiera",
+                        False, co2e_per_unit, bounds)
 
-    return co2e_per_unit * quantity, ""
+    return CO2Check(co2e_per_unit * quantity, "", False, co2e_per_unit, bounds)
+
+
+def validate_co2e(
+    co2e_per_unit: float,
+    quantity: float,
+    category: str,
+    unit: str = "",
+) -> tuple[float, str]:
+    """(total_co2e, note) from check_co2e."""
+    checked = check_co2e(co2e_per_unit, quantity, category, unit)
+    return checked.total, checked.note

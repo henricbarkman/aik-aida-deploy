@@ -3,9 +3,47 @@
 from __future__ import annotations
 
 import json
+import math
 import sys
 
 from aida.models import AggregateResult, Project, Selections
+
+
+def _number(value) -> float | None:
+    """A figure as a float, or None when there is no usable figure.
+
+    bool is excluded on purpose: True is an int to Python and would sum as 1.
+    NaN and ±inf are no figure either; inf made round() raise in the chat state.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value):
+        return None
+    return float(value)
+
+
+def article_price(alt: dict | None) -> float:
+    """The per-article asking price of a Palats row, or 0 for any other row.
+
+    Such a row ("725 kr/st *") prices one listed article for a component counted
+    in m2, lm or kg, so it is not the component's cost and must never be summed
+    as one. Rows built since 2026-09-30 carry it in `article_price_sek` with
+    cost_sek 0. Analyses saved before that hold it in cost_sek, and the only
+    trace of what it is is the trailing " *" on a Palats row: read those the same
+    way, so an old analysis stops reporting a 29 000 kr saving on a floor.
+    """
+    if not isinstance(alt, dict):
+        return 0.0
+    price = _number(alt.get("article_price_sek"))
+    if price is not None and price > 0:
+        return price
+    legacy = (
+        "article_price_sek" not in alt
+        and str(alt.get("name") or "").rstrip().endswith("*")
+        and str(alt.get("source") or "").startswith("[Palats]")
+    )
+    cost = _number(alt.get("cost_sek"))
+    return cost if legacy and cost is not None and cost > 0 else 0.0
 
 
 def compute_aggregate(project: Project, selections: Selections) -> AggregateResult:
@@ -20,39 +58,56 @@ def compute_aggregate(project: Project, selections: Selections) -> AggregateResu
     # so a basket where one of two components was unpriced reported a large
     # saving against a full baseline. Track which ones, so every presentation
     # site can say what the total leaves out, and keep a second pair of totals
-    # over the priced subset so a percentage compares like with like.
+    # over the subset priced on both sides so a percentage compares like with
+    # like. The baseline side got the same rule on 2026-09-30.
     unpriced: list[str] = []
+    baseline_unpriced: list[str] = []
     comparable_cost = 0.0
     comparable_baseline_cost = 0.0
 
-    # Validate: all project components must have a selection
-    project_ids = {c.id for c in project.components}
-    selection_ids = {c.id for c in selections.components}
-    missing = project_ids - selection_ids
-    if missing:
-        print(f"Varning: Komponenter saknar val: {missing}", file=sys.stderr)
+    project_ids = [c.id for c in project.components]
+    known_ids = set(project_ids)
+    # Components the totals will not cover. Filled in below with every project
+    # component that has no selection, or one without a usable climate figure.
+    # A stderr line was all this used to produce, and on Vercel nobody reads it.
+    counted: set[str] = set()
 
     for sel in selections.components:
         # Skip selections for components no longer in the project (e.g. a
         # component removed after it was selected). Summing these orphans would
         # silently inflate the totals with phantom components.
-        if sel.id not in project_ids:
+        if sel.id not in known_ids:
             print(f"Varning: hoppar över urval för okänd komponent: {sel.id}", file=sys.stderr)
             continue
-        alt = sel.selected_alternative
-        alt_co2e = alt.get("co2e_kg", 0)
-        alt_cost = alt.get("cost_sek", 0) or 0
+        alt =sel.selected_alternative if isinstance(sel.selected_alternative, dict) else {}
+        alt_co2e = _number(alt.get("co2e_kg"))
+        bl_co2e = _number(sel.baseline_co2e_kg)
+        if alt_co2e is None or bl_co2e is None:
+            # A missing figure is not zero emissions: counted as 0 it became a
+            # saving of the whole baseline, and None raised a TypeError that
+            # took /api/report down with a 500. Named as "utan val" instead.
+            print(f"Varning: urval utan CO2e-värde för {sel.id}, räknas inte", file=sys.stderr)
+            continue
+        counted.add(sel.id)
+        # A per-article reuse price is not the component's cost (see
+        # article_price), whichever shape the row was saved in.
+        per_article = article_price(alt)
+        alt_cost = 0.0 if per_article else max(_number(alt.get("cost_sek")) or 0.0, 0.0)
+        bl_cost = max(_number(sel.baseline_cost_sek) or 0.0, 0.0)
         has_price = alt_cost > 0
+        baseline_has_price = bl_cost > 0
 
         total_co2e += alt_co2e
         total_cost += alt_cost
-        baseline_co2e += sel.baseline_co2e_kg
-        baseline_cost += sel.baseline_cost_sek
-        if has_price:
+        baseline_co2e += bl_co2e
+        baseline_cost += bl_cost
+        if has_price and baseline_has_price:
             comparable_cost += alt_cost
-            comparable_baseline_cost += sel.baseline_cost_sek
-        else:
+            comparable_baseline_cost += bl_cost
+        if not has_price:
             unpriced.append(sel.name)
+        if not baseline_has_price:
+            baseline_unpriced.append(sel.name)
 
         component_details.append({
             "id": sel.id,
@@ -60,12 +115,17 @@ def compute_aggregate(project: Project, selections: Selections) -> AggregateResu
             "valt_alternativ": alt.get("name", ""),
             "co2e_kg": alt_co2e,
             "kostnad_sek": alt_cost,
-            "baslinje_co2e_kg": sel.baseline_co2e_kg,
-            "baslinje_kostnad_sek": sel.baseline_cost_sek,
-            "co2e_besparing_kg": round(sel.baseline_co2e_kg - alt_co2e, 1),
+            "baslinje_co2e_kg": bl_co2e,
+            "baslinje_kostnad_sek": bl_cost,
+            "co2e_besparing_kg": round(bl_co2e - alt_co2e, 1),
             # Explicit, so the report table can print "Pris saknas" instead of
             # formatting a zero that reads as free.
             "pris_saknas": not has_price,
+            "baslinje_pris_saknas": not baseline_has_price,
+            # The one listed article's price for a per-article reuse pick, so
+            # the report can name it next to "Pris saknas" without it ever
+            # entering a sum. 0 for every other pick.
+            "artikelpris_sek": per_article,
             "källa": alt.get("source", ""),
             # Carried through so the report can state where a reuse figure
             # assumes more stock than Palats holds. None for non-reuse picks
@@ -81,6 +141,11 @@ def compute_aggregate(project: Project, selections: Selections) -> AggregateResu
             "gwp_underlag": alt.get("gwp_basis", ""),
         })
 
+    # Project order, so the report lists the gaps the way the table shows them.
+    missing = [cid for cid in project_ids if cid not in counted]
+    if missing:
+        print(f"Varning: Komponenter saknar val: {missing}", file=sys.stderr)
+
     return AggregateResult(
         total_co2e_kg=round(total_co2e, 1),
         total_cost_sek=round(total_cost),
@@ -92,6 +157,8 @@ def compute_aggregate(project: Project, selections: Selections) -> AggregateResu
         unpriced_components=unpriced,
         comparable_cost_sek=round(comparable_cost),
         comparable_baseline_cost_sek=round(comparable_baseline_cost),
+        baseline_unpriced_components=baseline_unpriced,
+        missing_selection_ids=missing,
     )
 
 

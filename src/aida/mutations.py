@@ -23,8 +23,11 @@ change.
 
 from __future__ import annotations
 
+import math
+
 from aida import followup as followup_mod
 from aida import overrides as overrides_mod
+from aida.agents.aggregate import _number, article_price
 from aida.data.climate_data import canonical_category
 
 # The units a component can be counted in. kg since HENRIC-3290 del 3: a
@@ -60,22 +63,31 @@ def _rescale_picks(chosen: dict, picks: list, factor: float) -> None:
     totals but leave fractional window counts on screen. Mirrors
     allocatePicks/combinedSelection in the web UI.
     """
+    # Half away from zero, like the browser's Math.round. Python's round() is
+    # banker's rounding: 4.5 became 4 here and 5 there, so the same edit split
+    # the windows 4+2 on the server and 5+1 in the browser.
+    def half_up(x: float) -> int:
+        return math.floor(x + 0.5)
+
     old_need = sum(max(0.0, float(p.get("quantity") or 0)) for p in picks)
-    new_need = max(0, round(old_need * factor))
+    new_need = max(0, half_up(old_need * factor))
     left = new_need
     for idx, p in enumerate(picks):
         old_q = max(0.0, float(p.get("quantity") or 0))
-        per_co2e = (p.get("co2e_kg") or 0) / old_q if old_q else 0
-        per_cost = (p.get("cost_sek") or 0) / old_q if old_q else 0
+        # A part without a climate figure has none to share (as in the browser).
+        co2e = _number(p.get("co2e_kg"))
+        per_co2e = None if co2e is None else (co2e / old_q if old_q else 0)
+        per_cost = (_number(p.get("cost_sek")) or 0) / old_q if old_q else 0
         if idx == len(picks) - 1:
             q = left
         else:
-            q = min(max(0, round(old_q * factor)), max(0, left - (len(picks) - 1 - idx)))
+            q = min(max(0, half_up(old_q * factor)), max(0, left - (len(picks) - 1 - idx)))
         left -= q
         p["quantity"] = q
-        p["co2e_kg"] = per_co2e * q
+        p["co2e_kg"] = None if per_co2e is None else per_co2e * q
         p["cost_sek"] = per_cost * q
-    chosen["co2e_kg"] = sum(p["co2e_kg"] for p in picks)
+    chosen["co2e_kg"] = (None if any(p["co2e_kg"] is None for p in picks)
+                         else sum(p["co2e_kg"] for p in picks))
     unpriced = any(not (p["cost_sek"] > 0) and p["quantity"] > 0 for p in picks)
     chosen["cost_sek"] = 0 if unpriced else sum(p["cost_sek"] for p in picks)
     chosen["name"] = " + ".join(f"{p.get('name', '')} × {p['quantity']}" for p in picks)
@@ -85,12 +97,45 @@ def _rescale_picks(chosen: dict, picks: list, factor: float) -> None:
         )
 
 
-def _scale_component_values(cid: str, factor: float, baseline, alternatives, selections) -> set[str]:
+def _scaled(value, factor: float):
+    """value × factor, keeping a missing figure missing.
+
+    A None CO₂e or price means "not known"; multiplying it raised TypeError,
+    and defaulting it to 0 would store a known 0 kg.
+    """
+    n = _number(value)
+    return None if n is None else n * factor
+
+
+def _scale_field(row: dict, key: str, factor: float) -> None:
+    """Scale row[key] in place, leaving an absent key absent. The browser drops
+    an undefined figure from the JSON, so "no key" is the common form of "not
+    known"; writing 0 for it would count as a real 0 kg."""
+    if key in row:
+        row[key] = _scaled(row[key], factor)
+
+
+def _scale_cost(row: dict, factor: float) -> None:
+    """Scale a row's cost, unless it is a per-article reuse price.
+
+    One listed article costs the same whatever the need, so "725 kr/st *" must
+    stay 725. Rows built since 2026-09-30 keep that price in article_price_sek
+    (never scaled) with cost_sek 0; older saved rows still hold it in cost_sek,
+    which doubled to 1 450 on a 45 → 90 m2 edit.
+    """
+    if article_price(row):
+        return
+    _scale_field(row, "cost_sek", factor)
+
+
+def _scale_component_values(cid: str, factor: float, baseline, alternatives, selections,
+                            new_quantity: float | None = None) -> set[str]:
     """Scale all cached CO₂e and cost values for a single component by `factor`.
 
     Returns a set naming which state bags were touched. Per-unit climate and price
     are linear in quantity under NollCO2; scaling avoids a full rerun when only
-    quantity changes.
+    quantity changes. `new_quantity`, when given, replaces the baseline row's own
+    copy of the quantity, which the Baslinje tab prints under the total.
     """
     touched: set[str] = set()
     if factor == 1.0:
@@ -99,34 +144,37 @@ def _scale_component_values(cid: str, factor: float, baseline, alternatives, sel
     if baseline and baseline.get("components"):
         for c in baseline["components"]:
             if c.get("component_id") == cid:
-                c["co2e_kg"] = c.get("co2e_kg", 0) * factor
-                c["cost_sek"] = c.get("cost_sek", 0) * factor
+                _scale_field(c, "co2e_kg", factor)
+                _scale_field(c, "cost_sek", factor)
+                # The row carries its own quantity for the "17,4 kg CO₂e/m2 ×
+                # 45 m2" line. Left alone, that line went on saying 45 under a
+                # total scaled to 90, the one figure meant to be checkable.
+                if new_quantity is not None and "quantity" in c:
+                    c["quantity"] = new_quantity
                 touched.add("baseline")
 
     if alternatives and alternatives.get("components"):
         for c in alternatives["components"]:
             if c.get("component_id") != cid:
                 continue
-            if "baseline_co2e_kg" in c:
-                c["baseline_co2e_kg"] = c.get("baseline_co2e_kg", 0) * factor
-            if "baseline_cost_sek" in c:
-                c["baseline_cost_sek"] = c.get("baseline_cost_sek", 0) * factor
+            _scale_field(c, "baseline_co2e_kg", factor)
+            _scale_field(c, "baseline_cost_sek", factor)
             for a in c.get("alternatives", []):
-                a["co2e_kg"] = a.get("co2e_kg", 0) * factor
-                a["cost_sek"] = a.get("cost_sek", 0) * factor
+                _scale_field(a, "co2e_kg", factor)
+                _scale_cost(a, factor)
             touched.add("alternatives")
 
     if selections and cid in selections:
         sel = selections[cid]
-        sel["baseline_co2e_kg"] = sel.get("baseline_co2e_kg", 0) * factor
-        sel["baseline_cost_sek"] = sel.get("baseline_cost_sek", 0) * factor
+        _scale_field(sel, "baseline_co2e_kg", factor)
+        _scale_field(sel, "baseline_cost_sek", factor)
         chosen = sel.get("selected_alternative") or {}
         picks = chosen.get("picks") if isinstance(chosen, dict) else None
         if isinstance(picks, list) and len(picks) > 1:
             _rescale_picks(chosen, picks, factor)
         elif chosen:
-            chosen["co2e_kg"] = chosen.get("co2e_kg", 0) * factor
-            chosen["cost_sek"] = chosen.get("cost_sek", 0) * factor
+            _scale_field(chosen, "co2e_kg", factor)
+            _scale_cost(chosen, factor)
         touched.add("selections")
 
     return touched
@@ -145,6 +193,20 @@ def _apply_update_component(inp, project, baseline, alternatives, selections, pe
     if unit is not None and unit not in COMPONENT_UNITS:
         name = target.get("name") or cid
         return f"Enheten för {name} måste vara m2, st, lm eller kg.", False, set()
+
+    # The same rule add_component applies. A quantity of 0 or below cannot be
+    # scaled from or to, so 45 → 0 → 90 left the project at 90 m2 with every
+    # figure still for 45 and nothing queued to recompute them. The cell refuses
+    # it in the browser; the chat tool and a direct /api/mutate did not.
+    quantity = inp.get("quantity")
+    if quantity is not None:
+        name = target.get("name") or cid
+        try:
+            quantity = float(quantity)
+        except (TypeError, ValueError):
+            return f"Mängd saknas eller går inte att tolka för {name}.", False, set()
+        if quantity != quantity or quantity <= 0:
+            return f"Mängden för {name} måste vara större än noll.", False, set()
 
     changed = {}
     old_quantity = target.get("quantity")
@@ -185,7 +247,8 @@ def _apply_update_component(inp, project, baseline, alternatives, selections, pe
         if old_q is not None and new_q is not None:
             if old_q > 0 and new_q > 0 and old_q != new_q:
                 factor = new_q / old_q
-                touched |= _scale_component_values(cid, factor, baseline, alternatives, selections)
+                touched |= _scale_component_values(cid, factor, baseline, alternatives, selections,
+                                                   new_quantity=new_q)
                 return (
                     f"Uppdaterade {cid}: mängd {old_q:g} → {new_q:g} {target.get('unit', '')}. "
                     f"Baslinje och alternativ skalade automatiskt — ingen omräkning behövs."
@@ -305,11 +368,11 @@ def _apply_select_alternative(inp, project, baseline, alternatives, selections, 
             "name": comp_alts.get("component_name", ""),
             "selected_alternative": {
                 "name": "Baslinje",
-                "co2e_kg": comp_alts.get("baseline_co2e_kg", 0),
+                "co2e_kg": comp_alts.get("baseline_co2e_kg"),
                 "cost_sek": comp_alts.get("baseline_cost_sek", 0),
                 "source": "NollCO2",
             },
-            "baseline_co2e_kg": comp_alts.get("baseline_co2e_kg", 0),
+            "baseline_co2e_kg": comp_alts.get("baseline_co2e_kg"),
             "baseline_cost_sek": comp_alts.get("baseline_cost_sek", 0),
         }
         return f"Valde baslinjen för {comp_alts.get('component_name', cid)}.", True, {"selections"}
@@ -331,21 +394,41 @@ def _apply_select_alternative(inp, project, baseline, alternatives, selections, 
             f"Tillgängliga: {', '.join(names)}"
         ), False, set()
 
+    # A per-article reuse price travels in its own field and never as the
+    # component's cost, also when the row was saved in the old shape with the
+    # price in cost_sek. The stock and basis fields travel too, so the report
+    # can state the assumption behind a reuse figure. Same fields as selectAlt
+    # in the browser; a choice made here dropped the last three until
+    # 2026-10-01. A missing CO₂e stays missing (None), never a stored 0 kg.
+    per_article = article_price(match)
+    cost = 0 if per_article else match.get("cost_sek", 0)
     selections[cid] = {
         "id": cid,
         "name": comp_alts.get("component_name", ""),
         "selected_alternative": {
             "name": match.get("name", ""),
-            "co2e_kg": match.get("co2e_kg", 0),
-            "cost_sek": match.get("cost_sek", 0),
+            "co2e_kg": match.get("co2e_kg"),
+            "cost_sek": cost,
+            "article_price_sek": per_article,
             "source": match.get("source", ""),
+            "available_quantity": match.get("available_quantity"),
+            "price_basis": match.get("price_basis") or "",
+            "gwp_basis": match.get("gwp_basis") or "",
         },
-        "baseline_co2e_kg": comp_alts.get("baseline_co2e_kg", 0),
+        "baseline_co2e_kg": comp_alts.get("baseline_co2e_kg"),
         "baseline_cost_sek": comp_alts.get("baseline_cost_sek", 0),
     }
+    if per_article:
+        price = f"{round(per_article)} SEK per artikel, totalpris okänt"
+    elif (_number(cost) or 0) > 0:
+        price = f"{round(cost)} SEK"
+    else:
+        price = "pris saknas"
+    co2e = _number(match.get("co2e_kg"))
+    climate = f"{round(co2e)} kg CO₂e" if co2e is not None else "klimatvärde saknas"
     return (
         f"Valde '{match.get('name')}' för {comp_alts.get('component_name', cid)} "
-        f"({round(match.get('co2e_kg', 0))} kg CO₂e, {round(match.get('cost_sek', 0))} SEK)."
+        f"({climate}, {price})."
     ), True, {"selections"}
 
 

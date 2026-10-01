@@ -19,6 +19,7 @@ aida.docx_export makes the Word file.
 from __future__ import annotations
 
 from aida import claims as claims_mod
+from aida.agents.aggregate import _number
 from aida import sheet as sheet_mod
 
 KIND_LABELS = {"epd": "EPD", "boverket": "Boverkets klimatdatabas", "nollco2": "NollCO2",
@@ -151,15 +152,16 @@ def _baslinje(st: dict) -> str:
     if not comps:
         return ""
     rows = [[c.get("component_name", ""), _figure(c.get("co2e_kg"), "kg CO2e"), _source(c)] for c in comps]
-    total = 0.0
-    for c in comps:
-        try:
-            total += float(c.get("co2e_kg") or 0)
-        except (TypeError, ValueError):
-            pass
+    # A row without a figure is left out and named, never counted as 0.
+    known = [n for n in (_number(c.get("co2e_kg")) for c in comps) if n is not None]
+    missing = [c.get("component_name", "") for c in comps if _number(c.get("co2e_kg")) is None]
+    total = f"Totalt: {_figure(sum(known), 'kg CO2e')}"
+    if missing:
+        total += (f" för {len(known)} av {len(comps)} komponenter. "
+                  f"Saknar klimatvärde: {', '.join(missing)}")
     return "\n\n".join([f"## {sheet_mod.MODEL_SECTIONS['baslinje']}",
                         _table(["Komponent", "Klimatpåverkan", "Källa"], rows),
-                        f"Totalt: {_figure(total, 'kg CO2e')}."])
+                        total + "."])
 
 
 def _alternativ(st: dict) -> str:

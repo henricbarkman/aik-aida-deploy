@@ -153,6 +153,20 @@ _WITHHELD_KEYS: dict[tuple[str, str, str], str] = {
         "leverantör (Rockfon Chicago Metallic), så ett typvärde vore deras "
         "sortiment och inte ett typiskt val"
     ),
+    # hiss/st, 2026-09-30 (handover review C5). Six whole-elevator EPDs
+    # (Schindler 5500 3.33, FUJITEC ELSIA 9.09, TK EOX 13.4, TK endura MRL
+    # 174) tagged per piece, and none of them can be one elevator: a lift is
+    # tonnes of steel, and the baseline's own range starts at 2 000 kg. The
+    # declared unit is something else (per kg, per trip, per year) that the
+    # catalog build read as "st". The 13.4 median was then clamped to the
+    # range midpoint, 16 000, under a label that still said "13,4 kg/st x 1
+    # st". Withheld, so a lift gets the agent's estimate and the row says why.
+    # The rows are unchanged in the catalog.
+    ("hiss", "", "st"): (
+        "katalogens EPD:er för hela hissar anger 3 till 174 kg CO2e per "
+        "styck, vilket inte kan vara en hel hiss, så deras enhet är fel "
+        "angiven"
+    ),
 }
 
 
@@ -213,7 +227,10 @@ _SPLIT_SUBCATEGORIES: dict[str, dict[str, tuple[str, ...]]] = {
 # glazed partition filed under fönster met used windows), and the baseline's
 # CO2e range for the category does not apply to their typvärde (177.4 kg/m2
 # was clamped to a plasterboard wall's 8). Not aggregat, whose range check
-# caught a unit-tag fault in the catalog and stays.
+# caught a unit-tag fault in the catalog and stays. Since 2026-09-30 the
+# baseline range-checks no typvärde at runtime (handover review C5); the range
+# half of this set is now read by test_baseline_clamp, which checks every
+# other published typvärde against its category's range.
 UNLIKE_THEIR_CATEGORY = frozenset({("innervägg", "glasparti"), ("golv", "avjämning")})
 
 
@@ -812,20 +829,6 @@ def aggregat_typvärde(name: str, usage_context: str = "", quantity: float = 1) 
             # Whether stating a flow would give a number: the row only asks for
             # it when it would.
             "flow_available": per_flow is not None}
-
-
-# Back-compat alias — old call sites used "median" terminology before we
-# switched to upper-half methodology. Same value, clearer name.
-def get_baseline_median(category: str, unit: str, subcategory: str = "") -> dict | None:
-    """Deprecated — use get_baseline_typvärde. Kept for back-compat."""
-    data = get_baseline_typvärde(category, unit, subcategory)
-    if data is None:
-        return None
-    # Synthesize the old key name from the new structure
-    return {
-        **data,
-        "median_co2e_per_unit": data["baseline_co2e_per_unit"],
-    }
 
 
 def list_available_categories() -> list[tuple[str, str, str, int]]:

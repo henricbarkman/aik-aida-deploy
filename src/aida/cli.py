@@ -1,11 +1,11 @@
 """Aida CLI. Climate calculator for building renovations.
 
-Usage:
-    python -m aida.cli intake --input "<description>"
-    python -m aida.cli baseline --project <project.json>
-    python -m aida.cli alternatives --project <project.json> --baseline <baseline.json>
-    python -m aida.cli aggregate --project <project.json> --selections <selections.json>
-    python -m aida.cli report --project <project.json> --selections <selections.json> [--format markdown|pdf]
+Usage (bin/aida runs "python -m aida.cli" with .env and the project's venv):
+    bin/aida intake --input "<description>"
+    bin/aida baseline --project <project.json>
+    bin/aida alternatives --project <project.json> --baseline <baseline.json>
+    bin/aida aggregate --project <project.json> --selections <selections.json>
+    bin/aida report --project <project.json> --selections <selections.json> [--format markdown|pdf]
 """
 
 import sys
@@ -17,6 +17,9 @@ def main():
         sys.exit(1)
 
     command = sys.argv[1]
+    if command in ("-h", "--help", "help"):
+        print(__doc__)
+        return
     # Remove the command from argv so submodules see their own args
     sys.argv = [sys.argv[0]] + sys.argv[2:]
 

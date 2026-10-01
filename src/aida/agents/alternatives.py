@@ -14,8 +14,11 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+import anthropic
+
 logger = logging.getLogger(__name__)
 
+from aida.agents.aggregate import _number, article_price
 from aida.api_client import (
     DEFAULT_MODEL,
     EFFORT_HIGH,
@@ -30,6 +33,7 @@ from aida.data.climate_data import (
     resolve_category,
 )
 from aida.data.nordic_supply import availability_label, nordic_supplier
+from aida.errors import UserFacingError
 from aida.llm_json import extract_json_object, extract_json_value
 from aida.models import (
     Alternative,
@@ -76,10 +80,9 @@ _SUBCATEGORIZED_CATEGORIES = {"sanitet", "belysning", "vitvaror", "fast_inrednin
 # in articles) are never hidden: no data is not the same as no coverage.
 MIN_REUSE_COVERAGE = 0.2
 
-# Cheap, fast model for the retrieval router (same as the orchestrator's
-# intent classifier). Routing is a short structured-classification task.
 # Material routing is a correctness step (the toalett/kakel mis-routing lived
-# here) — runs on the default Opus 4.8 model now, not the old Haiku.
+# here), so it runs on the default model, not the cheap one the chat's intent
+# classifier uses.
 _ROUTER_MODEL = DEFAULT_MODEL
 
 SYSTEM_PROMPT = """Du är Aidas alternativanalys-agent — en byggnadsexpert som hittar klimatsmartare alternativ till konventionella byggmaterial.
@@ -115,7 +118,7 @@ TEKNISKA REGLER:
 - Använd fältet "Tillgänglighet", inte "Geo", för att bedöma om en förvaltare kan köpa produkten. Geo är deklarationens giltighetsområde, inte var varan finns: Ahlsell AB deklarerar GLO.
 - Är klimatskillnaden liten mellan två alternativ, välj det med "nordisk leverantör". Är skillnaden stor, välj det bästa ändå och nämn i reasoning att leverantören är utländsk.
 - Minst ett av dina EPD-alternativ ska ha "nordisk leverantör" om listan innehåller något sådant.
-- Om EPD-värdet är i en annan enhet (kg) än projektets enhet (m2, st), gör en rimlig omräkning och notera det.
+- Välj EPD:er i projektets enhet. Systemet räknar co2e_kg från EPD:ns eget värde efteråt och jämför bara samma enhet (undantag anges i uppgiften), så en EPD i en annan enhet visas inte och en egen omräkning används inte.
 - co2e_kg MÅSTE vara > 0 — alla byggmaterial har klimatpåverkan, även återbruk (transport och renovering). Returnera aldrig 0.
 - Föreslå KOMPLETTA system, inte enskilda komponenter.
 - alternative_type är "climate_optimized" för EPD-rader och "reuse" för Palats-rader. Aldrig "reuse" på en EPD, aldrig "climate_optimized" på en annons.
@@ -817,47 +820,49 @@ _match_key = match_key
 _tokens = tokens
 
 
-def match_epd_by_name(name: str, epds: list[dict]) -> dict | None:
-    """Find which candidate EPD an LLM-written alternative name refers to.
+def _name_candidates(name: str, epds: list[dict]) -> list[dict]:
+    """The catalog rows an LLM-written name may refer to, best match only.
 
     The model paraphrases and truncates product names, so exact equality is
-    useless. Containment either way first, longest match wins; then a token
-    overlap for the cases containment cannot reach, such as
-    "Fibre cement cladding HardiePanel® / Hardie® Architectural Panel" for a
-    catalog entry called "S-P-10857 Fibre cement cladding: HardiePanel®,
-    Hardie® Architectural Panel" — same product, reordered and re-punctuated.
+    useless. Containment either way first, longest match wins, and every row
+    tied for it is returned; then a token overlap for the cases containment
+    cannot reach, such as "Fibre cement cladding HardiePanel® / Hardie®
+    Architectural Panel" for a catalog entry called "S-P-10857 Fibre cement
+    cladding: HardiePanel®, Hardie® Architectural Panel" — same product,
+    reordered and re-punctuated. [] when nothing matches or the token overlap
+    has no clear winner.
 
-    Used to carry facts the model cannot be trusted to relay (which GWP
-    indicator a figure rests on) from the catalog onto the alternative.
+    Returning the whole tie lets each caller decide whether the tied rows
+    disagree about the thing it needs: the GWP label for match_epd_by_name,
+    the figure itself for _catalog_row_for.
     """
     if not name:
-        return None
+        return []
     needle = _match_key(name)
     if not needle:
-        return None
-    best = None
+        return []
     best_len = 0
     tied: list[dict] = []
+    exact: list[dict] = []
     for epd in epds:
         epd_name = _match_key(epd.get("name") or "")
         if not epd_name:
             continue
         if epd_name == needle:
-            return epd
+            # All of them: 96 names occur more than once in the catalog, some
+            # with different figures, so the first exact hit is not the answer.
+            exact.append(epd)
+            continue
         if epd_name in needle or needle in epd_name:
             overlap = min(len(epd_name), len(needle))
             if overlap > best_len:
-                best, best_len, tied = epd, overlap, [epd]
+                best_len, tied = overlap, [epd]
             elif overlap == best_len:
                 tied.append(epd)
-    if best is not None:
-        # A tie is only a problem when the tied entries disagree about the
-        # thing we are carrying across. Two equally-matching fossil products
-        # give the same answer either way; one fossil and one GHG do not, and
-        # guessing there would put a label on a product that may not deserve it.
-        if len({e.get("gwp_basis", "") for e in tied}) > 1:
-            return None
-        return best
+    if exact:
+        return exact
+    if tied:
+        return tied
 
     # Token overlap, for names the model reordered or re-punctuated past what
     # containment can follow. Deliberately strict: at least three quarters of
@@ -867,7 +872,7 @@ def match_epd_by_name(name: str, epds: list[dict]) -> dict | None:
     # leaving a fossil figure unlabelled.
     needle_tokens = _tokens(needle)
     if len(needle_tokens) < 2:
-        return None
+        return []
     scored: list[tuple[float, dict]] = []
     for epd in epds:
         epd_tokens = _tokens(_match_key(epd.get("name") or ""))
@@ -877,11 +882,262 @@ def match_epd_by_name(name: str, epds: list[dict]) -> dict | None:
         if score >= 0.75:
             scored.append((score, epd))
     if not scored:
-        return None
+        return []
     scored.sort(key=lambda pair: pair[0], reverse=True)
     if len(scored) > 1 and scored[0][0] - scored[1][0] < 0.15:
-        return None  # ambiguous, better to say nothing
-    return scored[0][1]
+        return []  # ambiguous, better to say nothing
+    return [scored[0][1]]
+
+
+def match_epd_by_name(name: str, epds: list[dict]) -> dict | None:
+    """Find which candidate EPD an LLM-written alternative name refers to.
+
+    Used to carry facts the model cannot be trusted to relay (which GWP
+    indicator a figure rests on) from the catalog onto the alternative.
+    """
+    tied = _name_candidates(name, epds)
+    if not tied:
+        return None
+    # A tie is only a problem when the tied entries disagree about the thing
+    # we are carrying across. Two equally-matching fossil products give the
+    # same answer either way; one fossil and one GHG do not, and guessing
+    # there would put a label on a product that may not deserve it.
+    if len({e.get("gwp_basis", "") for e in tied}) > 1:
+        return None
+    return tied[0]
+
+
+def _model_number(value) -> float | None:
+    """A finite number from a field the model wrote, or None.
+
+    The model writes JSON by hand, and "ca 400", "1 200", null and true all
+    arrive in number fields. Before 2026-09-30 they were stored as-is, and a
+    string reached `alt.co2e_kg <= 0` in _validate_alternatives as a
+    TypeError that took the whole component out of the analysis.
+    """
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        out = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if out != out or out in (float("inf"), float("-inf")):
+        return None
+    return out
+
+
+def _reg_tokens(reg_no: str) -> set[str]:
+    """The forms a registration number may be cited in, normalised.
+
+    A third of the catalog stores two ids in one field, "EPD-IES-0006778:001
+    (S-P-06778)", and the model cites either one, with or without the
+    ":001" product suffix. Each is a form; short ones are dropped as too
+    ambiguous to count as a citation.
+    """
+    out: set[str] = set()
+    for tok in re.findall(r"[\w][\w\-:./]*", _match_key(reg_no)):
+        tok = tok.rstrip(".:/")
+        out.add(tok)
+        if ":" in tok:
+            out.add(tok.split(":", 1)[0])
+    return {t for t in out if len(t) >= 5}
+
+
+def _cites_reg_no(source_key: str, epd: dict) -> bool:
+    """True when a normalised source string names one of this row's
+    registration numbers as a whole token. Bounded on both sides, because
+    "S-P-0111" is a substring of "S-P-01111"."""
+    if not source_key:
+        return False
+    return any(
+        re.search(rf"(?<![\w-]){re.escape(tok)}(?![\w-])", source_key)
+        for tok in _reg_tokens(str(epd.get("reg_no") or ""))
+    )
+
+
+def _name_accounts_for(needle_key: str, epd: dict) -> bool:
+    """Whether a name match on this row explains the whole model-written name.
+
+    A catalog name found inside a longer model name is only evidence when
+    what is left over is the manufacturer (the prompt asks for "Produktnamn
+    (Tillverkare)") or punctuation. "Fire rated Doors Acme" contains the
+    catalog's "Doors", and without this check it took that row's figure and
+    an [EPD] tag, which promoted an invented product to a declared one. The
+    other shapes are left as they were: an exact name, the model shortening
+    the catalog name, or the strict token-overlap winner.
+    """
+    name_key = _match_key(epd.get("name") or "")
+    if not name_key or name_key == needle_key or name_key not in needle_key:
+        return True
+    return _leftover_words(needle_key, epd) <= _words(_match_key(epd.get("owner") or ""))
+
+
+def _words(text: str) -> set[str]:
+    """Words of three letters or more, punctuation stripped first ("(Bolon AB)"
+    is {"bolon"}: _tokens would keep "ab)" as "ab")."""
+    return {w for w in re.findall(r"\w+", text) if len(w) >= 3}
+
+
+def _leftover_words(needle_key: str, epd: dict) -> set[str]:
+    """The words of a model-written name that the catalog row's name does not
+    cover: normally the manufacturer the prompt asks for in parentheses."""
+    name_key = _match_key(epd.get("name") or "")
+    rest = needle_key.replace(name_key, " ", 1) if name_key else needle_key
+    return _words(rest)
+
+
+def _catalog_row_for(item: dict, epds: list[dict]) -> dict | None:
+    """The one catalog row a model-written EPD alternative refers to, or None.
+
+    Two pieces of evidence: the name (the same matcher the GWP label uses)
+    and the registration number the prompt asks the model to cite in
+    `source`. When both are there they must agree, and the rows both point
+    at are the answer; that also settles a multi-product EPD, where one
+    number covers rows with different figures. When they disagree the row is
+    refused: a short catalog name inside a longer model name ("LED
+    DOWNLIGHT" inside "Planar LED Downlight") is a name match to the wrong
+    product, and a number the model misquoted is a number match to one.
+    Without a citation the name has to account for itself
+    (_name_accounts_for). The manufacturer breaks a remaining tie. Rows that
+    agree on the comparable figure and the GWP basis are one answer however
+    many there are; rows that disagree are not, and guessing between them
+    would put one product's number on another's name.
+    """
+    name = str(item.get("name") or "")
+    needle = _match_key(name)
+    by_name = _name_candidates(name, epds)
+    source_key = _match_key(str(item.get("source") or ""))
+    cited = [e for e in epds if _cites_reg_no(source_key, e)]
+    if by_name and cited:
+        cands = [e for e in by_name if any(e is c for c in cited)]
+    elif cited:
+        cands = _name_candidates(name, cited) or cited
+    else:
+        cands = [e for e in by_name if _name_accounts_for(needle, e)]
+
+    def distinct(rows):
+        return {(_epd_comparable(e), e.get("gwp_basis", "")) for e in rows}
+
+    if len(distinct(cands)) > 1:
+        # "Floor Tile (Graniser CERAMICS)": the catalog has three Floor Tiles.
+        # Only words beyond the product name count, or an owner whose name is
+        # also in the product's ("Kingspan Kooltherm") would always win.
+        by_owner = [e for e in cands
+                    if _words(_match_key(e.get("owner") or "")) & _leftover_words(needle, e)]
+        cands = by_owner if len(distinct(by_owner)) == 1 else []
+    return cands[0] if cands else None
+
+
+def _catalog_co2e(matched: dict, proj_comp, category: str) -> tuple[float | None, str]:
+    """(co2e_kg, note) for an EPD alternative, computed from its catalog row.
+
+    The model used to supply co2e_kg itself, and the per-component prompt
+    left unit mismatches to "en rimlig omräkning": a per-kg toilet EPD was
+    multiplied by a count of toilets (0.9 kg/kg × 30 = 27 kg against a
+    1 545 kg baseline, shown as a 98 % saving). The figure is now the
+    catalog's, times the component quantity, and only in the component's own
+    unit: the declared unit first (an m3 component meets an m3 row's own
+    figure, not its per-m2 restatement), then the functional unit
+    _epd_comparable derives. One bridge is allowed, the one the baseline side
+    already uses for count-denominated products: a per-kg row for a component
+    counted in st, through the typical item mass for its (category,
+    subcategory), and only when the row is that kind of product or of no
+    stated kind; a bathtub's kg figure times a toilet's mass is neither.
+    Anything else is refused rather than guessed.
+
+    On success `note` is "" or a Swedish sentence for the reasoning; on
+    refusal co2e is None and `note` says why, in Swedish, for the row that
+    tells the förvaltare nothing could be compared.
+    """
+    from aida.data.unit_conversion import typical_item_mass
+    from aida.followup import normalize_unit, units_comparable
+
+    quantity = _model_number(getattr(proj_comp, "quantity", None))
+    if not quantity or quantity <= 0:
+        return None, "komponenten saknar en mängd att räkna på"
+    comp_unit = proj_comp.unit or ""
+    declared = _model_number(matched.get("gwp_a1a3"))
+    if declared and declared > 0 and units_comparable(str(matched.get("unit") or ""), comp_unit):
+        return round(declared * quantity, 1), ""
+    gwp, epd_unit = _epd_comparable(matched)
+    if gwp <= 0:
+        return None, "EPD:n saknar ett användbart klimatvärde"
+    if units_comparable(epd_unit, comp_unit):
+        return round(gwp * quantity, 1), ""
+    if normalize_unit(epd_unit) == "kg" and normalize_unit(comp_unit) == "st":
+        sub = _component_subcategory(proj_comp, category)
+        mass = typical_item_mass(category, sub) if category else None
+        if not mass:
+            return None, (
+                "EPD:n anges per kg och komponenten räknas i styck, och ingen "
+                "typisk vikt per styck är känd för den här sortens produkt"
+            )
+        row_sub = matched.get("subcategory") or ""
+        if row_sub and row_sub != sub:
+            return None, (
+                f"EPD:n anges per kg och gäller en annan produkttyp ({row_sub}) än "
+                f"komponenten ({sub}), så den typiska vikten per styck går inte att använda"
+            )
+        co2e = round(gwp * mass * quantity, 1)
+        return co2e, (
+            f"CO2e räknat från EPD:ns deklarerade värde: {gwp:g} kg CO2e/kg × "
+            f"{mass:g} kg/st (antagen typisk vikt, approximation) × "
+            f"{quantity:g} st = {co2e:g} kg."
+        )
+    return None, f"EPD:n anges per {epd_unit or 'okänd enhet'} och komponenten i {comp_unit}"
+
+
+def _component_subcategory(proj_comp, category: str | None) -> str:
+    """The subcategory the component's name gives within `category`, or ""."""
+    from aida.data.palats_client import component_subcategory
+
+    return component_subcategory(proj_comp.name, category) if category else ""
+
+
+def _item_mass(proj_comp, category: str | None) -> float | None:
+    """Typical kg per piece for a component counted in st, or None.
+
+    Same lookup as the baseline's kg->st bridge (baseline._apply_epd_median_
+    fallback, alternatives._effective_baseline_co2e): the routed category and
+    the subcategory the component's name gives.
+    """
+    from aida.data.unit_conversion import typical_item_mass
+    from aida.followup import normalize_unit
+
+    if normalize_unit(getattr(proj_comp, "unit", "") or "") != "st" or not category:
+        return None
+    return typical_item_mass(category, _component_subcategory(proj_comp, category))
+
+
+def _mass_bridge_clause(proj_comp, category: str | None) -> str:
+    """The one exception to "skip an EPD in another unit", told to the model
+    with the mass the code will use, so its reasoning ("−45 % CO2e") is
+    computed the same way as the figure the row ends up carrying."""
+    mass = _item_mass(proj_comp, category)
+    if not mass:
+        return ""
+    return (
+        f"\nUndantag: en EPD deklarerad per kg för samma sorts produkt räknas om med "
+        f"en antagen typisk vikt på {mass:g} kg/st, alltså EPD-värdet × {mass:g} × "
+        f"{proj_comp.quantity} st. Använd den omräkningen när du jämför med baslinjen."
+    )
+
+
+# Registry names as a reader knows them, for a source string the code builds.
+_REGISTRY_LABELS = {"environdec": "Environdec", "environdec_manual": "Environdec",
+                    "epd_norge": "EPD-Norge", "epd_hub": "EPD Hub", "ibu": "IBU",
+                    "ul_environment": "UL Environment"}
+
+
+class RankingFailed(RuntimeError):
+    """The ranking call for one component failed: the API call raised, or the
+    answer was not readable JSON. Not the same as an empty answer, which is
+    the model saying nothing in the lists fits. `timed_out` is kept apart
+    because its advice differs: fewer components, not just another try."""
+
+    def __init__(self, component_name: str, *, timed_out: bool = False) -> None:
+        super().__init__(component_name)
+        self.timed_out = timed_out
 
 
 def _format_epd_list(epds: list[dict]) -> str:
@@ -1412,7 +1668,10 @@ def _reuse_figures(
     - If project counts in "st" (fönster, dörr), Palats price * quantity
       gives a directly comparable total.
     - If project counts in "m2" (golv, vägg), we can't calculate total
-      (unknown coverage per article). Show per-article price instead.
+      (unknown coverage per article). total_cost is then 0, unpriced, and the
+      caller keeps listing.price as the row's per-article price. Until
+      2026-09-30 the per-article price was returned as the total, and a 45 m2
+      floor was summed as costing 725 kr.
     """
     from aida.data.palats_client import _DEFAULT_REUSE_CO2E, REUSE_CO2E_PER_UNIT
 
@@ -1445,8 +1704,9 @@ def _reuse_figures(
             price_note += " | Täckning: okänd (antal ej angivet i annonsen)"
         cost_is_estimate = False
     elif listing.price > 0:
-        # Units don't match — show per-article price only
-        total_cost = listing.price
+        # Units don't match: the price is for one article, and how much of the
+        # need an article covers is unknown, so there is no total to give.
+        total_cost = 0
         price_note = (
             f"Pris: {listing.price:.0f} SEK/st ({listing.quantity} tillgängliga)"
             " — yta per artikel okänd | Täckning: okänd (antal per "
@@ -1510,8 +1770,9 @@ def _reuse_alternative(
     # "Porslinstvättställ" and 18 "Träfönster" at one location, and the table,
     # selection intent and multi-pick all identify a row by name: without the
     # number two such listings were one row to them and could not be combined.
-    # The id is stable across reruns, so the name is too. Mark with * when cost
-    # is per-article, not total.
+    # The id is stable across reruns, so the name is too. Mark with * when the
+    # price is per-article, not total: the table's footnote and canCombine read
+    # the marker. The totals read article_price_sek and cost_sek instead.
     where = f"Palats återbruk, {listing.location}" if listing.location else "Palats återbruk"
     display_name = f"{listing.title} ({where}, annons {listing.id})" if listing.id else f"{listing.title} ({where})"
     if cost_is_estimate:
@@ -1527,6 +1788,7 @@ def _reuse_alternative(
         available_quantity=listing.quantity,
         price_basis="listing" if listing.price > 0 else "",
         url=listing.url or "",
+        article_price_sek=round(listing.price) if cost_is_estimate else 0,
     )
 
 
@@ -1777,9 +2039,11 @@ def find_alternatives(
     3. For each component, gather the relevant EPDs AND the matching Palats
        listings (routed category, strict subcategory, coverage gate, cap 5)
     4. One LLM call ranks both sources together and writes the reasoning for
-       every row, reuse included
-    5. If that call fails, the Palats rows are appended deterministically so
-       an EPD-side error never hides a reuse find
+       every row, reuse included; the CO2e on every row is computed from the
+       catalog row or the listing, not taken from the model
+    5. If any component fails (the ranking call, or our own processing), the
+       whole step raises a UserFacingError naming it. A partial result would
+       be read as the project total downstream.
     """
     from aida.data import palats_client
     from aida.data.palats_client import fetch_listings
@@ -1884,12 +2148,14 @@ def find_alternatives(
                 palats_listings, comp_key,
             )
 
+        refused: list[str] = []
         alternatives = _find_alternatives_with_epds(
             proj_comp, bl_comp, epds_for_category, user_feedback,
             needs_analysis=project.needs_analysis,
             effective_baseline_co2e=eff_baseline_co2e,
             palats_candidates=palats_candidates,
             category=comp_key,
+            refused=refused,
         )
 
         # Validate data quality: filter zero CO2, component-only parts, flag prices
@@ -1956,7 +2222,8 @@ def find_alternatives(
                 co2e_kg=eff_baseline_co2e,
                 cost_sek=bl_comp.cost_sek,
                 source="N/A",
-                reasoning=no_alt_reason or "Inga alternativ identifierade.",
+                reasoning=(no_alt_reason or _refused_reason(refused)
+                           or "Inga alternativ identifierade."),
                 alternative_type="baseline",
             ))
 
@@ -1972,6 +2239,7 @@ def find_alternatives(
     # max(1, ...) guards against an empty baseline — ThreadPoolExecutor(0) raises.
     max_workers = max(1, min(len(baseline.components), 5))
     results_map = {}
+    failures: dict[str, Exception] = {}
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_comp = {
             executor.submit(_process_component, bl): bl
@@ -1983,8 +2251,18 @@ def find_alternatives(
                 r = future.result()
                 if r:
                     results_map[bl.component_id] = r
-            except Exception:
+            except Exception as exc:
                 logger.warning("Component failed: %s", bl.component_name, exc_info=True)
+                failures[bl.component_id] = exc
+
+    # A component that failed used to be dropped here with a log line, and
+    # nothing downstream noticed: the report gate iterates the components this
+    # returns, so "every component chosen" held for the survivors and the
+    # report presented their sum as the project total. The baseline refuses
+    # the same thing in _complete_baseline. Raised before pricing and
+    # commentary, so a run that is going to be discarded does not pay for them.
+    if failures:
+        raise _alternatives_failed(baseline.components, failures)
 
     # Preserve original component order
     component_results = [
@@ -2020,6 +2298,53 @@ def find_alternatives(
     return result
 
 
+def _alternatives_failed(baseline_components: list, failures: dict) -> UserFacingError:
+    """The error for a run in which one or more components failed.
+
+    Names every failed component, in project order, and says why nothing is
+    shown. A failed ranking call (API error, unreadable answer) is 502 and
+    worth retrying as is, a timed-out one 504; anything else is a fault on
+    our side, 500.
+    """
+    names = [bl.component_name for bl in baseline_components
+             if bl.component_id in failures]
+    upstream = all(isinstance(e, RankingFailed) for e in failures.values())
+    timed_out = upstream and all(e.timed_out for e in failures.values())
+    if timed_out:
+        # Same advice as the route's own 504 branch, which a timeout inside
+        # the ranking call never reached (it was swallowed here before).
+        why, status = "Modellen svarade inte i tid.", 504
+        retry = "Försök igen, eller minska antalet komponenter."
+    elif upstream:
+        why, status = "Modellen svarade inte eller gav ett svar som inte gick att läsa.", 502
+        retry = "Försök igen, det brukar gå igenom vid nästa försök."
+    else:
+        why, status = "Ett fel uppstod när förslagen sammanställdes.", 500
+        retry = "Försök igen. Står felet kvar, hör av dig så tittar vi i loggarna."
+    return UserFacingError(
+        f"Alternativen kunde inte tas fram för alla komponenter (saknas: "
+        f"{', '.join(names)}). {why} Inga alternativ visas, eftersom en "
+        f"jämförelse där komponenter saknas ser ut som hela projektet. {retry}",
+        status_code=status,
+    )
+
+
+def _refused_reason(refused: list[str]) -> str:
+    """Why a component ended with no comparable alternative although the model
+    proposed some, for the "Inga alternativ hittades" row. "" when nothing was
+    refused, so the caller falls back to its own sentence."""
+    if not refused:
+        return ""
+    reasons = "; ".join(dict.fromkeys(refused))
+    text = f"Inget av förslagen från EPD-listan gick att jämföra med baslinjen ({reasons})."
+    if any("typisk vikt" in r for r in refused):
+        text += (
+            " Ange vilken sorts produkt det är (till exempel toalettstol eller "
+            "handfat), eller mängden i kg, så kan de jämföras."
+        )
+    return text
+
+
 def _enrich_alternative_prices(
     components: list[ComponentAlternatives],
     project: Project,
@@ -2047,8 +2372,9 @@ def _enrich_alternative_prices(
     import time
 
     from aida.api_client import remaining_budget
-    from aida.data.price_validation import validate_total_price
+    from aida.data.price_validation import check_total_price
     from aida.data.pricing_provider import (
+        BASIS_ADJUSTED,
         BASIS_LLM_ESTIMATE,
         BASIS_WEB_SEARCH,
         estimate_prices_batch,
@@ -2120,19 +2446,27 @@ def _enrich_alternative_prices(
             alt.price_basis = basis
             alt.reasoning = alt.reasoning.replace(". Pris ej tillgängligt.", "")
             alt.reasoning = alt.reasoning.replace("Pris ej tillgängligt.", "")
-            if source and source.lower() not in alt.reasoning.lower():
-                alt.reasoning = alt.reasoning.rstrip(". ") + f". Prisunderlag: {source}."
 
+            # An outlier is replaced by the category's typical price. The row
+            # then says so, and no longer names the source of a figure it does
+            # not show (review L2; the baseline does the same with
+            # ADJUSTED_PRICE_SOURCE).
             category = category_by_cid.get(comp.component_id, "")
+            note = ""
             if quantity > 0 and category:
-                validated_cost, note = validate_total_price(
+                checked = check_total_price(
                     alt.cost_sek, quantity, category, is_estimate=is_estimate,
                     unit=comp_unit,
                 )
-                if validated_cost != alt.cost_sek:
-                    alt.cost_sek = validated_cost
-                if note and note.lower() not in alt.reasoning.lower():
-                    alt.reasoning = alt.reasoning.rstrip(". ") + f". {note}."
+                alt.cost_sek = checked.cost
+                note = checked.note
+                if checked.replaced:
+                    alt.price_basis = BASIS_ADJUSTED
+                    source = ""
+            if source and source.lower() not in alt.reasoning.lower():
+                alt.reasoning = alt.reasoning.rstrip(". ") + f". Prisunderlag: {source}."
+            if note and note.lower() not in alt.reasoning.lower():
+                alt.reasoning = alt.reasoning.rstrip(". ") + f". {note}."
 
             logger.info(
                 "Priced '%s' via %s: %d SEK/%s x %g = %d SEK total",
@@ -2182,6 +2516,7 @@ def _find_alternatives_with_epds(
     effective_baseline_co2e: float | None = None,
     palats_candidates: list[tuple] | None = None,
     category: str | None = None,
+    refused: list[str] | None = None,
 ) -> list[Alternative]:
     """Use LLM to rank EPD alternatives and Palats reuse listings together.
 
@@ -2197,9 +2532,18 @@ def _find_alternatives_with_epds(
     [Palats återbruk], and the model ranks both sources in one list and
     writes the reasoning for the reuse rows too. The figures on a reuse row
     (CO2e from REUSE_CO2E_PER_UNIT, the listing's own price) are computed
-    here, not taken from the model. If the call fails, the candidates are
-    still appended through the deterministic fallback so an EPD-side API
-    error never hides a reuse find.
+    here, not taken from the model.
+
+    The figures on an EPD row are ours too (_catalog_co2e): the model picks
+    and argues, the catalog row times the quantity is the number. A row that
+    maps to no catalog row, or only to one in another unit, is dropped and
+    logged, and the reason is appended to ``refused`` when the caller passes
+    a list, so the component can say why nothing was comparable.
+
+    If the call itself fails (API error, unreadable answer) this raises
+    RankingFailed. It used to return [] or the Palats rows alone, which the
+    table then showed as "Inga alternativ hittades", i.e. as the model having
+    looked and found no better product.
     """
     client = get_client()
     palats_candidates = palats_candidates or []
@@ -2234,7 +2578,7 @@ def _find_alternatives_with_epds(
     prompt = f"""Komponent: {proj_comp.name}
 Antal: {proj_comp.quantity} {proj_comp.unit}
 Baslinje CO2e: {baseline_for_prompt} kg ({baseline_label})
-Baslinje kostnad: {bl_comp.cost_sek} SEK
+Baslinje kostnad: {_prompt_cost(bl_comp.cost_sek)}
 
 Föreslå alternativ ur listorna nedan: 2-4 EPD-alternativ, plus varje Palats-annons som passar komponenten. Rangordna dem TILLSAMMANS i en lista. Inkludera hela spannet av CO2e-värden — användaren optimerar totalen över hela projektet, inte per komponent, så ett alternativ som ligger något över baslinjen kan vara värt att visa om det möter behoven bättre. Rangordna med lägst CO2e först. I reasoning: ange explicit hur alternativet jämför mot baslinjen (t.ex. "−45% CO2e" eller "+12% CO2e — men kortare leveranskedja och tystare drift").
 """
@@ -2269,7 +2613,7 @@ TILLGÄNGLIGA EPD:er FÖR DENNA KATEGORI ({len(epds)} st):
 {_format_epd_list(epds)}{r_caveat}
 
 Välj de 2-4 bästa alternativen från listan ovan. Beräkna total CO2e baserat på EPD-värdet × {proj_comp.quantity} {proj_comp.unit}.
-Om EPD-enheten inte matchar projektenheten: hoppa över den EPD:n. Räkna aldrig om mellan enheter med en antagen densitet eller tjocklek — en sådan omräkning ser ut som en besparing men är en gissning.
+Om EPD-enheten inte matchar projektenheten: hoppa över den EPD:n. Räkna aldrig om mellan enheter med en antagen densitet eller tjocklek — en sådan omräkning ser ut som en besparing men är en gissning.{_mass_bridge_clause(proj_comp, category)}
 Se till att minst ett alternativ har "nordisk leverantör", om listan innehåller något sådant. Finns inget, säg det i reasoning i stället för att låtsas.
 """
     else:
@@ -2294,6 +2638,8 @@ Inga återbruksannonser på Palats matchar denna komponent just nu, så listan b
 
     prompt += "\nSvara med JSON-array."
 
+    # Only the call and the parse are "the model failed". A fault in the row
+    # handling below is our own bug and must not be reported as a busy API.
     try:
         response = call_model(
             client,
@@ -2303,115 +2649,154 @@ Inga återbruksannonser på Palats matchar denna komponent just nu, så listan b
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt}],
         )
-
         text = extract_text(response)
-
         data = extract_json_value(text, what="alternativsökningen")
-        if isinstance(data, dict):
-            data = data.get("alternatives", [data])
-        if not isinstance(data, list):
-            data = [data]
+    except Exception as exc:
+        logger.warning("Ranking call failed for %s", proj_comp.name, exc_info=True)
+        raise RankingFailed(
+            proj_comp.name,
+            timed_out=isinstance(exc, (anthropic.APITimeoutError, TimeoutError)),
+        ) from exc
 
-        results = []
-        used_candidates: set[str] = set()
-        for item in data:
-            if not isinstance(item, dict):
-                logger.info("Skipping non-object item in alternatives: %r", item)
+    if isinstance(data, dict):
+        data = data.get("alternatives", [data])
+    if not isinstance(data, list):
+        data = [data]
+
+    results = []
+    used_candidates: set[str] = set()
+    for item in data:
+        if not isinstance(item, dict):
+            logger.info("Skipping non-object item in alternatives: %r", item)
+            continue
+        source = str(item.get("source", "") or "")
+        is_reuse = (
+            item.get("alternative_type") == "reuse"
+            or "[palats]" in source.lower()
+        )
+        if is_reuse:
+            # A reuse row is only ever a Palats candidate the prompt showed.
+            # Its figures are ours (REUSE_CO2E_PER_UNIT and the listing
+            # price), its reasoning is the model's. Anything that does not
+            # map back to a candidate is fabricated and dropped, logged.
+            hit = _match_palats_candidate(item, palats_candidates)
+            if hit is None:
+                logger.warning(
+                    "Dropped reuse row %r for %s: matches no Palats candidate "
+                    "(source=%r)", item.get("name"), proj_comp.name, source,
+                )
                 continue
-            source = str(item.get("source", "") or "")
-            is_reuse = (
-                item.get("alternative_type") == "reuse"
-                or "[palats]" in source.lower()
-            )
-            if is_reuse:
-                # A reuse row is only ever a Palats candidate the prompt showed.
-                # Its figures are ours (REUSE_CO2E_PER_UNIT and the listing
-                # price), its reasoning is the model's. Anything that does not
-                # map back to a candidate is fabricated and dropped, logged.
-                hit = _match_palats_candidate(item, palats_candidates)
-                if hit is None:
-                    logger.warning(
-                        "Dropped reuse row %r for %s: matches no Palats candidate "
-                        "(source=%r)", item.get("name"), proj_comp.name, source,
-                    )
-                    continue
-                listing, coverage = hit
-                if str(listing.id) in used_candidates:
-                    logger.info("Duplicate reuse row for listing %s; keeping the first",
-                                listing.id)
-                    continue
-                used_candidates.add(str(listing.id))
-                results.append(_reuse_alternative(
-                    listing, coverage, proj_comp.quantity, proj_comp.unit,
-                    category, str(item.get("reasoning", "") or ""),
-                ))
-                continue
-
-            # Tag source based on whether it references an EPD
-            if not source.startswith("["):
-                if "epd" in source.lower() or "environdec" in source.lower():
-                    source = f"[EPD] {source}"
-                else:
-                    source = f"[Uppskattning] {source}"
-
-            # Which GWP indicator this rests on is a fact about the catalog, not
-            # something to hope the model repeats, so match it back by name.
-            alt_name = item.get("name", "Okänt alternativ")
-            matched = match_epd_by_name(alt_name, epds)
-            gwp_basis = (matched or {}).get("gwp_basis", "") if matched else ""
-            if gwp_basis == "ghg":
-                # Rides in `source` as well as its own field: source is what the
-                # report's component table prints, so the basis reaches the
-                # document without a separate plumbing path.
-                source = f"{source} (GWP-GHG)"
-
-            results.append(Alternative(
-                name=alt_name,
-                co2e_kg=item.get("co2e_kg", baseline_for_prompt),
-                cost_sek=item.get("cost_sek", 0),
-                source=source,
-                reasoning=item.get("reasoning", ""),
-                alternative_type="climate_optimized",
-                gwp_basis=gwp_basis,
-            ))
-
-        # Candidates the model left out. The prompt asks for every one of
-        # them, so an omission is either a judgement it was told to voice on
-        # another row or a lapse. Either way the listing exists on Palats and
-        # Johanna's April complaint was exactly a toilet that did not appear,
-        # so the row is appended with the factual fallback text and the
-        # omission is logged with the listing named. Data on the floor must
-        # say so.
-        for listing, coverage in palats_candidates:
+            listing, coverage = hit
             if str(listing.id) in used_candidates:
+                logger.info("Duplicate reuse row for listing %s; keeping the first",
+                            listing.id)
                 continue
-            logger.warning(
-                "Ranking omitted Palats listing %s (%r) for %s; appending with "
-                "fallback reasoning", listing.id, listing.title, proj_comp.name,
-            )
+            used_candidates.add(str(listing.id))
             results.append(_reuse_alternative(
                 listing, coverage, proj_comp.quantity, proj_comp.unit,
-                category, _FALLBACK_REUSE_REASONING,
+                category, str(item.get("reasoning", "") or ""),
             ))
+            continue
 
-        return results
-    except Exception:
-        logger.warning("Failed to parse alternatives for %s", proj_comp.name, exc_info=True)
-        if palats_candidates:
-            # The EPD side failed; the reuse side is deterministic and must not
-            # go down with it. Same rows, fallback reasoning, logged.
+        # An EPD row, the same rule as a reuse row: it must map back to a
+        # row the prompt showed, and its figure is the catalog's, not the
+        # model's multiplication. What the model contributes is the choice
+        # and the reasoning.
+        alt_name = str(item.get("name") or "").strip()
+        matched = _catalog_row_for(item, epds)
+        if matched is None:
             logger.warning(
-                "Ranking call failed for %s; appending %d Palats listings via fallback",
-                proj_comp.name, len(palats_candidates),
+                "Dropped EPD row %r for %s: matches no single catalog candidate "
+                "(source=%r)", alt_name, proj_comp.name, source,
             )
-            return [
-                _reuse_alternative(
-                    listing, coverage, proj_comp.quantity, proj_comp.unit,
-                    category, _FALLBACK_REUSE_REASONING,
+            if refused is not None:
+                refused.append("ett förslag motsvarade ingen rad i EPD-listan")
+            continue
+        co2e, note = _catalog_co2e(matched, proj_comp, category)
+        if co2e is None:
+            logger.warning(
+                "Dropped EPD row %r for %s: %s is declared per %s, component "
+                "counted in %s (%s)", alt_name, proj_comp.name, matched.get("name"),
+                _epd_comparable(matched)[1], proj_comp.unit, note,
+            )
+            if refused is not None:
+                refused.append(note)
+            continue
+        model_co2e = _model_number(item.get("co2e_kg"))
+        if model_co2e is None or abs(model_co2e - co2e) > 0.05 * co2e:
+            logger.info(
+                "CO2e for %r (%s) set from the catalog: %s kg, the model wrote %r",
+                alt_name, proj_comp.name, co2e, item.get("co2e_kg"),
+            )
+            if not note:
+                # The model's reasoning ("−98 % CO2e") was argued from its own
+                # figure; the arithmetic that replaced it goes next to it.
+                gwp, unit = _epd_comparable(matched)
+                note = (
+                    f"CO2e räknat från EPD:ns deklarerade värde: {gwp:g} kg CO2e/"
+                    f"{unit} × {_model_number(proj_comp.quantity):g} "
+                    f"{proj_comp.unit} = {co2e:g} kg."
                 )
-                for listing, coverage in palats_candidates
-            ]
-        return []
+        # A price the model could not write as a number is an unknown price,
+        # which the enrichment pass fills in; never a reason to lose the row.
+        cost = _model_number(item.get("cost_sek"))
+        if cost is None or cost < 0:
+            if item.get("cost_sek") not in (None, 0, "", "0"):
+                logger.info("Unreadable cost_sek %r for %r; treated as unknown",
+                            item.get("cost_sek"), alt_name)
+            cost = 0
+
+        # Every row that gets here is a catalog row, whatever the model put in
+        # `source`, so it is tagged as one (the B1 filter keeps unpriced EPD
+        # rows and drops unpriced estimates).
+        if not source.lower().startswith("[epd]"):
+            registry = matched.get("source_registry") or "environdec"
+            source = " ".join(p for p in (
+                "[EPD]", _REGISTRY_LABELS.get(registry, registry),
+                str(matched.get("reg_no") or "")) if p)
+
+        # Which GWP indicator this rests on is a fact about the catalog, not
+        # something to hope the model repeats.
+        gwp_basis = matched.get("gwp_basis", "") or ""
+        if gwp_basis == "ghg":
+            # Rides in `source` as well as its own field: source is what the
+            # report's component table prints, so the basis reaches the
+            # document without a separate plumbing path.
+            source = f"{source} (GWP-GHG)"
+
+        reasoning = str(item.get("reasoning") or "").strip()
+        if note:
+            reasoning = f"{reasoning.rstrip('. ')}. {note}" if reasoning else note
+        results.append(Alternative(
+            name=alt_name or str(matched.get("name") or "Okänt alternativ"),
+            co2e_kg=co2e,
+            cost_sek=cost,
+            source=source,
+            reasoning=reasoning,
+            alternative_type="climate_optimized",
+            gwp_basis=gwp_basis,
+        ))
+
+    # Candidates the model left out. The prompt asks for every one of
+    # them, so an omission is either a judgement it was told to voice on
+    # another row or a lapse. Either way the listing exists on Palats and
+    # Johanna's April complaint was exactly a toilet that did not appear,
+    # so the row is appended with the factual fallback text and the
+    # omission is logged with the listing named. Data on the floor must
+    # say so.
+    for listing, coverage in palats_candidates:
+        if str(listing.id) in used_candidates:
+            continue
+        logger.warning(
+            "Ranking omitted Palats listing %s (%r) for %s; appending with "
+            "fallback reasoning", listing.id, listing.title, proj_comp.name,
+        )
+        results.append(_reuse_alternative(
+            listing, coverage, proj_comp.quantity, proj_comp.unit,
+            category, _FALLBACK_REUSE_REASONING,
+        ))
+
+    return results
 
 
 COMMENTARY_PROMPT = """Du är Aida — en byggnadsexpert som hjälper förvaltare och byggledare att hitta renoveringslösningar med kraftigt minskad klimatpåverkan.
@@ -2429,6 +2814,13 @@ Format:
 - Konkret och direkt, med materialnamn och siffror.
 - Skriv som en kunnig byggnadsexpert som pratar med en projektledare.
 - Skriv på svenska."""
+
+
+def _prompt_cost(value) -> str:
+    """A cost for a model prompt. The model reads "0 SEK" as free and reasons
+    about cost from it, so a missing price must say it is missing."""
+    n = _number(value)
+    return f"{n:.0f} SEK" if n is not None and n > 0 else "pris saknas"
 
 
 def _generate_commentary(
@@ -2449,7 +2841,7 @@ def _generate_commentary(
     for comp in result.components:
         bl_co2 = comp.baseline_co2e_kg
         bl_cost = comp.baseline_cost_sek
-        summary_lines.append(f"\n{comp.component_name} (baslinje: {bl_co2:.0f} kg CO2e, {bl_cost:.0f} SEK):")
+        summary_lines.append(f"\n{comp.component_name} (baslinje: {bl_co2:.0f} kg CO2e, {_prompt_cost(bl_cost)}):")
         usage = usage_by_id.get(comp.component_id, "")
         if usage:
             summary_lines.append(f"  Användning: {usage}")
@@ -2457,7 +2849,9 @@ def _generate_commentary(
             # Convention (matches the per-component prompt): minus = reduction.
             # pct = (alt - baseline)/baseline, so a 45% saving renders as "-45%".
             pct = ((alt.co2e_kg - bl_co2) / bl_co2 * 100) if bl_co2 > 0 else 0
-            cost_str = f"{alt.cost_sek:.0f} SEK" if alt.cost_sek > 0 else "Pris ej tillgängligt"
+            per_article = article_price(alt.to_dict())
+            cost_str = (f"annonspris {per_article:.0f} kr/st, täckning okänd" if per_article
+                        else _prompt_cost(alt.cost_sek))
             summary_lines.append(
                 f"  - {alt.name} ({alt.alternative_type}): {alt.co2e_kg:.0f} kg CO2e, "
                 f"{cost_str} ({pct:+.0f}% CO2e) | {alt.source}"
@@ -2472,10 +2866,13 @@ Projektets behov (användargodkänt):
 {inferred}
 """
 
+    # One line per row. Joined with "" until 2026-10-01, which ran every
+    # alternative onto its component's heading line.
+    alternatives_text = "\n".join(summary_lines)
     prompt = f"""Projekt: {project.building_type}, {project.area_bta} m2{needs_block}
 
 Alternativ som hittats:
-{''.join(summary_lines)}
+{alternatives_text}
 
 Skriv din kommentar."""
 

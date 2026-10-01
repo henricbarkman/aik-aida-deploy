@@ -6,13 +6,19 @@ Returns None silently if key is missing or any error occurs.
 from __future__ import annotations
 
 import logging
-import os
 import re
+import time
 
 import anthropic
 
-from aida.api_client import LLM_CALL_TIMEOUT as PLATFORM_CALL_TIMEOUT
-from aida.api_client import call_model
+# LLM_CALL_TIMEOUT: the per-call timeout of the shared client pricing runs on,
+# re-exported for the check that it sits below the platform ceiling.
+from aida.api_client import (
+    LLM_CALL_TIMEOUT,  # noqa: F401
+    call_model,
+    get_client,
+    is_truncated,
+)
 from aida.name_match import best_token_match, match_key
 
 logger = logging.getLogger(__name__)
@@ -25,15 +31,14 @@ PRICING_MODEL = "anthropic/claude-sonnet-5.5"
 PRICING_EFFORT = "medium"
 PRICING_MAX_TOKENS = 8000  # room for adaptive thinking + a short price answer
 MAX_SEARCH_USES = 3
-OPENROUTER_BASE_URL = "https://openrouter.ai/api"
 
+# A fallback call started with less time than this left is not worth making:
+# it would be cut off by its own timeout before the model has answered.
+_MIN_FALLBACK_SECONDS = 10.0
 
-# Non-streaming; web search + adaptive thinking can run long, so allow headroom.
-# Derived from the platform ceiling rather than hardcoded: this module used to
-# carry a flat 300.0, which equalled Vercel's maxDuration exactly, so the SDK
-# timeout could never fire first and a slow price search killed the whole
-# function. Same defect api_client fixed for itself in M3 (2026-08-14).
-LLM_CALL_TIMEOUT = PLATFORM_CALL_TIMEOUT
+# The clock deadlines are measured on. A module attribute so a test can move
+# time forward without sleeping.
+_now = time.monotonic
 
 # Source labels carried on Alternative.price_basis, so the table and the report
 # can say where a number came from instead of rendering three different kinds of
@@ -41,16 +46,41 @@ LLM_CALL_TIMEOUT = PLATFORM_CALL_TIMEOUT
 BASIS_WEB_SEARCH = "market_estimate"   # web-searched typical installed price
 BASIS_LLM_ESTIMATE = "llm_estimate"    # model's own estimate, no source found
 BASIS_LISTING = "listing"              # a real Palats asking price
+BASIS_ADJUSTED = "adjusted"           # an outlier replaced by the category's typical price
 
 
 def _get_client() -> anthropic.Anthropic | None:
-    """Return OpenRouter client for web search, or None if key not configured."""
-    api_key = os.environ.get("OPENROUTER_API_KEY")
-    if not api_key:
+    """The shared client (api_client.get_client), or None when no key is set.
+
+    None, not an exception: pricing is optional, and a missing key leaves the
+    rows "Pris saknas" instead of failing the step. This module used to build
+    its own client with its own base URL and timeout alias, so a fix made in
+    api_client (the timeout in M3, max_retries=0) had to be copied here by
+    hand, and a provider change would have left pricing on the old one.
+    """
+    try:
+        return get_client()
+    except RuntimeError as e:
+        logger.info("Pricing lookups disabled: %s", e)
         return None
-    return anthropic.Anthropic(
-        api_key=api_key, base_url=OPENROUTER_BASE_URL, timeout=LLM_CALL_TIMEOUT,
-    )
+
+
+def _timeout_kwargs(timeout: float | None) -> dict:
+    """Per-call timeout for call_model, when the caller has a budget."""
+    return {"timeout": timeout} if timeout else {}
+
+
+def _complete_text(response, text: str) -> str:
+    """The answer without a line the model was cut off in the middle of.
+
+    A price list stopped at max_tokens ends mid-line, and a cut line still
+    parses: "PRIS: 1250 SEK/m2" cut after the "m" reads as 1250 SEK per metre.
+    The complete lines above it are kept."""
+    if not is_truncated(response):
+        return text
+    logger.warning("Price answer cut off at max_tokens (%d chars); last line dropped",
+                   len(text))
+    return text.rsplit("\n", 1)[0] if "\n" in text else ""
 
 
 # Spellings a price answer uses for the units Aida counts quantities in, Swedish
@@ -126,7 +156,9 @@ def _extract_price(text: str, unit_hint: str) -> tuple[float, str] | None:
     return price, unit
 
 
-def _estimate_price_without_search(product_name: str, unit_hint: str) -> tuple[float, str, str] | None:
+def _estimate_price_without_search(
+    product_name: str, unit_hint: str, *, timeout: float | None = None,
+) -> tuple[float, str, str] | None:
     """LLM estimate without web search — fallback when web search fails."""
     client = _get_client()
     if client is None:
@@ -147,11 +179,16 @@ def _estimate_price_without_search(product_name: str, unit_hint: str) -> tuple[f
             max_tokens=PRICING_MAX_TOKENS,
             effort=PRICING_EFFORT,
             messages=[{"role": "user", "content": prompt}],
+            **_timeout_kwargs(timeout),
         )
     except Exception as e:
         logger.warning("Price estimation failed for '%s': %s", product_name, e)
         return None
 
+    if is_truncated(response):
+        # One price is one line; a cut-off answer has no complete one to keep.
+        logger.warning("Price estimate for '%s' cut off at max_tokens", product_name)
+        return None
     text_parts = [b.text for b in (response.content or []) if hasattr(b, "type") and b.type == "text"]
     full_text = " ".join(text_parts)
     if not full_text:
@@ -166,16 +203,34 @@ def _estimate_price_without_search(product_name: str, unit_hint: str) -> tuple[f
     return price, unit, "LLM-uppskattning"
 
 
-def lookup_price(product_name: str, unit_hint: str = "") -> tuple[float, str, str] | None:
+def lookup_price(
+    product_name: str, unit_hint: str = "", *, timeout: float | None = None,
+) -> tuple[float, str, str] | None:
     """Search the web for current Swedish market price of a building material.
 
     Returns (price_sek, unit, source_description) or None on any failure.
     Falls back to LLM estimate without web search if web search fails.
     Never raises.
+
+    ``timeout`` is the time the whole lookup may take, fallback included. The
+    web call gets all of it and the estimate only what is left, so a search
+    that times out cannot be followed by a second full-length call.
     """
     client = _get_client()
     if client is None:
         return None
+
+    deadline = _now() + timeout if timeout else None
+
+    def fallback() -> tuple[float, str, str] | None:
+        if deadline is None:
+            return _estimate_price_without_search(product_name, unit_hint)
+        left = deadline - _now()
+        if left < _MIN_FALLBACK_SECONDS:
+            logger.warning("No time left to estimate a price for '%s' (%.0fs)",
+                           product_name, left)
+            return None
+        return _estimate_price_without_search(product_name, unit_hint, timeout=left)
 
     prompt = _build_prompt(product_name, unit_hint)
 
@@ -196,10 +251,16 @@ def lookup_price(product_name: str, unit_hint: str = "") -> tuple[float, str, st
                     "timezone": "Europe/Stockholm",
                 },
             }],
+            **_timeout_kwargs(timeout),
         )
     except Exception as e:
         logger.warning("Pricing web search failed for '%s': %s", product_name, e)
-        return _estimate_price_without_search(product_name, unit_hint)
+        return fallback()
+
+    if is_truncated(response):
+        logger.warning("Price search for '%s' cut off at max_tokens, trying estimate",
+                       product_name)
+        return fallback()
 
     # Extract text and source URL from response
     text_parts = []
@@ -217,12 +278,12 @@ def lookup_price(product_name: str, unit_hint: str = "") -> tuple[float, str, st
 
     full_text = " ".join(text_parts)
     if not full_text:
-        return _estimate_price_without_search(product_name, unit_hint)
+        return fallback()
 
     result = _extract_price(full_text, unit_hint)
     if result is None:
         logger.info("Could not extract price for '%s' from web search, trying estimate", product_name)
-        return _estimate_price_without_search(product_name, unit_hint)
+        return fallback()
 
     price, unit = result
     source = f"Webbsökning ({source_url})" if source_url else "Webbsökning"
@@ -232,11 +293,15 @@ def lookup_price(product_name: str, unit_hint: str = "") -> tuple[float, str, st
 
 def lookup_prices_batch(
     products: list[tuple[str, str]],
+    *,
+    timeout: float | None = None,
 ) -> dict[str, tuple[float, str, str]]:
     """Look up prices for multiple products in a single LLM web search call.
 
     Args:
         products: list of (product_name, unit_hint) tuples
+        timeout: seconds the lookup may take in all; None is the client's
+            own per-call timeout.
 
     Returns:
         dict mapping lowercase product_name -> (price_per_unit, unit, source)
@@ -245,7 +310,7 @@ def lookup_prices_batch(
         return {}
     if len(products) == 1:
         name, unit = products[0]
-        result = lookup_price(name, unit)
+        result = lookup_price(name, unit, timeout=timeout)
         return {name.lower(): result} if result else {}
 
     client = _get_client()
@@ -297,6 +362,7 @@ def lookup_prices_batch(
                     "timezone": "Europe/Stockholm",
                 },
             }],
+            **_timeout_kwargs(timeout),
         )
     except Exception as e:
         logger.warning("Batch pricing web search failed: %s", e)
@@ -315,7 +381,7 @@ def lookup_prices_batch(
                     if url and url not in source_urls:
                         source_urls.append(url)
 
-    full_text = "\n".join(text_parts)
+    full_text = _complete_text(response, "\n".join(text_parts))
     if not full_text:
         return {}
 
@@ -500,7 +566,7 @@ def estimate_prices_batch(
             max_tokens=PRICING_MAX_TOKENS,
             effort=PRICING_EFFORT,
             messages=[{"role": "user", "content": prompt}],
-            **({"timeout": timeout} if timeout else {}),
+            **_timeout_kwargs(timeout),
         )
     except Exception as e:
         logger.warning("Batch price estimation failed: %s", e)
@@ -510,7 +576,7 @@ def estimate_prices_batch(
         b.text for b in (response.content or [])
         if hasattr(b, "type") and b.type == "text"
     ]
-    full_text = "\n".join(text_parts)
+    full_text = _complete_text(response, "\n".join(text_parts))
     if not full_text:
         return {}
 

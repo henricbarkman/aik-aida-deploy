@@ -46,7 +46,7 @@ Finns varken en passande produkt i Boverket eller ett typvärde gör Aida en ege
 
 ### Katalogen
 
-Alternativen kommer ur en katalog med 1 428 miljödeklarationer i 21 kategorier, nästan alla från det internationella EPD-systemet Environdec. Katalogen är sammanställd i förväg. Produktnamnen i Environdec är oftast på engelska, och en sökning på svenska byggdelsnamn missar det mesta.
+Alternativen kommer ur en katalog med 2 613 miljödeklarationer i 26 kategorier. De flesta kommer från det internationella EPD-systemet Environdec och ungefär var sjätte från norska EPD-Norge. Katalogen är sammanställd i förväg. Produktnamnen i Environdec är oftast på engelska, och en sökning på svenska byggdelsnamn missar det mesta.
 
 ### Hur alternativen väljs
 

@@ -19,7 +19,6 @@ from aida.api_client import (
 )
 from aida.data.climate_data import canonical_category
 from aida.llm_json import ModelOutputError, extract_json_object
-from aida.models import Project
 
 logger = logging.getLogger(__name__)
 
@@ -315,12 +314,6 @@ def run_intake(description: str, attachments: list[dict] | None = None) -> dict:
             second, getattr(retry, "stop_reason", None), retry_text[:2000],
         )
         raise
-
-
-def intake_from_description(description: str) -> Project:
-    """Run intake and return a Project object."""
-    data = run_intake(description)
-    return Project.from_dict(data)
 
 
 def main():

@@ -10,7 +10,8 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api"
 
 # Vercel kills the function at maxDuration (see vercel.json). AIDA_MAX_DURATION
 # lets another host override it without a code change.
-PLATFORM_MAX_DURATION = float(os.environ.get("AIDA_MAX_DURATION", "300"))
+# An empty value (a copied .env.example line) means the default, not float("").
+PLATFORM_MAX_DURATION = float(os.environ.get("AIDA_MAX_DURATION") or "300")
 
 # Left for Flask to build and return the answer, including the 504 body when a
 # step really does run long.
@@ -25,39 +26,59 @@ _RESPONSE_HEADROOM = 30.0
 LLM_CALL_TIMEOUT = max(30.0, PLATFORM_MAX_DURATION - _RESPONSE_HEADROOM)
 
 
-def remaining_budget(started_at: float) -> float:
+def remaining_budget(started_at: float, now: float | None = None) -> float:
     """Seconds left of the request before the platform kills the function.
 
     A step that makes a second call (intake's repair round-trip) must not hand
     the SDK a timeout longer than the request has left, or the function dies
     mid-call and the user gets a gateway page instead of our own message.
+
+    ``now`` is a time.monotonic() reading, for callers that take an injectable
+    clock; omitted, the real clock is read.
     """
     import time
 
-    spent = time.monotonic() - started_at
+    spent = (time.monotonic() if now is None else now) - started_at
     return max(0.0, LLM_CALL_TIMEOUT - spent)
 
 
 def get_client() -> anthropic.Anthropic:
-    """Get Anthropic client routed through OpenRouter.
+    """Anthropic SDK client routed through OpenRouter (OPENROUTER_API_KEY).
 
-    Uses OPENROUTER_API_KEY (primary), falls back to direct Anthropic access.
+    OpenRouter is the only path. Every model id in Aida is in OpenRouter's
+    format ("anthropic/claude-opus-5.5"), which api.anthropic.com rejects, so
+    the direct-Anthropic fallback that used to sit here (on ANTHROPIC_API_KEY)
+    returned a client whose every call failed. A missing key now fails here,
+    by name, instead of as a model-not-found error on the first call.
+
+    max_retries=0: the SDK's default of two silent retries covers timeouts,
+    429 and 5xx, so a call that timed out at LLM_CALL_TIMEOUT started again
+    instead of raising, and Vercel killed the function mid-retry. The timeout
+    budget above only holds if one call is one attempt. Callers that can
+    afford a second try (intake's repair, the pricing estimate pass) make it
+    themselves, with the remaining budget.
     """
     openrouter_key = os.environ.get("OPENROUTER_API_KEY")
-    if openrouter_key:
-        return anthropic.Anthropic(
-            api_key=openrouter_key,
-            base_url=OPENROUTER_BASE_URL,
-            timeout=LLM_CALL_TIMEOUT,
+    if not openrouter_key:
+        raise RuntimeError(
+            "OPENROUTER_API_KEY is not set. Aida calls every model through "
+            "OpenRouter; ANTHROPIC_API_KEY is not used."
         )
-
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if api_key:
-        return anthropic.Anthropic(api_key=api_key, timeout=LLM_CALL_TIMEOUT)
-
-    raise RuntimeError(
-        "No API key found. Set OPENROUTER_API_KEY or ANTHROPIC_API_KEY."
+    return anthropic.Anthropic(
+        api_key=openrouter_key,
+        base_url=OPENROUTER_BASE_URL,
+        timeout=LLM_CALL_TIMEOUT,
+        max_retries=0,
     )
+
+
+def is_truncated(response) -> bool:
+    """True when the model stopped at max_tokens, so its text is cut off.
+
+    A cut-off answer can still contain a parseable fragment (one inner object
+    of a list, the first lines of a price list), and a fragment read as the
+    answer is worse than an error: it looks complete."""
+    return getattr(response, "stop_reason", None) == "max_tokens"
 
 
 # Default model for Aida's reasoning agents (OpenRouter format).
@@ -97,8 +118,10 @@ _ADAPTIVE_MODELS = {"anthropic/claude-opus-5.5", "anthropic/claude-sonnet-5.5"}
 def _thinking_request(model: str, effort: str | None) -> dict:
     """Request kwargs for adaptive thinking at `effort`. Empty when thinking is
     off or the model can't do adaptive thinking. output_config goes via
-    extra_body because the pinned SDK (0.86) doesn't type it; OpenRouter
-    forwards it to the model (verified against Opus 4.8)."""
+    extra_body because that works whether or not the installed SDK types it
+    (0.86 does not), so the request body is the same on every SDK version:
+    local venvs and a fresh Vercel build have not always resolved the same
+    one. OpenRouter forwards it to the model (verified against Opus 4.8)."""
     if not effort or model not in _ADAPTIVE_MODELS:
         return {}
     return {

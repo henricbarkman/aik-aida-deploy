@@ -29,25 +29,12 @@ class BoverketClient:
             or DEFAULT_API_URL
         )
 
-    def get_latest_version(self) -> str:
-        url = f"{self.base_url}/api/Klimat/v2/GetLatestVersion/sv/json"
-        resp = requests.get(url, timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
-        return resp.json()["Version"]
-
     def get_all_resources(self, version: str = "senaste") -> list[dict]:
         url = f"{self.base_url}/api/Klimat/v2/GetAllResources/{version}/sv/json"
         resp = requests.get(url, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
         return data.get("Resources", [])
-
-    def get_categories(self, version: str = "senaste") -> list[dict]:
-        url = f"{self.base_url}/api/Klimat/v2/GetAllCategories/{version}/sv/json"
-        resp = requests.get(url, timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("Categories", [])
 
     def resources_to_cache_entries(self, resources: list[dict]) -> list[CacheEntry]:
         now = time.time()

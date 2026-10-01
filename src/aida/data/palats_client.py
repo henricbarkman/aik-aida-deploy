@@ -95,10 +95,6 @@ class PalatsListing:
     url: str  # Direct link to listing on palats.app
     location: str  # Human-readable location name
 
-    @property
-    def display_source(self) -> str:
-        return f"[Palats] palats.app — {self.title}"
-
 
 def _login() -> dict[str, str] | None:
     """Authenticate with username/password, return fresh cookies."""

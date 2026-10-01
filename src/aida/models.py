@@ -225,6 +225,14 @@ class Alternative:
     # the id regex reads, not a URL anyone can open. "" for everything else and
     # for analyses saved before 2026-09-14.
     url: str = ""
+    # The asking price of ONE listed article, for a Palats row whose component
+    # is counted in m2, lm or kg: the area an article covers is unknown, so no
+    # total can be formed. Until 2026-09-30 that per-article price sat in
+    # cost_sek, and every total read 725 kr as the cost of a 45 m2 floor. Now
+    # cost_sek is 0 (unpriced, like any other missing price) and the table
+    # prints this field as "725 kr/st *". 0 for every other row. Rows saved
+    # before 2026-09-30 lack the key; aggregate.article_price() reads those.
+    article_price_sek: float = 0
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -321,10 +329,20 @@ class AggregateResult:
     # compares like with like instead of a partial sum against a full baseline.
     comparable_cost_sek: float = 0
     comparable_baseline_cost_sek: float = 0
+    # The same rule on the baseline side. A baseline the pricing step could not
+    # price is stored as 0 ("Pris ej tillgängligt"), and until 2026-09-30 that
+    # zero entered the comparable pair: 40 000 kr against a floor baseline of
+    # "0" read as a 40 000 kr overrun.
+    baseline_unpriced_components: list[str] = field(default_factory=list)
+    # Project components the totals do not cover: no selection at all (its
+    # alternatives step failed, or it was added later), or a selection without a
+    # usable co2e_kg. Both used to vanish with a line on stderr while the report
+    # called the rest "Total klimatpåverkan".
+    missing_selection_ids: list[str] = field(default_factory=list)
 
     @property
     def cost_is_partial(self) -> bool:
-        return bool(self.unpriced_components)
+        return bool(self.unpriced_components or self.baseline_unpriced_components)
 
     def to_dict(self) -> dict:
         return {
@@ -338,6 +356,8 @@ class AggregateResult:
                 "komponenter_utan_pris": self.unpriced_components,
                 "jamforbar_kostnad_sek": self.comparable_cost_sek,
                 "jamforbar_baslinje_kostnad_sek": self.comparable_baseline_cost_sek,
+                "baslinje_komponenter_utan_pris": self.baseline_unpriced_components,
+                "komponenter_utan_val": self.missing_selection_ids,
             },
             "komponenter": self.components,
         }

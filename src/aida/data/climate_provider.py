@@ -19,6 +19,8 @@ import sys
 from dataclasses import dataclass
 
 from aida.data.climate_cache import CacheEntry, ClimateCache
+from aida.errors import UserFacingError
+from aida.name_match import match_key
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +97,32 @@ def _conversion_is_implausible(
         typ["baseline_co2e_per_unit"], _CONVERSION_SANITY_FACTOR,
     )
     return True
+
+
+def resolve_boverket_product(name: str | None, products: list[CacheEntry]) -> CacheEntry | None:
+    """The Boverket product a model-written name refers to, or None.
+
+    The baseline prompt asks for the exact product name from the list it
+    shows, and the row is then labelled "Boverkets klimatdatabas". Nothing
+    checked that the name was on the list: a product the model invented
+    ("Golvmatta, homogen PVC 2 mm") came back credited to Boverket with the
+    model's own figure (handover review 2026-09-30, E3). A caller that gets
+    None here must not use the Boverket label.
+
+    Matching goes through name_match.match_key, the same normalisation the
+    EPD and price matchers use, so an en dash or a decimal comma the model
+    retyped does not turn a real product into an unknown one. Deliberately
+    no containment or token overlap: Boverket lists near-identical names
+    with different figures ("Betong C30/37" and its variants), and picking
+    the wrong one would be the same false attribution in a subtler form.
+    """
+    key = match_key(name or "")
+    if not key:
+        return None
+    for product in products:
+        if match_key(product.name or product.product_name or "") == key:
+            return product
+    return None
 
 
 def _match_boverket_category(boverket_cat: str) -> str | None:
@@ -188,52 +216,39 @@ class ClimateProvider:
 
         return None
 
-    def lookup_without_price(
-        self,
-        product_name: str,
-        component_hint: str = "",
-    ) -> ClimateResult | None:
-        """Look up climate data without triggering price enrichment.
-
-        Same fallback chain as lookup() but skips the per-component LLM
-        web search for prices. Use this when price enrichment will be
-        done separately in batch.
-        """
-        if not product_name or not product_name.strip():
-            return None
-
-        key = product_name.lower().strip()
-
-        cached = self._cache.get(key)
-        if cached:
-            result = _entry_to_result(cached)
-            return self._maybe_convert_units(result, component_hint or key, cached.extra_json)
-
-        result = self._try_boverket(key, component_hint)
-        if result:
-            return result
-
-        result = self._try_environdec(key, component_hint)
-        if result:
-            return result
-
-        # Retry with normalized category key
-        result = self._try_normalized(key, component_hint)
-        if result:
-            return result
-
-        return None
-
     def ensure_synced(self) -> None:
-        """Pre-load Boverket data if not already synced."""
-        if not self._boverket_synced:
-            if self._cache.count("boverket") > 0:
-                self._boverket_synced = True
-            else:
-                try:
-                    self.sync_boverket()
-                except Exception as e:
-                    logger.warning("Boverket pre-sync failed: %s", e)
+        """Pre-load Boverket data if not already synced, or refuse.
+
+        Raises UserFacingError (503) when the Boverket list is still empty
+        after the sync attempt. Until 2026-09-30 that was one warning, and the
+        baseline then ran against an empty "BOVERKETS PRODUKTLISTA": every row
+        became an estimate, or a Boverket product the model named from memory
+        and that the row then credited to Boverkets klimatdatabas. The trigger
+        is a deploy without climate_cache.db (gitignored until 2026-09-30,
+        tracked since) at a moment Boverket's API does not answer;
+        an aged cache is not affected, since get_all_boverket ignores the TTL.
+        A baseline that has never seen Boverket is not a baseline, so the
+        step stops with a sentence the förvaltare can act on.
+        """
+        if self._boverket_synced:
+            return
+        if self._cache.count("boverket") > 0:
+            self._boverket_synced = True
+            return
+        try:
+            self.sync_boverket()
+        except Exception as e:
+            logger.warning("Boverket pre-sync failed: %s", e)
+        if self._cache.count("boverket") == 0:
+            self._boverket_synced = False
+            logger.error("Boverket list is empty after a sync attempt (cache %s); "
+                         "refusing to compute a baseline without it",
+                         getattr(self._cache, "db_path", "?"))
+            raise UserFacingError(
+                "Boverkets klimatdatabas går inte att nå just nu, och utan den kan "
+                "baslinjen inte räknas. Försök igen om en stund.",
+                status_code=503,
+            )
 
     def _maybe_enrich_cost(self, result: ClimateResult, product_name: str) -> ClimateResult:
         """Try web search for current market price. Skips if already enriched."""

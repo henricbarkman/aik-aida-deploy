@@ -34,10 +34,10 @@ A stated floor is honest; a fabricated total is not.
 
 from __future__ import annotations
 
-import copy
 from datetime import UTC, datetime
 
 from aida import overrides as overrides_mod
+from aida.agents.aggregate import article_price
 
 # Spelling variants of one unit, not classes of comparable units. Every entry
 # here means "the same physical quantity written differently"; nothing that
@@ -205,7 +205,8 @@ def _outcome_for(as_built: dict, component_unit: str) -> tuple[float | None, str
 def _planned_for(cid: str, selections: dict, baseline_co2e: float | None):
     """(kg, is_baseline). A component nobody chose an alternative for is planned
     as its baseline, and the caller says so in the cell rather than presenting
-    the baseline as if it had been a choice."""
+    the baseline as if it had been a choice. A chosen alternative without a
+    figure is an unknown plan, not the baseline's (same rule as the cost)."""
     sel = selections.get(cid) if isinstance(selections, dict) else None
     if isinstance(sel, dict):
         alt = sel.get("selected_alternative")
@@ -213,18 +214,31 @@ def _planned_for(cid: str, selections: dict, baseline_co2e: float | None):
             value = _num(alt.get("co2e_kg"))
             if value is not None:
                 return value, alt.get("name") == "Baslinje"
+            if alt.get("name") != "Baslinje":
+                return None, False
     return baseline_co2e, True
 
 
 def _planned_cost_for(cid: str, selections: dict, baseline_cost: float | None):
+    """The planned cost, or None when the plan has no price.
+
+    A component nobody chose for is planned at its baseline cost. A chosen
+    alternative without a price is an unknown plan, not the baseline's: until
+    2026-10-01 it fell back to the baseline cost, and a per-article Palats price
+    saved in cost_sek counted as the whole component's cost. An unpriced
+    baseline (0) is no plan either: planned at 0 kr, its whole actual cost read
+    as overrun and "estimated 0" went into the calibration facts.
+    """
     sel = selections.get(cid) if isinstance(selections, dict) else None
     if isinstance(sel, dict):
         alt = sel.get("selected_alternative")
-        if isinstance(alt, dict):
+        if isinstance(alt, dict) and alt.get("name") != "Baslinje":
+            if article_price(alt):
+                return None
             value = _num(alt.get("cost_sek"))
-            if value is not None and value > 0:
-                return value
-    return baseline_cost
+            return value if value is not None and value > 0 else None
+    value = _num(baseline_cost)
+    return value if value is not None and value > 0 else None
 
 
 def compute(project, baseline, selections, as_built, overrides=None) -> dict:
@@ -299,8 +313,11 @@ def _totals(rows) -> dict:
     A total that silently skipped them would still be a total; it just would not
     be the one the reader thinks they are looking at.
     """
-    counted = [r for r in rows if r["outcome_co2e_kg"] is not None]
-    uncounted = [r["name"] for r in rows if r["outcome_co2e_kg"] is None]
+    # A row counts only with all three figures: the cards and the report say
+    # baseline and plan cover the same rows as the outcome.
+    counted = [r for r in rows if r["outcome_co2e_kg"] is not None
+               and r["baseline_co2e_kg"] is not None and r["planned_co2e_kg"] is not None]
+    uncounted = [r["name"] for r in rows if r not in counted]
 
     outcome = _sum(r["outcome_co2e_kg"] for r in counted)
     # Compared over the SAME rows, never over all of them: an outcome for three
@@ -309,7 +326,12 @@ def _totals(rows) -> dict:
     baseline = _sum(r["baseline_co2e_kg"] for r in counted)
     planned = _sum(r["planned_co2e_kg"] for r in counted)
 
-    cost_rows = [r for r in counted if r["actual_cost_sek"] is not None]
+    # Cost is compared over rows priced on BOTH sides, for the same reason as
+    # above; a row with an actual cost but no planned one is named instead.
+    cost_rows = [r for r in counted
+                 if r["actual_cost_sek"] is not None and r["planned_cost_sek"] is not None]
+    cost_uncounted = [r["name"] for r in counted
+                      if r["actual_cost_sek"] is not None and r["planned_cost_sek"] is None]
     actual_cost = _sum(r["actual_cost_sek"] for r in cost_rows)
     planned_cost = _sum(r["planned_cost_sek"] for r in cost_rows)
 
@@ -326,6 +348,7 @@ def _totals(rows) -> dict:
         "planned_cost_sek": round(planned_cost),
         "cost_difference_sek": round(actual_cost - planned_cost),
         "cost_rows_counted": len(cost_rows),
+        "cost_uncounted_names": cost_uncounted,
     }
 
 
@@ -384,9 +407,3 @@ def drop_for_component(as_built, cid: str) -> bool:
         return False
     del as_built[cid]
     return True
-
-
-def strip_for_storage(as_built) -> dict:
-    """What goes in `as_built_data`. A copy, so the caller's bag is not aliased
-    into the row that gets sent to Supabase."""
-    return copy.deepcopy(as_built) if isinstance(as_built, dict) else {}

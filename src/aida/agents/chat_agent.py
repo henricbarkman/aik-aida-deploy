@@ -24,6 +24,7 @@ from aida.api_client import (
     extract_text,
     get_client,
 )
+from aida.agents.aggregate import _number, article_price
 from aida.data.climate_data import VALID_CATEGORIES
 from aida.errors import UserFacingError
 
@@ -321,6 +322,23 @@ TOOLS = [
 ]
 
 
+def _kg(value) -> str:
+    """A climate figure for the snapshot, or a word when there is none."""
+    n = _number(value)
+    return f"{round(n)} kg CO₂e" if n is not None else "CO₂e saknas"
+
+
+def _sek(row: dict) -> str:
+    """A cost for the snapshot. The model answers cost questions from this text,
+    so a missing price must read as missing, never as "0 SEK" (free), and a
+    per-article reuse price must not read as the component's cost."""
+    per_article = article_price(row)
+    if per_article:
+        return f"annonspris {round(per_article)} kr/st, täckning okänd"
+    n = _number(row.get("cost_sek"))
+    return f"{round(n)} SEK" if n is not None and n > 0 else "pris saknas"
+
+
 def _format_state(project, baseline, alternatives, selections) -> str:
     """Compact, LLM-readable snapshot of current state."""
     lines = []
@@ -337,13 +355,29 @@ def _format_state(project, baseline, alternatives, selections) -> str:
         lines.append("PROJEKT: (inget projekt än)")
 
     if baseline and baseline.get("components"):
-        total_co2 = sum(c.get("co2e_kg", 0) for c in baseline["components"])
-        total_cost = sum(c.get("cost_sek", 0) for c in baseline["components"])
-        lines.append(f"\nBASLINJE: {round(total_co2):,} kg CO₂e, {round(total_cost):,} SEK totalt")
-        for c in baseline["components"]:
+        rows = baseline["components"]
+
+        # A partial sum says how much it covers, and an empty one says nothing
+        # is known, so the model never reads "0 kg" or "0 SEK" as a figure.
+        def covered(values, unit, missing):
+            if len(values) == len(rows):
+                return f"{round(sum(values)):,} {unit}"
+            if not values:
+                return f"{missing} saknas för alla komponenter"
+            return (f"{round(sum(values)):,} {unit} för {len(values)} av {len(rows)} "
+                    f"komponenter (övriga saknar {missing})")
+
+        co2 = [n for n in (_number(c.get("co2e_kg")) for c in rows) if n is not None]
+        priced = [n for n in (_number(c.get("cost_sek")) for c in rows) if n and n > 0]
+        co2_part = covered(co2, "kg CO₂e", "klimatvärde")
+        cost_part = covered(priced, "SEK", "pris")
+        if len(priced) == len(rows):
+            cost_part += " totalt"
+        lines.append(f"\nBASLINJE: {co2_part}, {cost_part}")
+        for c in rows:
             lines.append(
                 f"  {c.get('component_id')}: {c.get('component_name')} — "
-                f"{round(c.get('co2e_kg', 0))} kg CO₂e, {round(c.get('cost_sek', 0))} SEK"
+                f"{_kg(c.get('co2e_kg'))}, {_sek(c)}"
             )
 
     if alternatives and alternatives.get("components"):
@@ -352,9 +386,7 @@ def _format_state(project, baseline, alternatives, selections) -> str:
             alts = c.get("alternatives", [])
             lines.append(f"  {c.get('component_id')}: {c.get('component_name')} — {len(alts)} alternativ")
             for a in alts[:5]:
-                lines.append(
-                    f"    • {a.get('name')}: {round(a.get('co2e_kg', 0))} kg CO₂e, {round(a.get('cost_sek', 0))} SEK"
-                )
+                lines.append(f"    • {a.get('name')}: {_kg(a.get('co2e_kg'))}, {_sek(a)}")
             if len(alts) > 5:
                 lines.append(f"    ... +{len(alts) - 5} till")
 
@@ -363,10 +395,10 @@ def _format_state(project, baseline, alternatives, selections) -> str:
         if sel_entries:
             lines.append("\nVAL:")
             for cid, s in sel_entries:
-                sel = s.get("selected_alternative", {})
+                sel = s.get("selected_alternative") or {}
                 lines.append(
                     f"  {cid}: {s.get('name')} → {sel.get('name')} "
-                    f"({round(sel.get('co2e_kg', 0))} kg, {round(sel.get('cost_sek', 0))} SEK)"
+                    f"({_kg(sel.get('co2e_kg'))}, {_sek(sel)})"
                 )
 
     return "\n".join(lines)

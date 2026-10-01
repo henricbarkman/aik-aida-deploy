@@ -95,6 +95,10 @@ def generate_report_markdown(
         # A missing price is not zero kronor. Printing "0" in this column let
         # the model write about a cost saving that came out of a data gap.
         cost_cell = "Pris saknas" if comp.get("pris_saknas") else f"{comp['kostnad_sek']:,.0f}"
+        if comp.get("pris_saknas") and comp.get("artikelpris_sek"):
+            # Named, so the model can do what the system prompt asks about
+            # Palats per-article prices, but never as the component's cost.
+            cost_cell += f" (annonspris {comp['artikelpris_sek']:,.0f} per artikel, täckning okänd)"
         component_table += (
             f"| {comp['name']} | {comp['valt_alternativ']} | "
             f"{comp['co2e_kg']:.0f} | {comp['baslinje_co2e_kg']:.0f} | "
@@ -104,6 +108,7 @@ def generate_report_markdown(
 
     stock_caveats = build_stock_caveats(aggregate.components)
     gwp_caveats = build_gwp_basis_caveats(aggregate.components)
+    no_choice = build_missing_selection_caveat(project, aggregate)
     price_gap = build_missing_price_caveat(aggregate)
     estimated_prices = build_estimated_price_caveats(aggregate.components)
     override_rows = overrides_mod.listing(project.to_dict(), overrides)
@@ -132,17 +137,20 @@ Sammanställning:
 - Total klimatpåverkan (valt): {aggregate.total_co2e_kg:.0f} kg CO2e
 - Baslinje (konventionellt): {aggregate.baseline_total_co2e_kg:.0f} kg CO2e
 - Klimatbesparing: {aggregate.co2e_savings_kg:.0f} kg CO2e ({saving_pct_total:.0f}%)
-{_cost_prompt_lines(aggregate)}
+{_coverage_prompt_line(no_choice, len(aggregate.components))}{_cost_prompt_lines(aggregate)}
 Komponenttabell:
 | Komponent | Valt alternativ | CO2e (kg) | Baslinje (kg) | Besparing | Kostnad (SEK) | Källa |
 |-----------|----------------|-----------|---------------|-----------|---------------|-------|
 {component_table}
-{_caveat_prompt_block(stock_caveats)}{_price_gap_prompt_block(price_gap)}{_estimated_price_prompt_block(estimated_prices)}{_override_prompt_block(override_rows)}
+{_missing_selection_prompt_block(no_choice)}{_caveat_prompt_block(stock_caveats)}{_price_gap_prompt_block(price_gap)}{_estimated_price_prompt_block(estimated_prices)}{_override_prompt_block(override_rows)}
 Skriv en komplett rapport i markdown. Inkludera disclaimer om att detta är uppskattningar för beslutsstöd."""
         }],
     )
 
     markdown = extract_text(response)
+    if no_choice:
+        markdown = markdown.rstrip() + "\n\n" + render_missing_selection_caveat(
+            no_choice, len(aggregate.components))
     if stock_caveats:
         markdown = markdown.rstrip() + "\n\n" + render_stock_caveats(stock_caveats)
     if gwp_caveats:
@@ -185,24 +193,97 @@ def build_stock_caveats(components: list[dict]) -> list[dict]:
     return caveats
 
 
+def build_missing_selection_caveat(project: Project, aggregate) -> list[str]:
+    """Names of the project components the totals do not cover.
+
+    A component whose alternatives step failed never reaches the selections,
+    and the browser only asks for a choice per component that HAS alternatives.
+    Until 2026-09-30 the report then summed the rest and called it "Total
+    klimatpåverkan" with nothing to say a component was missing.
+    """
+    names = {c.id: c.name for c in project.components}
+    return [names.get(cid) or cid for cid in aggregate.missing_selection_ids]
+
+
+def _coverage_prompt_line(no_choice: list[str], counted: int) -> str:
+    if not no_choice:
+        return ""
+    return (
+        f"- Summorna ovan gäller {counted} av {counted + len(no_choice)} "
+        f"komponenter. Utan valt alternativ: {', '.join(no_choice)}.\n"
+    )
+
+
+def _missing_selection_prompt_block(no_choice: list[str]) -> str:
+    if not no_choice:
+        return ""
+    return (
+        "\nKomponenter utan valt alternativ (viktigt, nämn i sammanfattningen "
+        "och under osäkerheter):\n"
+        + "\n".join(f"- {name}" for name in no_choice)
+        + "\nDe ingår varken i klimat- eller kostnadssummorna. Kalla inte "
+        "summorna projektets totala klimatpåverkan.\n"
+    )
+
+
+def render_missing_selection_caveat(no_choice: list[str], counted: int) -> str:
+    """The appendix that always lands, regardless of what the model wrote."""
+    total = counted + len(no_choice)
+    rows = "\n".join(f"| {cell(name)} |" for name in no_choice)
+    return (
+        "## Komponenter utan valt alternativ\n\n"
+        f"{len(no_choice)} av {total} komponenter i projektet saknar ett valt "
+        "alternativ med klimatvärde och ingår inte i rapportens summor. "
+        "Klimatpåverkan, besparing och kostnad gäller alltså "
+        f"{counted} av {total} komponenter, inte hela projektet.\n\n"
+        "| Komponent utan val |\n|---|\n"
+        f"{rows}\n"
+    )
+
+
 def build_missing_price_caveat(aggregate) -> dict | None:
     """Facts about the part of the basket that has no price.
 
-    Returns None when every selected alternative is priced. Otherwise the names
-    of the unpriced components plus the two totals that ARE comparable, computed
-    over the priced subset only.
+    Returns None when every selected alternative and every baseline figure is
+    priced. Otherwise which side lacks a price, per component, plus the two
+    totals that ARE comparable, computed over the components priced on both
+    sides only. A baseline without a price is the same gap as an alternative
+    without one: until 2026-09-30 its zero entered the comparison and a floor
+    read as a 40 000 kr overrun against a baseline nobody had priced.
     """
-    if not aggregate.unpriced_components:
+    unpriced = list(aggregate.unpriced_components)
+    baseline_unpriced = list(aggregate.baseline_unpriced_components)
+    if not unpriced and not baseline_unpriced:
         return None
-    priced_count = len(aggregate.components) - len(aggregate.unpriced_components)
+    rows = []
+    comparable = 0
+    for c in aggregate.components:
+        alt_gap, bl_gap = bool(c.get("pris_saknas")), bool(c.get("baslinje_pris_saknas"))
+        if alt_gap and bl_gap:
+            rows.append({"komponent": c.get("name", ""), "saknas": "Valt alternativ och baslinje"})
+        elif alt_gap:
+            rows.append({"komponent": c.get("name", ""), "saknas": "Valt alternativ"})
+        elif bl_gap:
+            rows.append({"komponent": c.get("name", ""), "saknas": "Baslinje"})
+        else:
+            comparable += 1
     return {
-        "utan_pris": list(aggregate.unpriced_components),
-        "antal_utan_pris": len(aggregate.unpriced_components),
-        "antal_prissatta": priced_count,
+        "utan_pris": unpriced,
+        "antal_utan_pris": len(unpriced),
+        "baslinje_utan_pris": baseline_unpriced,
+        "rader": rows,
+        "antal_prissatta": comparable,
         "antal_totalt": len(aggregate.components),
         "jamforbar_kostnad": aggregate.comparable_cost_sek,
         "jamforbar_baslinje": aggregate.comparable_baseline_cost_sek,
     }
+
+
+def _comparable_scope(n: int) -> str:
+    """Singular and plural: "de 1 komponenter" reads as generated text."""
+    if n == 1:
+        return "den komponent som har pris både i valt alternativ och i baslinjen"
+    return f"de {n} komponenter som har pris både i valt alternativ och i baslinjen"
 
 
 def _cost_prompt_lines(aggregate) -> str:
@@ -220,18 +301,38 @@ def _cost_prompt_lines(aggregate) -> str:
             f"- Baslinje kostnad: {aggregate.baseline_total_cost_sek:,.0f} SEK\n"
             f"- Kostnadsskillnad: {aggregate.cost_difference_sek:+,.0f} SEK\n"
         )
-    diff = gap["jamforbar_kostnad"] - gap["jamforbar_baslinje"]
-    return (
-        f"- Kostnad går INTE att totalsummera: {gap['antal_utan_pris']} av "
-        f"{gap['antal_totalt']} komponenter saknar pris "
-        f"({', '.join(gap['utan_pris'])}).\n"
-        f"- För de {gap['antal_prissatta']} komponenter som har pris: "
-        f"{gap['jamforbar_kostnad']:,.0f} SEK mot baslinjens "
-        f"{gap['jamforbar_baslinje']:,.0f} SEK, alltså {diff:+,.0f} SEK.\n"
-        f"- Ange ALDRIG en totalkostnad eller en procentuell kostnadsförändring "
-        f"för hela projektet. Redovisa bara delsumman ovan och säg vilka "
-        f"komponenter som saknar pris.\n"
+    lines = []
+    if gap["utan_pris"]:
+        lines.append(
+            f"- Kostnad går INTE att totalsummera: {gap['antal_utan_pris']} av "
+            f"{gap['antal_totalt']} komponenter saknar pris "
+            f"({', '.join(gap['utan_pris'])}).\n"
+        )
+    if gap["baslinje_utan_pris"]:
+        lines.append(
+            f"- Kostnad går INTE att jämföra mot baslinjen för "
+            f"{len(gap['baslinje_utan_pris'])} av {gap['antal_totalt']} "
+            f"komponenter, eftersom baslinjen saknar pris "
+            f"({', '.join(gap['baslinje_utan_pris'])}).\n"
+        )
+    if gap["antal_prissatta"]:
+        diff = gap["jamforbar_kostnad"] - gap["jamforbar_baslinje"]
+        lines.append(
+            f"- För {_comparable_scope(gap['antal_prissatta'])}: "
+            f"{gap['jamforbar_kostnad']:,.0f} SEK mot baslinjens "
+            f"{gap['jamforbar_baslinje']:,.0f} SEK, alltså {diff:+,.0f} SEK.\n"
+        )
+    else:
+        lines.append(
+            "- Ingen komponent har pris både i valt alternativ och i baslinjen, "
+            "så ingen kostnadsjämförelse går att göra.\n"
+        )
+    lines.append(
+        "- Ange ALDRIG en totalkostnad eller en procentuell kostnadsförändring "
+        "för hela projektet. Redovisa bara delsumman ovan och säg vilka "
+        "komponenter som saknar pris.\n"
     )
+    return "".join(lines)
 
 
 def _price_gap_prompt_block(gap: dict | None) -> str:
@@ -240,7 +341,7 @@ def _price_gap_prompt_block(gap: dict | None) -> str:
     return (
         "\nKomponenter utan pris (viktigt, ta upp under kostnadsbedömning och "
         "osäkerheter):\n"
-        + "\n".join(f"- {name}" for name in gap["utan_pris"])
+        + "\n".join(f"- {r['komponent']} (saknas: {r['saknas'].lower()})" for r in gap["rader"])
         + "\nEtt saknat pris betyder att ingen prisuppgift hittades, inte att "
         "posten är gratis. Skriv detta rakt ut.\n"
     )
@@ -248,18 +349,32 @@ def _price_gap_prompt_block(gap: dict | None) -> str:
 
 def render_missing_price_caveat(gap: dict) -> str:
     """The appendix that always lands, regardless of what the model wrote."""
-    rows = "\n".join(f"| {cell(name)} |" for name in gap["utan_pris"])
-    diff = gap["jamforbar_kostnad"] - gap["jamforbar_baslinje"]
+    rows = "\n".join(f"| {cell(r['komponent'])} | {r['saknas']} |" for r in gap["rader"])
+    said = []
+    if gap["utan_pris"]:
+        said.append(f"{gap['antal_utan_pris']} av {gap['antal_totalt']} valda "
+                    "alternativ saknar prisuppgift.")
+    if gap["baslinje_utan_pris"]:
+        said.append(f"Baslinjen saknar prisuppgift för {len(gap['baslinje_utan_pris'])} "
+                    f"av {gap['antal_totalt']} komponenter.")
+    if gap["antal_prissatta"]:
+        diff = gap["jamforbar_kostnad"] - gap["jamforbar_baslinje"]
+        comparison = (
+            "och den kostnadsjämförelse som redovisas gäller bara "
+            f"{_comparable_scope(gap['antal_prissatta'])}: "
+            f"{gap['jamforbar_kostnad']:,.0f} SEK mot baslinjens "
+            f"{gap['jamforbar_baslinje']:,.0f} SEK, alltså {diff:+,.0f} SEK."
+        )
+    else:
+        comparison = ("och ingen komponent har pris både i valt alternativ och "
+                      "i baslinjen, så någon kostnadsjämförelse går inte att göra.")
     return (
         "## Komponenter utan prisuppgift\n\n"
-        f"{gap['antal_utan_pris']} av {gap['antal_totalt']} valda alternativ "
-        "saknar prisuppgift. Det betyder att ingen prisuppgift gick att hitta, "
-        "inte att posten är kostnadsfri. Någon totalkostnad för projektet går "
-        "därför inte att ange, och den kostnadsjämförelse som redovisas gäller "
-        f"bara de {gap['antal_prissatta']} komponenter som har pris: "
-        f"{gap['jamforbar_kostnad']:,.0f} SEK mot baslinjens "
-        f"{gap['jamforbar_baslinje']:,.0f} SEK, alltså {diff:+,.0f} SEK.\n\n"
-        "| Komponent utan pris |\n|---|\n"
+        + " ".join(said)
+        + " Det betyder att ingen prisuppgift gick att hitta, inte att posten "
+        "är kostnadsfri. Någon totalkostnad för projektet går därför inte att "
+        f"ange, {comparison}\n\n"
+        "| Komponent | Pris saknas för |\n|---|---|\n"
         f"{rows}\n"
     )
 
@@ -536,6 +651,11 @@ def render_followup_report(project: dict, result: dict, overrides=None,
             f"{_fmt(totals.get('actual_cost_sek'))} SEK mot planerade "
             f"{_fmt(totals.get('planned_cost_sek'))} SEK, alltså "
             f"{_signed(totals.get('cost_difference_sek'))} SEK.\n\n"
+        )
+    if totals.get("cost_uncounted_names"):
+        body += (
+            "Har verkligt pris men inget planerat, så kostnaden jämförs inte: "
+            f"{', '.join(totals['cost_uncounted_names'])}.\n\n"
         )
 
     body += (

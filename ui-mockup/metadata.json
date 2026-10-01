@@ -1,7 +1,0 @@
-{
-  "name": "AI Assistant Tool Mockup",
-  "description": "A high-quality web interface mockup for an AI assistant tool, featuring a modern, minimalist, and positive design with light pastel colors. It includes a progress tracker, an AI chat panel, and a results display area.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}

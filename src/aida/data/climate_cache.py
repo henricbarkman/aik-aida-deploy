@@ -30,12 +30,8 @@ def _resolve_writable_path(source: Path) -> Path:
     return tmp_path
 
 
-# TTL in seconds
+# TTL in seconds. Environdec rows use the same 30 days (environdec_client.py).
 TTL_BOVERKET = 30 * 24 * 3600   # 30 days
-TTL_LOCAL = 365 * 24 * 3600     # 1 year (static data)
-TTL_ENVIRONDEC = 30 * 24 * 3600 # 30 days
-TTL_LLM = 7 * 24 * 3600        # 7 days
-TTL_PRICING = 30 * 24 * 3600   # 30 days
 
 
 @dataclass

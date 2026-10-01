@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+import time
 
 from aida.api_client import (
     DEFAULT_MODEL,
@@ -16,10 +17,9 @@ from aida.api_client import (
 )
 from aida.data.climate_data import (
     REASONING,
-    normalize_component_name,
     resolve_category,
 )
-from aida.data.climate_provider import ClimateProvider
+from aida.data.climate_provider import ClimateProvider, resolve_boverket_product
 from aida.errors import UserFacingError
 from aida.llm_json import ModelOutputError, extract_json_value
 from aida.models import Baseline, BaselineResult, Project
@@ -27,18 +27,32 @@ from aida.models import Baseline, BaselineResult, Project
 logger = logging.getLogger(__name__)
 
 
+# Source of a CO2e figure that is a category range's midpoint rather than
+# anything looked up. It contains "Uppskattning", so every renderer badges it
+# as an estimate.
+CLAMPED_CO2E_SOURCE = "Uppskattning (intervall)"
+
+# cost_source of a price that was an extreme outlier and is now the category
+# range midpoint times the quantity: no web search found it.
+ADJUSTED_PRICE_SOURCE = "Schablonpris (justerat)"
+
+
 def _validate_baseline(results: list[BaselineResult], components: list) -> list[BaselineResult]:
     """Validate prices and CO2 values on baseline results.
 
-    Extreme outliers get clamped to reasonable ranges. Mild outliers get flagged.
+    Extreme outliers get clamped to reasonable ranges, and a clamped row is
+    relabelled as the range estimate it has become. Mild outliers get flagged.
+    Every row leaves with co2e_kg == co2e_per_unit x quantity, which is the
+    multiplication the baseline view prints under the total.
     """
     from aida.data.epd_baseline_medians import UNLIKE_THEIR_CATEGORY
-    from aida.data.price_validation import validate_co2e, validate_total_price
+    from aida.data.price_validation import check_co2e, check_total_price
 
     comp_map = {c.id: c for c in components}
     for r in results:
         comp = comp_map.get(r.component_id)
         quantity = comp.quantity if comp else 0
+        unit = comp.unit if comp else ""
         category = resolve_category(r.component_name, comp.category if comp else "")
         is_estimate = "uppskattning" in (r.cost_source or "").lower()
 
@@ -48,34 +62,116 @@ def _validate_baseline(results: list[BaselineResult], components: list) -> list[
             if "pris ej tillgängligt" not in r.description.lower():
                 r.description = r.description.rstrip(". ") + ". Pris ej tillgängligt."
         else:
-            validated_cost, price_note = validate_total_price(
-                r.cost_sek, quantity, category, is_estimate=is_estimate,
-                unit=comp.unit if comp else "",
+            price = check_total_price(
+                r.cost_sek, quantity, category, is_estimate=is_estimate, unit=unit,
             )
-            if validated_cost != r.cost_sek:
-                r.cost_sek = validated_cost
-            if price_note and price_note.lower() not in r.description.lower():
-                r.description = r.description.rstrip(". ") + f". {price_note}."
+            if price.cost != r.cost_sek:
+                r.cost_sek = price.cost
+            if price.replaced:
+                # The total is now the range midpoint, not the price the search
+                # found, so "Webbsökning (AI)" would attribute a number to a
+                # search that never produced it (handover review L2).
+                r.cost_source = ADJUSTED_PRICE_SOURCE
+            if price.note and price.note.lower() not in r.description.lower():
+                r.description = r.description.rstrip(". ") + f". {price.note}."
 
-        # Validate CO2. Not the typvärde of a subtype its category's range
-        # says nothing about: a glazed partition's 177.4 kg CO2e/m2 was
-        # clamped to the plasterboard wall's midpoint, 1419 kg to 64
-        # (HENRIC-3290 del 3, found in the production smoke). Every other
-        # subtype typvärde (toalett, vinyl, armatur) keeps the check, which
-        # is how a mis-tagged catalog row gets noticed.
+        # Validate CO2, except an EPD typvärde. The ranges are hand-written and
+        # the typvärde is the catalog's own median, so checking one against the
+        # other is circular: published typvärden for betongvägg, tak and
+        # yttervägg sat outside their ranges and every such row was stamped
+        # "Oväntat", and the broken hiss/st typvärde (13.4 kg per elevator) was
+        # clamped to 16 000 under a label that still read "13,4 kg/st x 1 st"
+        # (handover review C5). A mis-tagged catalog row is caught where it can
+        # be fixed instead: test_baseline_clamp checks every published
+        # typvärde against these ranges.
+        #
+        # A bridged typvärde keeps the check. kg -> st through an assumed item
+        # mass (a 45 kg bathtub) is a catalog median times a hand-written
+        # number, and that number is what the range can catch; no test sees
+        # it, since it is computed per component. Except the subtypes their
+        # category's range says nothing about (glasparti, avjämning).
         basis = r.basis or {}
-        unlike_category = (basis.get("kind") == "epd_typvärde"
-                           and (category, basis.get("subcategory")) in UNLIKE_THEIR_CATEGORY)
-        if quantity > 0 and r.co2e_kg > 0 and not unlike_category:
-            co2e_per_unit = r.co2e_kg / quantity
-            validated_co2, co2_note = validate_co2e(
-                co2e_per_unit, quantity, category, comp.unit if comp else "")
-            if validated_co2 != r.co2e_kg:
-                r.co2e_kg = validated_co2
-            if co2_note and co2_note.lower() not in r.description.lower():
-                r.description = r.description.rstrip(". ") + f". {co2_note}."
+        exempt = basis.get("kind") == "epd_typvärde" and (
+            not basis.get("bridge")
+            or (category, basis.get("subcategory")) in UNLIKE_THEIR_CATEGORY)
+        if not exempt and quantity > 0 and r.co2e_kg > 0:
+            co2 = check_co2e(r.co2e_kg / quantity, quantity, category, unit)
+            if co2.clamped:
+                _relabel_clamped_co2e(r, co2, quantity, unit, category)
+            elif co2.note and co2.note.lower() not in r.description.lower():
+                r.description = r.description.rstrip(". ") + f". {co2.note}."
+
+        _reconcile_per_unit(r, quantity, unit)
 
     return results
+
+
+def _relabel_clamped_co2e(r: BaselineResult, co2, quantity: float, unit: str,
+                          category: str) -> None:
+    """Rewrite a clamped row so every field describes the number it now shows.
+
+    Until 2026-09-30 only co2e_kg changed. The per-unit figure, source, basis
+    and description kept describing the discarded value, and the view printed
+    16 000 kg over "13,4 kg CO2e/st x 1 st", sourced as an EPD typvärde.
+    """
+    lo, hi, range_unit = co2.bounds
+    unit = unit or range_unit
+    was = r.co2e_kg / quantity
+    was_source = r.source or "okänd källa"
+    direction = "högt" if was > hi else "lågt"
+
+    r.co2e_kg = co2.total
+    r.co2e_per_unit = co2.per_unit
+    r.unit = unit
+    r.quantity = quantity
+    r.source = CLAMPED_CO2E_SOURCE
+    # The Boverket product line would otherwise sit under a number that is
+    # no longer that product's.
+    r.boverket_product = ""
+    r.basis = {
+        "kind": "intervall",
+        "label": f"Uppskattning ur rimlighetsintervall för {category}",
+        "min": lo,
+        "max": hi,
+        "discarded_per_unit": round(was, 3),
+        "discarded_source": was_source,
+        "reason": (f"Beräknat värde {was:.4g} kg CO2e/{unit} ({was_source}) var "
+                   f"orimligt {direction} och används inte"),
+    }
+    # assumed_material stays on the row (it is still what the agent assumed is
+    # built), but the description does not repeat it: the number is the
+    # category's midpoint, not that material's.
+    r.description = (
+        f"Uppskattning ur kategorins rimlighetsintervall: mittpunkten av "
+        f"{lo:g} till {hi:g} kg CO2e/{unit} för {category} ({co2.per_unit:g} kg "
+        f"CO2e/{unit}) × {quantity:g} {unit}. Det beräknade värdet, {was:.4g} kg "
+        f"CO2e/{unit} ({was_source}), var orimligt {direction} och används inte."
+    )
+
+
+def _reconcile_per_unit(r: BaselineResult, quantity: float, unit: str) -> None:
+    """Hold co2e_kg == co2e_per_unit x quantity, in the component's unit.
+
+    The view prints that multiplication under the total so it can be checked
+    by hand, and a multiplication that does not add up is worse than none. The
+    total wins: it is what every sum and every alternative is measured
+    against, and the per-unit figure is the one that can be in the wrong unit
+    (a Boverket kg value next to a count in m2). Rounding is allowed for: the
+    total carries one decimal, the per-unit figure two to four.
+    """
+    if quantity <= 0:
+        return
+    tolerance = 0.05 + 0.0005 * quantity + 1e-9
+    if abs(r.co2e_per_unit * quantity - r.co2e_kg) > tolerance:
+        logger.warning(
+            "Baseline %s: %s kg CO2e/%s x %g %s is not the total %s; per-unit "
+            "figure rederived from the total",
+            r.component_id, r.co2e_per_unit, r.unit, quantity, unit, r.co2e_kg,
+        )
+        r.co2e_per_unit = round(r.co2e_kg / quantity, 4)
+    r.quantity = quantity
+    if unit:
+        r.unit = unit
 
 
 MATCH_SYSTEM_PROMPT = """Du är Aidas baslinjeberäknare — en byggnadsexpert som beräknar baslinjen för klimatpåverkan.
@@ -171,13 +267,37 @@ Svara med ENBART giltig JSON (ingen markdown, inga kommentarer):
 ]"""
 
 
-def calculate_baseline(project: Project) -> Baseline:
+# The clock the request budget is read from. A module attribute so a test can
+# move time forward instead of sleeping.
+_clock = time.monotonic
+
+# Request budget for the pricing passes. The estimate batch is one call
+# without tools (17 s for four products, measured 2026-08-20), so the web
+# call's timeout keeps _ESTIMATE_RESERVE back, and the estimate pass starts
+# with as little as _MIN_ESTIMATE_BUDGET. The floor sits well under the
+# reserve on purpose: a timed-out call returns a moment after its timeout, and
+# with the two equal the estimate pass could never follow a search that timed
+# out. The web pass itself needs _MIN_WEB_PRICING_BUDGET to be worth starting,
+# which leaves its search 45 s.
+_ESTIMATE_RESERVE = 45.0
+_MIN_ESTIMATE_BUDGET = 20.0
+_MIN_WEB_PRICING_BUDGET = 90.0
+
+WEB_PRICE_SOURCE = "Webbsökning (AI)"
+ESTIMATED_PRICE_SOURCE = "Uppskattning (AI)"
+
+
+def calculate_baseline(project: Project, *, started_at: float | None = None) -> Baseline:
     """Calculate NollCO2 baseline for each component.
 
-    Uses a single LLM call with the full Boverket product list (~229 products,
-    ~2200 tokens) for semantic matching. The LLM picks the best Boverket
-    product per component, or estimates when no match exists.
+    Matches components against the full Boverket product list (about 660 rows)
+    in parallel LLM calls of BASELINE_CHUNK_SIZE components each. The LLM picks
+    the best Boverket product per component, or estimates when none fits.
+
+    ``started_at`` is the request's start on the time.monotonic clock, for the
+    pricing budget; omitted, the budget counts from this call.
     """
+    started_at = _clock() if started_at is None else started_at
     provider = ClimateProvider()
     provider.ensure_synced()
 
@@ -192,9 +312,35 @@ def calculate_baseline(project: Project) -> Baseline:
     # component's category has reliable aggregated data.
     _apply_epd_median_fallback(results, project)
 
-    # Phase 2: Batch price enrichment
+    # Phase 2 and 3: prices, within what is left of the request.
+    _price_baseline(results, project, provider, started_at=started_at)
+
+    results = _validate_baseline(results, project.components)
+    return Baseline(components=results)
+
+
+def _price_baseline(results: list[BaselineResult], project: Project,
+                    provider: ClimateProvider, *, started_at: float) -> None:
+    """Price every row, in the unit its component is counted in (in-place).
+
+    Two passes, each one call for all the rows it covers: a web search batch,
+    then the model's own estimate for whatever the search left. Until
+    2026-09-30 the second pass was a loop of lookup_price per product, a web
+    search plus an estimate each, run one after the other with no clock: a
+    batch answer that came back as prose (zero rows parsed) turned a
+    31-component project into up to 62 sequential calls, Vercel killed the
+    function at 300 s, and the matching already paid for was lost (handover
+    review L3). The alternatives' pricing was restructured the same way in
+    August.
+
+    A pass the request no longer has time for is skipped, and its rows keep
+    cost 0, which _validate_baseline marks "Pris ej tillgängligt". A failing
+    lookup or cache write does not fail the baseline: a price is worth less
+    than the baseline it belongs to.
+    """
+    from aida.api_client import remaining_budget
     from aida.data.pricing_provider import (
-        lookup_price,
+        estimate_prices_batch,
         lookup_prices_batch,
         price_unit_matches,
     )
@@ -209,51 +355,84 @@ def calculate_baseline(project: Project) -> Baseline:
                                    if r.component_id in comp_map else "")
         for r in results
     }
-    products_needing_prices = [
+    def cached(name: str) -> bool:
+        try:
+            return _is_price_cached(provider, name)
+        except Exception as e:  # noqa: BLE001 - a cache read is not worth the baseline
+            logger.warning("Price cache read failed for '%s': %s", name, e)
+            return False
+
+    wanted = [
         (r.component_name, unit_by_name.get(r.component_name.lower(), ""))
         for r in results
-        if not _is_price_cached(provider, r.component_name)
+        if not cached(r.component_name)
     ]
+    if not wanted:
+        return
 
-    def _usable(product_key: str, price_unit: str) -> bool:
-        want = unit_by_name.get(product_key, "")
-        if not want or price_unit_matches(price_unit, want):
-            return True
-        logger.warning(
-            "Baseline price for '%s' is per %r but the component is counted in "
-            "%r; discarded", product_key, price_unit, want,
-        )
-        return False
+    # lowercase name -> (price per unit, cost_source)
+    prices: dict[str, tuple[float, str]] = {}
 
-    batch_prices: dict[str, tuple[float, str, str]] = {}
-    if products_needing_prices:
-        batch_prices = {
-            key: val
-            for key, val in lookup_prices_batch(products_needing_prices).items()
-            if _usable(key, val[1])
-        }
-        for product_key, (price, _unit, _source) in batch_prices.items():
-            provider._cache.update_cost(product_key, price)
+    def take(found: dict, default_source: str) -> None:
+        for key, (price, price_unit, src) in (found or {}).items():
+            if key in prices:
+                continue
+            want = unit_by_name.get(key, "")
+            if want and not price_unit_matches(price_unit, want):
+                logger.warning(
+                    "Baseline price for '%s' is per %r but the component is "
+                    "counted in %r; discarded", key, price_unit, want,
+                )
+                continue
+            # A single-product "batch" is lookup_price, which falls back to an
+            # estimate by itself; that one must not be labelled a search. Read
+            # off the prefix pricing_provider gives every estimate, not a
+            # substring: a search's source label carries its citation URL,
+            # and a slug like "prisuppskattning" is still a search.
+            source = (ESTIMATED_PRICE_SOURCE if (src or "").startswith("LLM-uppskattning")
+                      else default_source)
+            prices[key] = (price, source)
+            if source == WEB_PRICE_SOURCE:
+                try:
+                    provider._cache.update_cost(key, price)
+                except Exception as e:  # noqa: BLE001
+                    logger.warning("Price cache write failed for '%s': %s", key, e)
 
-        for name, unit in products_needing_prices:
-            if name.lower() not in batch_prices:
-                result = lookup_price(name, unit)
-                if result and _usable(name.lower(), result[1]):
-                    price, u, src = result
-                    batch_prices[name.lower()] = (price, u, src)
-                    provider._cache.update_cost(name.lower(), price)
+    def left() -> float:
+        return remaining_budget(started_at, now=_clock())
 
-    # Phase 3: Apply prices to results
+    budget = left()
+    if budget >= _MIN_WEB_PRICING_BUDGET:
+        try:
+            take(lookup_prices_batch(wanted, timeout=budget - _ESTIMATE_RESERVE),
+                 WEB_PRICE_SOURCE)
+        except Exception as e:  # noqa: BLE001 - pricing must not fail the baseline
+            logger.warning("Baseline web pricing failed: %s", e)
+    else:
+        logger.warning("Baseline web pricing skipped: %.0fs left of the request", budget)
+
+    missing = [(name, unit) for name, unit in wanted if name.lower() not in prices]
+    if missing:
+        budget = left()
+        if budget >= _MIN_ESTIMATE_BUDGET:
+            try:
+                take(estimate_prices_batch(missing, timeout=budget),
+                     ESTIMATED_PRICE_SOURCE)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("Baseline price estimate failed: %s", e)
+        else:
+            logger.warning(
+                "%d baseline rows left unpriced: %.0fs left of the request",
+                len(missing), budget,
+            )
+
     for r in results:
-        batch_result = batch_prices.get(r.component_name.lower())
-        if batch_result:
+        hit = prices.get(r.component_name.lower())
+        if hit:
             comp = comp_map.get(r.component_id)
             quantity = comp.quantity if comp else 1
-            r.cost_sek = round(batch_result[0] * quantity)
-            r.cost_source = "Webbsökning (AI)"
-
-    results = _validate_baseline(results, project.components)
-    return Baseline(components=results)
+            r.cost_sek = round(hit[0] * quantity)
+            r.cost_source = hit[1]
 
 
 # Boverket categories whose kg value is a solid material, so that kg per m3 is a
@@ -536,6 +715,9 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
                     # sanitet/handfat baseline as plain "sanitet".
                     "subcategory": kg_data.get("subcategory", ""),
                     "level": kg_data.get("level", ""),
+                    # Read by _validate_baseline, which range-checks a value
+                    # resting on an assumed mass (a published one it does not).
+                    "bridge": "mass",
                 }
                 mass_note = (
                     f" Omräknat kg→st via antagen typisk vikt {mass} kg/st "
@@ -576,19 +758,20 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
                     "subcategory": subcategory,
                     "reason": why[0].upper() + why[1:],
                 }
-            elif subcategory and withheld_reason(category, subcategory, comp.unit):
+            elif withheld_reason(category, subcategory, comp.unit):
                 # Enough EPDs, deliberately not published (one supplier's
-                # range, los_inredning/förvaring). Same reasoning as above: a
-                # reader who can see the catalog rows would otherwise assume
-                # the estimate is their median.
+                # range, los_inredning/förvaring; a mis-read unit, hiss/st).
+                # Same reasoning as above: a reader who can see the catalog
+                # rows would otherwise assume the estimate is their median.
                 why = withheld_reason(category, subcategory, comp.unit)
-                note = (f" Inget EPD-typvärde för {category}/{subcategory}: {why}. "
+                key = f"{category}/{subcategory}" if subcategory else category
+                note = (f" Inget EPD-typvärde för {key}: {why}. "
                         f"Siffran är därför en uppskattning.")
                 if note.strip() not in (r.description or ""):
                     r.description = (r.description or "").rstrip() + note
                 r.basis = {
                     "kind": "saknar_typvärde",
-                    "label": f"Inget EPD-typvärde för {category}/{subcategory}",
+                    "label": f"Inget EPD-typvärde för {key}",
                     "subcategory": subcategory,
                     "reason": why[0].upper() + why[1:],
                 }
@@ -662,6 +845,7 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
             "geo_scope": geo_scope,
             "sample_size_global": n_global,
             "sample_size_europe": n_europe,
+            "bridge": typvärde_data.get("bridge", ""),
         }
         # assumed_material is deliberately NOT cleared. Before 2026-09-01 this
         # assignment replaced the whole description, and the standard material
@@ -934,7 +1118,23 @@ Matcha varje komponent ovan mot bästa Boverket-produkt. Använd EXAKT de compon
         co2e_per_unit = item.get("co2e_per_unit", 0)
         co2e_kg = item.get("co2e_kg", co2e_per_unit * quantity)
 
-        boverket_match = item.get("boverket_product")
+        boverket_match = str(item.get("boverket_product") or "").strip()
+        if boverket_match:
+            product = resolve_boverket_product(boverket_match, boverket_products)
+            if product is None:
+                # A name that is not on the list is the model's own product and
+                # figure; labelling it "Boverkets klimatdatabas" credits Boverket
+                # with a number it never published. As an estimate the row goes
+                # on to the EPD typvärde fallback like any other.
+                logger.warning(
+                    "Baseline match: %r for %s is not on Boverket's list; "
+                    "treated as an estimate", boverket_match, comp_id,
+                )
+                boverket_match = ""
+            else:
+                # The list's own spelling, so _apply_member_geometry's lookup by
+                # name finds the product the model retyped.
+                boverket_match = product.name or product.product_name
         source = "Boverkets klimatdatabas" if boverket_match else "Uppskattning"
         cost_source = "Uppskattning (AI)" if not boverket_match else ""
 

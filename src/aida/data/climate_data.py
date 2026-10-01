@@ -475,7 +475,7 @@ _CEILING_STEMS = ("undertak", "innertak", "himling", "akustikplatt",
                   "akustikskiv", "ljudabsorbent", "väggabsorbent",
                   "takabsorbent", "akustikabsorbent", "baffel", "bafflar",
                   "akustikö", "takplatt", "tvärprofil", "huvudprofil",
-                  "ecophon", "rockfon")
+                  "ecophon", "rockfon", "gipstak")
 # The ceiling grid series, as words: "T24 tvärprofil", "T15-profil".
 _GRID_SERIES_RE = re.compile(r"\bt(?:24|15)\b")
 # Compound tails that make a word something done to a ceiling or mounted in
@@ -491,7 +491,19 @@ _AIR_BEAM_RE = re.compile(r"(?:kyl|tilluft|luft|klimat|ventilation|värme|komfor
 # undertak"), free-hanging units before the tiles they are made of, a wall
 # before a tile ("Akustikplattor vägg" hang on a wall). The brands last, for
 # names that say nothing else ("Ecophon Focus A").
+#
+# HENRIC-3370 added three. A whole metal ceiling (panels, strips and grid
+# together, "Metallundertak") before the grid, since such a system includes
+# its own. A plastered or gypsum ceiling ("Nytt innertak av gips", "Gipstak",
+# "Putsat innertak") is boards or plaster fixed to the joists, not tiles in a
+# grid: the kinds gipstak and putstak, read from a word that begins with
+# "gips" or "puts" and is not itself a suspended ceiling or a tile
+# ("Gipsundertak" stays a ceiling tile, as before) and not "putsning", which
+# is cleaning.
 _CEILING_KINDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("metallundertak", ("metallundertak", "plåtundertak", "metallkassett",
+                        "plåtkassett", "metallraster", "cellundertak",
+                        "ribbundertak")),
     ("bärverk", ("bärverk", "tvärprofil", "huvudprofil", "bärprofil",
                  "undertaksprofil", "vinkelprofil", "kantprofil", "bärskena",
                  "upphängning")),
@@ -507,8 +519,31 @@ def _ceiling_kind_in(text: str) -> str:
         return "bärverk"
     words = [c.replace("-", "") for c in _COMPOUND_RE.findall(text)]
     for kind, stems in _CEILING_KINDS:
+        if kind == "bärverk":
+            # Plaster before the grid: "Gipstak inkl. bärverk" is a gypsum
+            # ceiling with its framing. "Bärverk för gipstak" is still the
+            # grid, read from the head before the whole name.
+            plaster = _plaster_kind(words)
+            if plaster:
+                return plaster
         if any(s in w for w in words for s in stems):
             return kind
+    return ""
+
+
+# Words that make a gips/puts word a suspended ceiling or tile after all.
+_PLASTER_NOT = ("undertak", "platt", "akustik", "putsning", "baffel", "bafflar")
+
+
+def _plaster_kind(words: list[str]) -> str:
+    # Anywhere in the name: "Undertaksplattor gips" are gypsum tiles.
+    if any(n in w for w in words for n in _PLASTER_NOT):
+        return ""
+    for w in words:
+        if w.startswith("gips"):
+            return "gipstak"
+        if w.startswith("puts"):
+            return "putstak"
     return ""
 
 

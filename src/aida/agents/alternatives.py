@@ -995,7 +995,26 @@ def _textile_rows(pool: list[dict], proj_comp, label: str) -> tuple[list[dict], 
 _CEILING_LABELS = {
     "akustikplatta": "undertaksplattor", "väggabsorbent": "väggabsorbenter",
     "baffel": "bafflar och akustiköar", "bärverk": "bärverk (T-profiler)",
+    "metallundertak": "metallundertak (plåtkassetter, ribbor och bärverk som ett system)",
+    "gipstak": "gipstak",
 }
+
+# A gypsum ceiling is plasterboard screwed to the joists or a furring, the same
+# boards innervägg holds per m2 (HENRIC-3370). Its rows are read from there by
+# name, since innervägg also holds glazed partitions, insulation sold as
+# "Drywall", prefab wall panels and MDF.
+_PLASTERBOARD_RE = re.compile(
+    r"plasterboard|gypsum|\bgips|gyproc|gyprock|\byeso\b|rigidur|\bba13\b|"
+    r"chapa de drywall")
+# What a board is fixed or finished with, named after the board.
+_NOT_BOARD_RE = re.compile(r"adhesive|paste|putt|framing|profile")
+
+
+def _plasterboard_rows(epd_data: dict[str, list[dict]]) -> list[dict]:
+    return [e for e in epd_data.get("innervägg", [])
+            if not e.get("subcategory")
+            and _PLASTERBOARD_RE.search(e.get("name", "").lower())
+            and not _NOT_BOARD_RE.search(e.get("name", "").lower())]
 
 
 def _ceiling_rows(epd_data: dict[str, list[dict]], proj_comp) -> tuple[list[dict], str]:
@@ -1016,12 +1035,19 @@ def _ceiling_rows(epd_data: dict[str, list[dict]], proj_comp) -> tuple[list[dict
         return [], (
             "Namnet säger inte vilken sorts undertak eller akustikprodukt det "
             "gäller, och alternativ jämförs bara inom samma sort. Ange till "
-            "exempel \"Undertaksplattor\", \"Väggabsorbenter\", \"Bafflar\" "
-            "eller \"Bärverk T24\". Ett putsat eller gipsat innertak är inget "
-            "undertak, och där finns inga alternativ att jämföra med."
+            "exempel \"Undertaksplattor\", \"Väggabsorbenter\", \"Bafflar\", "
+            "\"Bärverk T24\", \"Gipstak\" eller \"Putsat innertak\"."
+        )
+    if sub == "putstak":
+        return [], (
+            "Ett putsat innertak jämförs inte med nyköp. Katalogen har puts "
+            "bara för fasader, per kg, och ingen EPD för invändig puts på tak."
         )
     label = _CEILING_LABELS.get(sub, sub)
-    pool = [e for e in epd_data.get("undertak", []) if e.get("subcategory") == sub]
+    if sub == "gipstak":
+        pool = _plasterboard_rows(epd_data)
+    else:
+        pool = [e for e in epd_data.get("undertak", []) if e.get("subcategory") == sub]
     if not pool:
         return [], f"Katalogen har inga EPD:er för {label}, så ingen jämförelse med nyköp görs."
 

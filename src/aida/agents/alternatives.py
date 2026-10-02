@@ -93,7 +93,7 @@ Hjälpa förvaltare och byggledare att hitta renoveringslösningar som kraftigt 
 
 Du får:
 1. En komponent med baslinjevärde (Boverket Typical, konventionellt standardmaterial)
-2. En lista med FAKTISKA EPD:er (Environmental Product Declarations) från Environdec-databasen, med verifierade GWP-värden. Rader märkta [EPD].
+2. En lista med FAKTISKA EPD:er (Environmental Product Declarations) från EPD-register (Environdec, EPD-Norge, EPD Hub m.fl.), med verifierade GWP-värden. Rader märkta [EPD].
 3. Ibland också en lista med ÅTERBRUKSANNONSER från Palats, Karlstads kommuns interna marknadsplats för begagnat byggmaterial. Rader märkta [Palats återbruk]. De är redan filtrerade på produkttyp och lagersaldo innan du får dem.
 
 Din uppgift:
@@ -136,7 +136,7 @@ Svara med giltig JSON-array:
     "name": "Produktnamn (Tillverkare)",
     "co2e_kg": <total CO2e i kg>,
     "cost_sek": <uppskattad kostnad i SEK, 0 om okänt>,
-    "source": "[EPD] Environdec <registreringsnummer>",
+    "source": "[EPD] <register> <registreringsnummer>",
     "reasoning": "Varför detta alternativ är bättre (klimat + praktiska behov)",
     "alternative_type": "climate_optimized"
   },
@@ -3615,12 +3615,13 @@ Inga återbruksannonser på Palats matchar denna komponent just nu, så listan b
 
         # Every row that gets here is a catalog row, whatever the model put in
         # `source`, so it is tagged as one (the B1 filter keeps unpriced EPD
-        # rows and drops unpriced estimates).
-        if not source.lower().startswith("[epd]"):
-            registry = matched.get("source_registry") or "environdec"
-            source = " ".join(p for p in (
-                "[EPD]", _REGISTRY_LABELS.get(registry, registry),
-                str(matched.get("reg_no") or "")) if p)
+        # rows and drops unpriced estimates). The register and number are the
+        # catalog row's own, always: the model copied the prompt's example and
+        # wrote "Environdec" for EPD-Norge and EPD Hub rows (HENRIC-3411).
+        registry = matched.get("source_registry") or "environdec"
+        source = " ".join(p for p in (
+            "[EPD]", _REGISTRY_LABELS.get(registry, registry),
+            str(matched.get("reg_no") or "")) if p)
 
         # Which GWP indicator this rests on is a fact about the catalog, not
         # something to hope the model repeats.

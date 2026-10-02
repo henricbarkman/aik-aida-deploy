@@ -226,9 +226,10 @@ produkt ENBART när den faktiskt ÄR komponentens standardmaterial:
 - Stålreglar matchar "Lättreglar av stål, primär" (stål är stål). OK.
 - Träreglar och konstruktionsvirke matchar "Sågat virke, u 16 %, barrträ" eller
   "Hyvlat virke, u 16 %, barrträ", OSB-skiva matchar "OSB" (trä är trä). OK.
-  Systemet räknar själv om ett kg-värde för stommens trä och skivor, och för skivan i ett
-  gipstak, till löpmeter eller m² ur tvärsnittet eller tjockleken i komponentens namn, så
-  räkna inte om de raderna själv. Andra skivor, t.ex. gips på en innervägg, räknar du om
+  Systemet räknar själv om ett kg-värde för stommens trä och skivor, för skivan i ett
+  gipstak och för en träpanel på fasad ("Hyvlat virke", panelen utan läkt och målning,
+  22 mm om namnet inte anger tjocklek), till löpmeter eller m² ur tvärsnittet eller
+  tjockleken i komponentens namn, så räkna inte om de raderna själv. Andra skivor, t.ex. gips på en innervägg, räknar du om
   själv enligt STEG 3.
   Detsamma gäller stålbalkar, stålpelare och stålreglar i löpmeter med en
   standardprofil i namnet ("HEA 200", "VKR 100x100x5", "Stålregel 70"): vikten per
@@ -635,6 +636,56 @@ def _apply_ceiling_board(r: BaselineResult, comp, product, extra: dict) -> None:
     )
 
 
+# Panel thickness when a wood facade's name gives none: the catalog's own
+# fasadskikt bridge (unit_conversion.CONVERSIONS["fasadskikt"], 22 mm, the
+# usual 22x120 to 22x170 panel), so the baseline and the alternatives it is
+# measured against rest on the same panel.
+_FACADE_PANEL_DEFAULT_MM = 22.0
+
+
+def _apply_facade_panel(r: BaselineResult, comp, product, extra: dict) -> None:
+    """Redo a wood facade cladding's Boverket baseline per m² (in-place).
+
+    HENRIC-3410. "Träpanel fasad", 150 m² in a school, got 1,61, 1,75, 5,83
+    and 5,83 kg CO2e/m² in four runs on 2026-10-02: the model matched
+    "Hyvlat virke" per kg and converted to m² in its head, each time with its
+    own panel volume, with or without battens and paint. The conversion is the
+    frame's: Boverket's figure per kg × Boverket's density × the panel's
+    thickness, from the name ("22 mm", "22x145") or 22 mm. The panel only:
+    paint is its own component (farg), and the cladding EPDs it is compared
+    with declare the board without battens.
+    """
+    from aida.data.climate_data import component_facade_kind
+    from aida.data.unit_conversion import cross_section_mm, thickness_mm
+
+    if comp.unit != "m2" or extra.get("category") != "Trävaror":
+        return
+    if component_facade_kind(comp.name) not in ("trä", ""):
+        return
+    density = extra.get("density_kg_m3")
+    if not density:
+        return
+    mm = thickness_mm(comp.name)
+    if mm is None:
+        section = cross_section_mm(comp.name)
+        mm = min(section) if section else None
+    assumed = mm is None
+    if assumed:
+        mm = _FACADE_PANEL_DEFAULT_MM
+    per_unit = round(product.co2e_per_unit * density * mm / 1000, 4)
+    r.co2e_per_unit = per_unit
+    r.unit = comp.unit
+    r.quantity = comp.quantity
+    r.co2e_kg = round(per_unit * comp.quantity, 1)
+    why = (f" Namnet anger ingen paneltjocklek, så en vanlig fasadpanel på "
+           f"{mm:g} mm antas." if assumed else "")
+    r.description = (r.description or "").rstrip() + (
+        f" Omräknat ur panelen, {mm:g} mm: {product.co2e_per_unit} kg CO2e/kg × "
+        f"{density:g} kg/m³ (Boverket) × {mm / 1000:g} m = {per_unit} kg CO2e/m². "
+        f"Bara panelen: läkt och målning ingår inte.{why}"
+    )
+
+
 def _apply_member_geometry(results: list[BaselineResult], project: Project,
                            boverket_products) -> None:
     """Redo a timber or board Boverket baseline per löpmeter or m2 (in-place).
@@ -659,7 +710,7 @@ def _apply_member_geometry(results: list[BaselineResult], project: Project,
         if not r.boverket_product or not comp or comp.unit not in ("lm", "m2"):
             continue
         category = resolve_category(comp.name, comp.category)
-        if category not in ("stomme", "undertak"):
+        if category not in ("stomme", "undertak", "fasadskikt"):
             continue
         product = by_name.get(r.boverket_product.strip().lower())
         if not product or (product.unit or "").lower() != "kg":
@@ -670,6 +721,9 @@ def _apply_member_geometry(results: list[BaselineResult], project: Project,
             continue
         if category == "undertak":
             _apply_ceiling_board(r, comp, product, extra)
+            continue
+        if category == "fasadskikt":
+            _apply_facade_panel(r, comp, product, extra)
             continue
         if _apply_profile_mass(r, comp, product, extra):
             continue

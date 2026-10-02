@@ -365,7 +365,12 @@ AREAL_DENSITY_KG_M2: dict[str, list[tuple[list[str], float]]] = {
     "fasadskikt": [
         (["puts", "putsbruk", "murbruk", "render", "renders", "mortar",
           "kalkspritputs", "stänkputs", "spritputs", "rivputs",
-          "slamningsputs", "lerputs", "finputsbruk", "designputs"], 20.0),
+          "slamningsputs", "lerputs", "finputsbruk", "designputs",
+          # Norwegian and Danish render, HENRIC-3392: "fiberpuss",
+          # "fasademørtel", "pussmørtel", "puds". Without them the only
+          # renders outside Saint-Gobain stayed per kg and pulled the kg
+          # queue of steel sandwich panels and WPC down to a mortar's value.
+          "puss", "mørtel", "puds"], 20.0),
     ],
 }
 

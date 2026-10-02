@@ -157,6 +157,19 @@ GROUPS: list[tuple[str, tuple[str, ...], str]] = [
      ("upm plywood", "upm timber"),
      "UPM half-year report 2026: Plywood is demerged into WISA Group Plc, "
      "planned 2026-10-31 -- take 'upm plywood' out of this entry then."),
+    ("Heidelberg Materials",
+     ("heidelberg materials", "heidelbergcement", "kynningsrud prefab",
+      "contiga", "abetong", "nordic precast"),
+     "heidelbergmaterials-northerneurope.com, 'HeidelbergCement acquires "
+     "Kynningsrud Prefab' (2019-12): bought by Nordic Precast Group, "
+     "HeidelbergCement's precast company of Abetong and Contiga; owned since "
+     "2020-04-01 (HENRIC-3393)."),
+    ("Consolis",
+     ("consolis", "spenncon", "spæncom", "spaencom", "strängbetong",
+      "strangbetong"),
+     "consolis.com/about-us/our-locations and consolis.com/entities/strangbetong: "
+     "Spenncon AS (Norway) and Strängbetong (Sweden) are Consolis companies; "
+     "consolis.com 2023-03: 'its Danish subsidiary, Spæncom' (HENRIC-3393)."),
     ("ArcelorMittal",
      ("arcelormittal",),
      "constructalia.arcelormittal.com 2025-10-14: 'ArcelorMittal Construction "

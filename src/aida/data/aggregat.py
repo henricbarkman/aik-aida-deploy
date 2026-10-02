@@ -232,6 +232,42 @@ EPD_FACTS: dict[str, EpdFact] = {
     "EPD-IES-0029383": EpdFact(None, None, "MyVallox 99 CFi: homes and other buildings; no flow stated"),
     # S&P NASHIRA S: "Double-flow VMC for homes"; states only a maximum.
     "EPD-IES-0017092": EpdFact(None, "lägenhet", "NASHIRA S: double-flow VMC for homes; only a maximum flow (up to 150 m3/h) stated"),
+    # Swegon Group AB, CASA (HENRIC-3398). One EPD, S-P-05388:003, with ten
+    # units each declared per piece; the class is per unit (PRODUCT_FACTS).
+    # Entered by hand: Environdec's data hub has no dataset for it.
+    "EPD-IES-0005388": EpdFact(None, None, "CASA, ten units in one EPD; class per unit in PRODUCT_FACTS"),
+}
+
+# Facts per product, for an EPD that declares several units with different
+# facts. Keyed by (registration stem, catalog name); facts_for reads these
+# before EPD_FACTS.
+#
+# Swegon CASA, S-P-05388:003 (read 2026-10-02, HENRIC-3398). Flow: the EPD's
+# only figure is the B6 scenario's "Average air handling capacity" (25 to 320
+# l/s), an operating average and not a design or maximum flow, the figure
+# GOLD's weighted mean was turned down for above. None of them enters the flow
+# typvärde. Class: the EPD says only "buildings". Swegon's CASA catalogue 2026
+# lists all ten under "Residential ventilation units" and gives nine an
+# Ecodesign energy class, which only a residential ventilation unit (RVU)
+# carries: under Regulation (EU) 1253/2014 art. 2(2) a unit up to 250 m3/h, or
+# up to 1 000 m3/h that the manufacturer declares exclusively residential.
+# That declaration is the manufacturer's own statement of use, so the nine are
+# lägenhet. R15V is "NRVU" in the same catalogue (max 1 710 m3/h) while Swegon
+# describes the R7-R15 sizes for "large residences, operating plants, and
+# meeting spaces alike", so it is left out of both classes, like Acetec.
+_CASA = "EPD-IES-0005388"
+_CASA_RVU = "Swegon CASA catalogue 2026: residential ventilation unit with an Ecodesign energy class (RVU, EU 1253/2014 art. 2(2)); EPD flow is a use-phase average"
+PRODUCT_FACTS: dict[tuple[str, str], EpdFact] = {
+    (_CASA, "Swegon CASA W3xs air handling unit"): EpdFact(None, "lägenhet", "W3xs: average 30 l/s; catalogue 36-288 m3/h, class A. " + _CASA_RVU),
+    (_CASA, "Swegon CASA W5 air handling unit"): EpdFact(None, "lägenhet", "W5: average 60 l/s; catalogue 108-468 m3/h, class A+. " + _CASA_RVU),
+    (_CASA, "Swegon CASA R2 air handling unit"): EpdFact(None, "lägenhet", "R2: average 25 l/s; catalogue 65-216 m3/h. " + _CASA_RVU),
+    (_CASA, "Swegon CASA R3 air handling unit"): EpdFact(None, "lägenhet", "R3: average 30 l/s; catalogue 90-295 m3/h. " + _CASA_RVU),
+    (_CASA, "Swegon CASA R5 air handling unit"): EpdFact(None, "lägenhet", "R5: average 60 l/s; catalogue 108-421 m3/h. " + _CASA_RVU),
+    (_CASA, "Swegon CASA R5H air handling unit"): EpdFact(None, "lägenhet", "R5-H (horizontal): average 60 l/s; catalogue 108-439 m3/h. " + _CASA_RVU),
+    (_CASA, "Swegon CASA R7H air handling unit"): EpdFact(None, "lägenhet", "R7-H (horizontal), use-phase column 'R7H': average 120 l/s; catalogue 216-749 m3/h. " + _CASA_RVU),
+    (_CASA, "Swegon CASA R7V air handling unit"): EpdFact(None, "lägenhet", "R7 (standing, R07V), use-phase column 'R7': average 100 l/s; catalogue 216-677 m3/h. " + _CASA_RVU),
+    (_CASA, "Swegon CASA R9V air handling unit"): EpdFact(None, "lägenhet", "R9 (R09V): average 170 l/s; catalogue 270-871 m3/h. " + _CASA_RVU),
+    (_CASA, "Swegon CASA R15V air handling unit"): EpdFact(None, None, "R15 (R15V): average 320 l/s; catalogue 360-1 710 m3/h, marked NRVU; for large residences and meeting spaces alike, so neither class"),
 }
 
 
@@ -241,8 +277,12 @@ def reg_stem(reg_no: str) -> str:
     return (reg_no or "").split(":", 1)[0].strip()
 
 
-def facts_for(reg_no: str) -> EpdFact | None:
-    return EPD_FACTS.get(reg_stem(reg_no))
+def facts_for(reg_no: str, name: str = "") -> EpdFact | None:
+    stem = reg_stem(reg_no)
+    product = PRODUCT_FACTS.get((stem, (name or "").strip()))
+    if product is not None:
+        return product
+    return EPD_FACTS.get(stem)
 
 
 # ---------------------------------------------------------------------------

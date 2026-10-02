@@ -226,8 +226,10 @@ produkt ENBART när den faktiskt ÄR komponentens standardmaterial:
 - Stålreglar matchar "Lättreglar av stål, primär" (stål är stål). OK.
 - Träreglar och konstruktionsvirke matchar "Sågat virke, u 16 %, barrträ" eller
   "Hyvlat virke, u 16 %, barrträ", OSB-skiva matchar "OSB" (trä är trä). OK.
-  Systemet räknar själv om ett kg-värde för trä och skivor till löpmeter eller m² ur
-  tvärsnittet eller tjockleken i komponentens namn, så räkna inte om de raderna själv.
+  Systemet räknar själv om ett kg-värde för stommens trä och skivor, och för skivan i ett
+  gipstak, till löpmeter eller m² ur tvärsnittet eller tjockleken i komponentens namn, så
+  räkna inte om de raderna själv. Andra skivor, t.ex. gips på en innervägg, räknar du om
+  själv enligt STEG 3.
   Detsamma gäller stålbalkar, stålpelare och stålreglar i löpmeter med en
   standardprofil i namnet ("HEA 200", "VKR 100x100x5", "Stålregel 70"): vikten per
   meter tas ur standardtabeller. Konstruktionsstål matchar "Konstruktionsstål, alla
@@ -498,6 +500,48 @@ def _apply_profile_mass(r: BaselineResult, comp, product, extra: dict) -> bool:
     return True
 
 
+def _apply_ceiling_board(r: BaselineResult, comp, product, extra: dict) -> None:
+    """Redo a gypsum ceiling's Boverket baseline per m² (in-place).
+
+    Boverket declares "Gipsskiva, standardskiva" per kg with a density (710
+    kg/m³), and a gipstak is counted in m². The prompt tells the model the
+    system converts boards from the thickness in the name, which until
+    2026-10-02 held for the frame only: "Gipstak 15 mm" kept 0,227 kg CO2e
+    per kg as its value per m², about a tenth of the board, and every
+    alternative came out above it. The thickness is the name's own board
+    thickness (gipsskiva), else a standard board of 12,5 mm, said in the row;
+    the layers are the name's ("2x13"), else one, as the prompt describes a
+    gipstak.
+    """
+    from aida.data.climate_data import ceiling_kind
+    from aida.data.gipsskiva import format_mm, layers_from_name, thickness_from_name
+
+    if comp.unit != "m2" or ceiling_kind(comp.name) != "gipstak":
+        return
+    if not (product.name or "").strip().lower().startswith(("gipsskiva", "fibergipsskiva")):
+        return
+    density = extra.get("density_kg_m3")
+    if extra.get("category") != "Byggskivor" or not density:
+        return
+    mm = thickness_from_name(comp.name)
+    assumed = mm is None
+    if assumed:
+        mm = 12.5
+    layers = layers_from_name(comp.name)
+    per_unit = round(product.co2e_per_unit * density * mm / 1000 * layers, 4)
+    r.co2e_per_unit = per_unit
+    r.unit = comp.unit
+    r.quantity = comp.quantity
+    r.co2e_kg = round(per_unit * comp.quantity, 1)
+    board = f"{layers} × {format_mm(mm)} mm" if layers > 1 else f"{format_mm(mm)} mm"
+    why = (" Namnet anger ingen skivtjocklek, så en standardskiva på 12,5 mm antas."
+           if assumed else "")
+    r.description = (r.description or "").rstrip() + (
+        f" Omräknat ur skivan, {board}: {product.co2e_per_unit} kg CO2e/kg × "
+        f"{density:g} kg/m³ (Boverket) × {layers * mm / 1000:g} m = {per_unit} kg CO2e/m².{why}"
+    )
+
+
 def _apply_member_geometry(results: list[BaselineResult], project: Project,
                            boverket_products) -> None:
     """Redo a timber or board Boverket baseline per löpmeter or m2 (in-place).
@@ -507,8 +551,8 @@ def _apply_member_geometry(results: list[BaselineResult], project: Project,
     to), guessing a section and a density for every stud. Both are known: the
     density is in Boverket's own record and the section is in the name
     ("Reglar 45x95"), so the arithmetic is done here instead and written out in
-    the row. Frame members only (stomme): a plasterboard's Boverket record has
-    its own areal weight, and this is not the place to second-guess it.
+    the row. Frame members (stomme), and the boards of a gypsum ceiling
+    (_apply_ceiling_board, HENRIC-3399).
 
     A name without a dimension keeps the model's figure, labelled as resting on
     an assumed section, since the chat is meant to ask for it before this runs.
@@ -521,7 +565,8 @@ def _apply_member_geometry(results: list[BaselineResult], project: Project,
         comp = comp_map.get(r.component_id)
         if not r.boverket_product or not comp or comp.unit not in ("lm", "m2"):
             continue
-        if resolve_category(comp.name, comp.category) != "stomme":
+        category = resolve_category(comp.name, comp.category)
+        if category not in ("stomme", "undertak"):
             continue
         product = by_name.get(r.boverket_product.strip().lower())
         if not product or (product.unit or "").lower() != "kg":
@@ -529,6 +574,9 @@ def _apply_member_geometry(results: list[BaselineResult], project: Project,
         try:
             extra = json.loads(product.extra_json or "{}")
         except (json.JSONDecodeError, TypeError):
+            continue
+        if category == "undertak":
+            _apply_ceiling_board(r, comp, product, extra)
             continue
         if _apply_profile_mass(r, comp, product, extra):
             continue

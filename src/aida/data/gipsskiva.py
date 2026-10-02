@@ -110,5 +110,25 @@ def component_class(name: str) -> tuple[str, bool]:
     return STANDARD_CLASS, False
 
 
+_LAYERS_X_RE = re.compile(r"(?<![\w.,])([2-4])\s*x\s*(?:6|9|12|13|15|16|18|25)\b")
+_LAYERS_WORD_RE = re.compile(r"\b(2|3|två|tre)\s+lager\b")
+_LAYERS_DOUBLE_RE = re.compile(r"\bdubbel|\bdubbla\b")
+
+
+def layers_from_name(name: str) -> int:
+    """How many boards a name says are stacked ("2x13", "två lager",
+    "dubbel gips"); 1 when it says nothing."""
+    text = (name or "").lower()
+    m = _LAYERS_X_RE.search(text)
+    if m:
+        return int(m.group(1))
+    m = _LAYERS_WORD_RE.search(text)
+    if m:
+        return {"två": 2, "tre": 3}.get(m.group(1)) or int(m.group(1))
+    if _LAYERS_DOUBLE_RE.search(text):
+        return 2
+    return 1
+
+
 def format_mm(mm: float) -> str:
     return f"{mm:g}".replace(".", ",")

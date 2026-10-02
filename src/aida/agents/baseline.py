@@ -869,11 +869,13 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
     """
     from aida.data.epd_baseline_medians import (
         _SPLIT_SUBCATEGORIES,
+        SUBTYPE_LABELS,
         get_baseline_typvärde,
         lookup_withheld_reason,
         member_typvärde,
         split_subcategory_miss,
         subtype_from_material,
+        subtype_named,
         textile_typvärde,
         textile_typvärde_unit,
         withheld_reason,
@@ -1060,6 +1062,25 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
         else:
             scope_note = ""
 
+        # A name that gives another floor than the baseline's (HENRIC-3406):
+        # "Textilmatta" against vinyl. The number stays the typical floor's,
+        # by method; the row says so, since unexplained it reads as a mistake.
+        named = subtype_named(category, comp.name)
+        named_note = ""
+        # Not for a levelling compound under a named floor ("Avjämning under
+        # vinylmatta"): that baseline is the compound, and rightly so.
+        if (named and named != used_sub
+                and subcategory not in _SPLIT_SUBCATEGORIES.get(category, {})
+                and (not used_sub or used_sub in SUBTYPE_LABELS)):
+            used_label = (SUBTYPE_LABELS.get(used_sub, used_sub) if used_sub
+                          else f"{category} i allmänhet")
+            named_note = (
+                f" Namnet anger {SUBTYPE_LABELS.get(named, named)}, men baslinjen är "
+                f"{used_label}: den beskriver vad som är typiskt för byggnaden och "
+                f"användningen, inte det material projektet har valt, eftersom "
+                f"jämförelsen annars blir cirkulär."
+            )
+
         # Which population the number rests on, stated with both counts. A
         # "global" key is not a weaker typvärde, it is a typvärde with a known
         # limitation the reader can weigh; hiding it behind a bare n would
@@ -1108,7 +1129,7 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
             f"Baslinje från EPD-typvärde: median av övre halvan av "
             f"{n} EPD:er (Environdec, EPD Norge) i kategorin {cat_label} "
             f"({baseline_per_unit} kg CO2e/{comp.unit}) × {comp.quantity} {comp.unit}."
-            f"{material_note}{scope_note}{geo_note}{conc_note}{mass_note} "
+            f"{material_note}{scope_note}{named_note}{geo_note}{conc_note}{mass_note} "
             f"Övre halvan används för att approximera 'standardval utan "
             f"klimathänsyn' — full median ({full_med}) hade underskattat "
             f"konventionellt val pga selection bias i EPD-databasen. "

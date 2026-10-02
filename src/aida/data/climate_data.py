@@ -602,6 +602,84 @@ def ceiling_subcategory(text: str) -> str:
     return ceiling_kind(text) or ""
 
 
+# Facade cladding by kind, HENRIC-3406. fasadskikt holds wood panels, renders,
+# boards (fibre cement, Steni, Rockpanel), metal and composite side by side and
+# carries no subcategory, so "Träpanel fasad" was measured against Weber's clay
+# plaster: the one row under its baseline in the production smoke, 2026-10-02.
+# A render is not an alternative to a wood panel, it needs another substrate
+# (insulation board, mesh) behind it. Kinds are read from a row's name and from
+# a component's, in this order: a "Wood Plastic Composite" is composite before
+# it is wood, an "Aluminium Cladding" metal and a "Fibre cement cladding" a
+# board before "cladding" reads as wood, and clay plaster ("lerputs") is its own
+# kind, an interior finish that no facade name asks for. Short stems are matched
+# from the start of a word, so "sträckmetall" never reads as trä; the render and
+# brick stems anywhere, because Swedish and Norwegian put them last in a
+# compound ("kalkspritputs", "Fiberpuss", "fasadtegel", "Fasadekledning").
+# The start-of-word stems are regular expressions: "gran" is spruce, not granite.
+_FACADE_KINDS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
+    # (kind, stems matched at the start of a word, stems matched anywhere)
+    ("komposit", ("wpc",), ("wood plastic composite", "träkomposit")),
+    ("lerputs", (), ("lerputs", "clay plaster", "leirpuss")),
+    ("metall", ("plåt", "aluminium", "aluminum", "metal", "stål", "steel", "kassett"),
+     ("sandwich", "fasadplåt", "metall")),
+    ("skiva", ("hardie", "steni", "rockpanel", "swisspearl", "cembrit", "hpl", "eternit"),
+     ("fibercement", "fibrecement", "fiber cement", "fibre cement", "fasadskiv",
+      "skivfasad", "ventilated facade panel")),
+    ("tegel", ("brick",), ("tegel", "murstens")),
+    ("puts", ("render", "stucco", "mortar"), ("puts", "puss", "puds", "mørtel")),
+    ("trä", ("trä", "lockpanel", "locklist", "spontpanel", "timber", "wood", "spruce",
+             r"gran(?!it|ul|d)", "furu", "pine", "larch", "lärk", "cedar", "ceder",
+             "thermowood", "thermopine", "malmfuru"),
+     ("träpanel", "träfasad", "stående panel", "liggande panel", "kledning", "cladding")),
+)
+_FACADE_KIND_RES = tuple(
+    (kind, re.compile("|".join(
+        [r"\b" + w for w in start] + [re.escape(w) for w in anywhere])))
+    for kind, start, anywhere in _FACADE_KINDS)
+
+# How each kind is named in a reason, in Swedish.
+FACADE_KIND_LABELS = {
+    "komposit": "träkomposit", "lerputs": "lerputs", "metall": "plåt och metall",
+    "skiva": "fasadskivor", "tegel": "tegel", "puts": "puts", "trä": "träpanel",
+}
+
+
+def _facade_kinds(text: str) -> list[str]:
+    """Every kind `text` names, most specific first. A kind whose every match
+    lies inside an earlier kind's match is not counted: "lerputs" is clay
+    plaster and not also a render, "träkomposit" composite and not also wood."""
+    lowered = (text or "").lower()
+    kinds: list[str] = []
+    taken: list[tuple[int, int]] = []
+    for kind, pattern in _FACADE_KIND_RES:
+        spans = [m.span() for m in pattern.finditer(lowered)]
+        if not spans:
+            continue
+        free = [s for s in spans if not any(a <= s[0] and s[1] <= b for a, b in taken)]
+        if free:
+            kinds.append(kind)
+        taken.extend(spans)
+    return kinds
+
+
+def facade_kind(text: str) -> str:
+    """The kind of facade cladding a catalog row's name gives ("trä", "puts",
+    "skiva", "metall", "komposit", "tegel", "lerputs"), or "". The first
+    wins: a product name says what it is first ("Aluminium Cladding")."""
+    kinds = _facade_kinds(text)
+    return kinds[0] if kinds else ""
+
+
+def component_facade_kind(text: str) -> str:
+    """The one kind of facade cladding a component's name gives, or "" when it
+    names none or several. "Träfasad med plåtbeslag" and "Putsad fasad med
+    träpanel" name two, and a guess at the main one would narrow the pool to
+    the wrong material, worse than comparing with the whole category (found in
+    review)."""
+    kinds = _facade_kinds(text)
+    return kinds[0] if len(kinds) == 1 else ""
+
+
 # Wet-room waterproofing, HENRIC-3290 del 3. "Tätskikt våtrum" had no category
 # unless intake declared one, and then it was kakel, the tiles laid on it. A
 # roof's waterproofing is the roof's own layer and stays tak: "Taktätskikt",

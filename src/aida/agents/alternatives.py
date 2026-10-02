@@ -1192,6 +1192,32 @@ def _names_del3_subtype(proj_comp) -> bool:
     return (own, component_subcategory(proj_comp.name, own)) in UNLIKE_THEIR_CATEGORY
 
 
+def _facade_kind_rows(rows: list[dict], proj_comp, category: str) -> tuple[list[dict], str]:
+    """Facade cladding rows of the kind the component's name gives, or the
+    reason there are none (HENRIC-3406).
+
+    Strict per kind, like stomme and furniture: a wood panel meets wood
+    panels, a render renders. In the production smoke 2026-10-02 "Träpanel
+    fasad" had 80 rows in its pool and the one under its baseline was Weber's
+    clay plaster, an interior finish. A name that gives no kind ("Fasad",
+    "Fasadbeklädnad"), or two ("Träfasad med plåtbeslag"), keeps the whole
+    category, as before.
+    """
+    from aida.data.climate_data import FACADE_KIND_LABELS, component_facade_kind, facade_kind
+
+    if category != "fasadskikt" or not rows:
+        return rows, ""
+    want = component_facade_kind(proj_comp.name)
+    if not want:
+        return rows, ""
+    same = [e for e in rows if facade_kind(e.get("name", "")) == want]
+    if same:
+        return same, ""
+    return [], (f"Katalogen har inga EPD:er för {FACADE_KIND_LABELS[want]} på fasad, och "
+                f"en fasad av ett annat material är ett annat byggsätt med ett annat "
+                f"underlag bakom.")
+
+
 # Split subtypes named in a reason, in Swedish.
 _SPLIT_LABELS = {"avjämning": "avjämningsmassa", "glasparti": "glaspartier",
                  "aggregat": "ventilationsaggregat"}
@@ -2841,6 +2867,9 @@ def find_alternatives(
         else:
             category_rows, no_alt_reason = _stomme_rows(epd_data, proj_comp, comp_key)
         category_rows = _split_subtype_rows(category_rows, proj_comp, comp_key)
+        if category_rows and not no_alt_reason:
+            category_rows, no_alt_reason = _facade_kind_rows(
+                category_rows, proj_comp, comp_key)
         if category_rows and not no_alt_reason:
             category_rows, no_alt_reason = _coverage_rows(
                 category_rows, proj_comp, comp_key)

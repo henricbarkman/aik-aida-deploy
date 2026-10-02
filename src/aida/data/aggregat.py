@@ -44,7 +44,10 @@ Airflow. Only a flow the EPD itself states for the declared unit counts.
     capacity at the highest SFP, the figure ProNordic's choice above already
     turns down. The maximum would move Swegon's eight rows from 0.76-1.33 to
     0.48-0.83 kg CO2e per m3/h. The older 011/012 EPD (S-P-05063, 2022) has no
-    use scenario and states no flow.
+    use scenario and states no flow. Since 2026-10-02 the GOLD rows come from
+    Swegon's EPD Hub declaration HUB-6058 instead (see PRODUCT_FACTS): it
+    states the design flow of size 012 (0.95 m3/s), and the other sizes keep
+    the 2024 design flows read here.
   - S&P's PURECLASS 800 CL states a "constant representative operating point
     of 700 m3/h" for its school scenario, the same kind of figure as Swegon's
     design flow. NASHIRA S (residential, "airflow rates of up to 150 m3/h")
@@ -160,21 +163,12 @@ EPD_FACTS: dict[str, EpdFact] = {
     "NEPD-6160-5425-EN": EpdFact(None, "lägenhet", "Nordic S3: no flow stated; apartments, houses, villas"),
     "NEPD-6161-5424-EN": EpdFact(None, "lägenhet", "Nordic S4: no flow stated; apartments, houses, villas"),
     "NEPD-9539-9190": EpdFact(None, "lägenhet", "Nordic S7 SW: no flow stated; apartments, houses, villas"),
-    # Swegon Group AB, GOLD/SILVER C RX (HENRIC-3386). PDF: "Declared unit 1
-    # finished product"; the ILCD gives a Mass equal to the unit's weight.
-    # Flow: the B6 scenario's "Design airflow rate" (100 %) in m3/s x 3600, at
-    # the annual average SFP 1.6 kW/(m3/s). PDFs read from Swegon's site and
-    # its Baltic distributor (ecowise.lv); Environdec's library no longer
-    # serves them, its data hub does.
-    "EPD-IES-0013087": EpdFact(1476, "byggnad", "GOLD RX 005: Design airflow rate 0.41 m3/s (max 0.65), SFP 1.6; 266 kg; comfort ventilation, placed by flow", 266),
-    "EPD-IES-0013088": EpdFact(2340, "byggnad", "GOLD RX 008: Design airflow rate 0.65 m3/s (max 1), SFP 1.6; 344 kg; comfort ventilation, placed by flow", 344),
-    "EPD-IES-0005063": EpdFact(None, "byggnad", "GOLD RX 012, S-P-05063 (2022): no flow and no use scenario; 488 kg; a size of the series between 007/008 and 014/020", 488),
-    "EPD-IES-0013089": EpdFact(5040, "byggnad", "GOLD RX 020: Design airflow rate 1.40 m3/s (max 2.1), SFP 1.6; 679 kg; comfort ventilation, placed by flow", 679),
-    "EPD-IES-0013090": EpdFact(6840, "byggnad", "GOLD RX 030: Design airflow rate 1.9 m3/s (max 3.2), SFP 1.6; 861 kg; comfort ventilation, placed by flow", 861),
-    "EPD-IES-0013091": EpdFact(10800, "byggnad", "GOLD RX 040: Design airflow rate 3 m3/s (max 5), SFP 1.6; 1254 kg; comfort ventilation, placed by flow", 1254),
-    "EPD-IES-0013092": EpdFact(14040, "byggnad", "GOLD RX 060: Design airflow rate 3.9 m3/s (max 6.5), SFP 1.6; 1534 kg; comfort ventilation, placed by flow", 1534),
-    "EPD-IES-0013343": EpdFact(19440, "byggnad", "GOLD RX 080: Design airflow rate 5.4 m3/s (max 9.5), SFP 1.6; 2482 kg; comfort ventilation, placed by flow", 2482),
-    "EPD-IES-0013344": EpdFact(31680, "byggnad", "GOLD RX 120: Design airflow rate 8.80 m3/s (max 14.0), SFP 1.6; 3920 kg; comfort ventilation, placed by flow", 3920),
+    # Swegon Group AB, GOLD RX: one EPD Hub declaration (HUB-6058, 2026) with
+    # a GWP per size; facts per size in PRODUCT_FACTS. It replaced nine
+    # Environdec EPDs (S-P-05063, 13087-13092, 13343, 13344, HENRIC-3386) that
+    # the library stopped serving (HENRIC-3405). Their piece_mass_kg went with
+    # them: the hand rows are per piece already.
+    "HUB-6058": EpdFact(None, None, "GOLD RX, one EPD with a GWP per size; facts per size in PRODUCT_FACTS"),
     # S&P Sistemas de Ventilación (Soler & Palau). Declared per unit in the
     # dataset itself (Number of pieces).
     "EPD-IES-0013020": EpdFact(None, "lägenhet", "SABIK 350: no flow stated ('its reference flow rate'); Range of domestic MVHR units"),
@@ -269,6 +263,39 @@ PRODUCT_FACTS: dict[tuple[str, str], EpdFact] = {
     (_CASA, "Swegon CASA R9V air handling unit"): EpdFact(None, "lägenhet", "R9 (R09V): average 170 l/s; catalogue 270-871 m3/h. " + _CASA_RVU),
     (_CASA, "Swegon CASA R15V air handling unit"): EpdFact(None, None, "R15 (R15V): average 320 l/s; catalogue 360-1 710 m3/h, marked NRVU; for large residences and meeting spaces alike, so neither class"),
 }
+
+# Swegon GOLD RX, HUB-6058 (EPD Hub, published 2026-04-17, read 2026-10-02,
+# HENRIC-3405). The declared unit is one GOLD RX 012; appendix 1 gives the
+# GWP-fossil A1-A3 of every size, each modelled individually. The catalog keeps
+# nine of the eighteen sizes, the larger of each pair Swegon's nine earlier
+# Environdec EPDs declared (004/005 ... 100/120), for two reasons: the pairs
+# differ by 0-7 %, and the flows below exist for those sizes only, so the
+# other nine could not be sized and would only have doubled one maker's share
+# of the building class.
+#
+# Flow. HUB-6058 states a design flow for the declared size alone: the B6
+# scenario's "Design airflow rate" 0.95 m3/s for RX 012 (the functional unit
+# says "up to 3420 m3/hr"). The other eight carry the design airflow rate of
+# the same size in Swegon's 2024 Environdec EPDs (the same B6 scenario, SFP
+# 1.6), which were withdrawn as LCA results, not as product ratings; 012's
+# 0.95 sits between 008's 0.65 and 020's 1.40, so the two declarations size
+# the series the same way. Without them eight GOLD rows would drop out of
+# every sized alternatives list and of the per-airflow typvärde. Class: the
+# smallest design flow, 1 476 m3/h, is above ProNordic L110R's 1 000, so
+# byggnad, as before.
+_GOLD = "HUB-6058"
+_GOLD_2024 = "the design airflow rate of this size in Swegon's 2024 Environdec EPD"
+PRODUCT_FACTS.update({
+    (_GOLD, "Swegon GOLD RX 005 air handling unit"): EpdFact(1476, "byggnad", f"GOLD RX 005: Design airflow rate 0.41 m3/s (S-P-13087), {_GOLD_2024}; comfort ventilation, placed by flow"),
+    (_GOLD, "Swegon GOLD RX 008 air handling unit"): EpdFact(2340, "byggnad", f"GOLD RX 008: Design airflow rate 0.65 m3/s (S-P-13088), {_GOLD_2024}; comfort ventilation, placed by flow"),
+    (_GOLD, "Swegon GOLD RX 012 air handling unit"): EpdFact(3420, "byggnad", "GOLD RX 012: Design airflow rate 0.95 m3/s, HUB-6058 appendix 2 (B6, 100 %), 'up to 3420 m3/hr' in its functional unit; comfort ventilation, placed by flow"),
+    (_GOLD, "Swegon GOLD RX 020 air handling unit"): EpdFact(5040, "byggnad", f"GOLD RX 020: Design airflow rate 1.40 m3/s (S-P-13089), {_GOLD_2024}; comfort ventilation, placed by flow"),
+    (_GOLD, "Swegon GOLD RX 030 air handling unit"): EpdFact(6840, "byggnad", f"GOLD RX 030: Design airflow rate 1.9 m3/s (S-P-13090), {_GOLD_2024}; comfort ventilation, placed by flow"),
+    (_GOLD, "Swegon GOLD RX 040 air handling unit"): EpdFact(10800, "byggnad", f"GOLD RX 040: Design airflow rate 3 m3/s (S-P-13091), {_GOLD_2024}; comfort ventilation, placed by flow"),
+    (_GOLD, "Swegon GOLD RX 060 air handling unit"): EpdFact(14040, "byggnad", f"GOLD RX 060: Design airflow rate 3.9 m3/s (S-P-13092), {_GOLD_2024}; comfort ventilation, placed by flow"),
+    (_GOLD, "Swegon GOLD RX 080 air handling unit"): EpdFact(19440, "byggnad", f"GOLD RX 080: Design airflow rate 5.4 m3/s (S-P-13343), {_GOLD_2024}; comfort ventilation, placed by flow"),
+    (_GOLD, "Swegon GOLD RX 120 air handling unit"): EpdFact(31680, "byggnad", f"GOLD RX 120: Design airflow rate 8.80 m3/s (S-P-13344), {_GOLD_2024}; comfort ventilation, placed by flow"),
+})
 
 
 def reg_stem(reg_no: str) -> str:

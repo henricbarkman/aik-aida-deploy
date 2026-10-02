@@ -782,6 +782,37 @@ def subtype_from_material(category: str, material: str) -> str:
     return ""
 
 
+def subtype_named(category: str, name: str) -> str:
+    """The subtype a component's NAME gives ("Textilmatta" -> textil), or "".
+
+    Read for the baseline row's text only, never for its number (HENRIC-3406):
+    the baseline is the floor typical for the building and its use, not the one
+    the project names, or the comparison turns circular (metod.md, Baslinjen;
+    DECISIONS.md 2). A row that says vinyl for "Textilmatta" without saying why
+    reads as a bug, and did once, to Demi on stage.
+
+    The bare "matta" is not read here: as a material it is the textile catch-all
+    after "plastmatta" and the rest, but in a name it is also a vinyl
+    ("Våtrumsmatta") or says nothing ("Golvmatta").
+    """
+    subs = _MATERIAL_SUBTYPE_KEYWORDS.get(category)
+    if not subs or not name:
+        return ""
+    text = name.lower()
+    for subtype, keywords in subs:
+        if any(kw in text for kw in keywords if kw != "matta"):
+            return subtype
+    return ""
+
+
+# How a floor subtype is named in a sentence, in Swedish.
+SUBTYPE_LABELS = {
+    "linoleum": "linoleum", "laminat": "laminatgolv", "keramik": "klinker eller keramiska plattor",
+    "trä": "trägolv", "gummi": "gummigolv", "epoxi": "epoxi- eller plastgjutet golv",
+    "vinyl": "vinylgolv", "textil": "textilgolv",
+}
+
+
 def get_baseline_typvärde(category: str, unit: str, subcategory: str = "") -> dict | None:
     """Look up EPD-baseline typvärde for a (category, unit[, subcategory]).
 

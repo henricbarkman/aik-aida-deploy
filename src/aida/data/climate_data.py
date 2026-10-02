@@ -427,6 +427,14 @@ def names_built_in(text: str) -> bool:
     return bool(_BUILT_IN_RE.search(head))
 
 
+def names_built_in_storage(text: str) -> bool:
+    """True for storage the name calls built in: "Platsbyggd garderob",
+    "Inbyggda skåp", "Fast monterade hyllor" (HENRIC-3394). Not a kitchen or
+    bathroom cabinet, which furniture_subcategory does not read as storage,
+    and not loose storage ("Förvaringsskåp")."""
+    return furniture_subcategory(text) == "förvaring" and names_built_in(text)
+
+
 def furniture_subcategory(text: str) -> str:
     """The loose-furniture subcategory `text` names, or "".
 

@@ -29,6 +29,7 @@ from aida.api_client import (
     get_client,
 )
 from aida.data.climate_data import (
+    names_built_in_storage,
     normalize_component_name,
     resolve_category,
 )
@@ -102,7 +103,7 @@ Din uppgift:
 4. Resonera om varför varje alternativ är bättre eller sämre — beskriv BÅDE klimatvinsten och hur det uppfyller praktiska behov. Det gäller återbruk lika mycket som nyinköp: säg vad annonsen är, hur den passar komponenten, vad täckningen och priset betyder i praktiken och vad förvaltaren behöver kontrollera (skick, mått, antal) innan den kan räknas in.
 
 PRINCIPER FÖR ALTERNATIV:
-- Användaren optimerar TOTALEN över hela projektet, inte per komponent. En komponent kan välja ett dyrare eller högre CO2e-alternativ om totalen blir bättre tack vare stora vinster på andra komponenter. Filtrera därför INTE bort alternativ enbart för att deras CO2e råkar vara högre än baslinjen — visa relevanta valmöjligheter med tydlig +/- jämförelse i reasoning. Rangordna gärna med lägst CO2e först så användaren ser besparingen, men inkludera även likvärdiga eller marginellt högre alternativ när de är funktionellt relevanta.
+- Ett nytt alternativ (EPD) ska ha lägre CO2e än baslinjen. Systemet tar bort EPD-alternativ på eller över baslinjen och säger själv till användaren när katalogen bara har sådana, så föreslå dem inte: de tar en plats som ett riktigt alternativ kunde haft. Bland alternativen under baslinjen gäller att användaren optimerar TOTALEN över hela projektet, inte per komponent: ett alternativ med mindre besparing men bättre funktion, pris eller leveranskedja kan vara rätt val, så visa spridningen med tydlig jämförelse i reasoning. Rangordna med lägst CO2e först så användaren ser besparingen.
 - Uttryckta behov är oförhandlingsbara — inget alternativ som inte uppfyller dem.
 - Resonera om hur alternativen möter behov: både uttryckta och antagna (ljudmiljö, inomhusklimat, underhåll, estetik, arbetsmiljö vid installation).
 - Presentera spridning i pris — det är användarens beslut att väga ekonomi mot klimat.
@@ -894,6 +895,46 @@ _FURNITURE_LABELS = {
 }
 
 
+def _built_in_storage_rows(epd_data: dict[str, list[dict]],
+                           proj_comp) -> tuple[list[dict], str]:
+    """Rows built-in storage can be compared against, or the reason there are
+    none (HENRIC-3394).
+
+    "Platsbyggd garderob" is fast inredning since HENRIC-3367, and until
+    2026-10-02 it then met the whole category: kitchen fronts, worktops,
+    sinks and bathroom cabinets. A built-in wardrobe, shelf or cabinet is
+    joinery, a carcass with doors, so its only comparable rows are the
+    catalog's cabinet carcasses (fast_inredning/köksskåp).
+
+    Units: kg meets kg, which compares the material of the carcass. A carcass
+    per piece is a kitchen cabinet of a size the EPD does not set against a
+    wardrobe's, and nothing in the catalog is declared per metre or per m² of
+    built-in storage, so st, lm and m² get the reason instead of a list.
+    """
+    pool = [e for e in epd_data.get("fast_inredning", [])
+            if e.get("subcategory") == "köksskåp"]
+    unit = proj_comp.unit.strip().lower()
+    if unit == "kg":
+        rows = [e for e in pool if _epd_comparable(e)[1] == "kg"]
+        if rows:
+            return rows, ""
+    per_kg = sum(1 for e in pool if _epd_comparable(e)[1] == "kg")
+    if not per_kg:
+        return [], (
+            "Katalogen har ingen miljödeklaration för platsbyggd förvaring "
+            "(garderober, skåp och hyllor byggda på plats) och inga för "
+            "skåpstommar per kg, så ingen jämförelse med nyköp görs. "
+            "Bänkskivor, diskbänkar och köksluckor jämförs inte.")
+    return [], (
+        "Katalogen har ingen miljödeklaration för platsbyggd förvaring "
+        "(garderober, skåp och hyllor byggda på plats). Det som liknar mest är "
+        f"{per_kg} deklaration{'er' if per_kg != 1 else ''} för skåpstommar till "
+        "kök per kg. Ett köksskåp per styck är en annan storlek än en garderob, "
+        "så de jämförs bara när mängden anges i kg. Bänkskivor, diskbänkar och "
+        "köksluckor jämförs inte."
+    )
+
+
 def _furniture_rows(epd_data: dict[str, list[dict]], proj_comp) -> tuple[list[dict], str]:
     """Rows a piece of loose furniture can be compared against, or the reason
     there are none (HENRIC-3290 del 2).
@@ -1017,6 +1058,55 @@ def _plasterboard_rows(epd_data: dict[str, list[dict]]) -> list[dict]:
             and not _NOT_BOARD_RE.search(e.get("name", "").lower())]
 
 
+# An innervägg component that names its boards (HENRIC-3399): "Gipsskivor
+# 12,5 mm", "Innervägg gips 2x13". A glazed partition is read before this.
+_NAMES_PLASTERBOARD_RE = re.compile(r"\bgips|gyproc|plasterboard|gipsvägg|gipsskiv")
+
+
+def _board_class_rows(pool: list[dict], proj_comp) -> tuple[list[dict], str]:
+    """Plasterboard rows of the component's thickness class, each carrying a
+    note that says which thickness was compared, or the reason there are none.
+
+    A thinner board is a different product, with another strength and fire
+    class, so a 9.5 mm board against a 12.5 mm baseline shows a saving that is
+    partly the thickness (HENRIC-3399). A board whose thickness is known from
+    neither its name nor its EPD is left out: unknown is not standard.
+    """
+    from aida.data.gipsskiva import (
+        STANDARD_TEXT,
+        board_thickness,
+        component_class,
+        format_mm,
+        thickness_class,
+    )
+
+    want, stated = component_class(proj_comp.name)
+    rows: list[dict] = []
+    unknown = 0
+    for e in pool:
+        mm, src = board_thickness(e)
+        if mm is None:
+            unknown += 1
+            continue
+        if thickness_class(mm) != want:
+            continue
+        b = dict(e)
+        b["board_mm"] = mm
+        if stated:
+            b["board_note"] = (f"Skivan är {format_mm(mm)} mm ({src}), samma "
+                               f"tjocklek som komponentens {want} mm.")
+        else:
+            b["board_note"] = (f"Skivan är {format_mm(mm)} mm ({src}). Komponenten "
+                               f"anger ingen tjocklek, så den jämförs med "
+                               f"standardskivor på {STANDARD_TEXT}.")
+        rows.append(b)
+    if rows:
+        return rows, ""
+    left_out = (f" {unknown} skivor anger ingen tjocklek och jämförs inte." if unknown else "")
+    return [], (f"Katalogen har inga gipsskivor på {want} mm att jämföra med, och "
+                f"skivor av en annan tjocklek är en annan produkt.{left_out}")
+
+
 def _ceiling_rows(epd_data: dict[str, list[dict]], proj_comp) -> tuple[list[dict], str]:
     """Rows a ceiling, an acoustic absorber or a grid can be compared against,
     or the reason there are none (HENRIC-3290 del 3).
@@ -1045,7 +1135,10 @@ def _ceiling_rows(epd_data: dict[str, list[dict]], proj_comp) -> tuple[list[dict
         )
     label = _CEILING_LABELS.get(sub, sub)
     if sub == "gipstak":
-        pool = _plasterboard_rows(epd_data)
+        rows, why = _board_class_rows(_plasterboard_rows(epd_data), proj_comp)
+        if why:
+            return [], why
+        pool = rows
     else:
         pool = [e for e in epd_data.get("undertak", []) if e.get("subcategory") == sub]
     if not pool:
@@ -1543,7 +1636,8 @@ def _catalog_co2e(matched: dict, proj_comp, category: str) -> tuple[float | None
     comp_unit = proj_comp.unit or ""
     declared = _model_number(matched.get("gwp_a1a3"))
     if declared and declared > 0 and units_comparable(str(matched.get("unit") or ""), comp_unit):
-        return round(declared * quantity, 1), ""
+        # A plasterboard row says which thickness it was compared at.
+        return round(declared * quantity, 1), str(matched.get("board_note") or "")
     gwp, epd_unit = _epd_comparable(matched)
     if gwp <= 0:
         return None, "EPD:n saknar ett användbart klimatvärde"
@@ -1694,6 +1788,9 @@ def _format_epd_list(epds: list[dict]) -> str:
         elif isinstance(epd.get("element_thickness_mm"), (int, float)):
             # A hollow-core row per m² is per m² at its own thickness.
             gwp_str += f" (tjocklek {epd['element_thickness_mm']:g} mm enligt EPD:n)"
+        elif isinstance(epd.get("board_mm"), (int, float)):
+            # A plasterboard row was picked for its thickness (HENRIC-3399).
+            gwp_str += f" (skiva {epd['board_mm']:g} mm)"
 
         source = epd.get("source_registry", "environdec")
         source_tag = f" [{source}]" if source != "environdec" else ""
@@ -1852,6 +1949,10 @@ def _validate_alternatives(
         #     baseline — a "climate-optimized" choice with co2e >= baseline is
         #     mislabeled and produces absurd kr/sparat-kg in the ranking. Reuse
         #     and info entries are exempt (different comparison / no number).
+        #     This is the rule metod.md and both prompts state (HENRIC-3396,
+        #     scripts/test_alternativ_under_baslinjen.py); until 2026-10-02 the
+        #     text said the opposite. A pool with only worse rows is explained
+        #     to the user by _filtered_pool_reason.
         if (alt.alternative_type == "climate_optimized"
                 and baseline_co2e > 0
                 and alt.co2e_kg >= baseline_co2e):
@@ -2702,10 +2803,22 @@ def find_alternatives(
             # the router filed "Glasparti mot korridor" under fönster, and it
             # was offered used wooden windows against a window baseline.
             comp_key = resolve_category(proj_comp.name, proj_comp.category)
-        if comp_key == "los_inredning":
+        if names_built_in_storage(proj_comp.name):
+            # Built-in storage is joinery wherever the router filed it
+            # (HENRIC-3367), and meets only cabinet carcasses (HENRIC-3394).
+            comp_key = "fast_inredning"
+            category_rows, no_alt_reason = _built_in_storage_rows(epd_data, proj_comp)
+        elif comp_key == "los_inredning":
             category_rows, no_alt_reason = _furniture_rows(epd_data, proj_comp)
         elif comp_key == "undertak":
             category_rows, no_alt_reason = _ceiling_rows(epd_data, proj_comp)
+        elif (comp_key == "innervägg"
+              and _NAMES_PLASTERBOARD_RE.search(proj_comp.name.lower())
+              and not _names_del3_subtype(proj_comp)):
+            # Plasterboard in a wall meets boards of its own thickness
+            # (HENRIC-3399), not the prefab panels and MDF in the bucket.
+            category_rows, no_alt_reason = _board_class_rows(
+                _plasterboard_rows(epd_data), proj_comp)
         else:
             category_rows, no_alt_reason = _stomme_rows(epd_data, proj_comp, comp_key)
         category_rows = _split_subtype_rows(category_rows, proj_comp, comp_key)
@@ -3286,7 +3399,7 @@ Antal: {proj_comp.quantity} {proj_comp.unit}
 Baslinje CO2e: {baseline_for_prompt} kg ({baseline_label})
 Baslinje kostnad: {_prompt_cost(bl_comp.cost_sek)}
 
-Föreslå alternativ ur listorna nedan: 2-4 EPD-alternativ, plus varje Palats-annons som passar komponenten. Rangordna dem TILLSAMMANS i en lista. Inkludera hela spannet av CO2e-värden — användaren optimerar totalen över hela projektet, inte per komponent, så ett alternativ som ligger något över baslinjen kan vara värt att visa om det möter behoven bättre. Rangordna med lägst CO2e först. I reasoning: ange explicit hur alternativet jämför mot baslinjen (t.ex. "−45% CO2e" eller "+12% CO2e — men kortare leveranskedja och tystare drift").
+Föreslå alternativ ur listorna nedan: 2-4 EPD-alternativ, plus varje Palats-annons som passar komponenten. Rangordna dem TILLSAMMANS i en lista. Välj bara EPD-alternativ med lägre CO2e än baslinjen: en ny produkt som inte sänker klimatpåverkan visas inte för användaren, och systemet förklarar självt när katalogen bara har sådana. Rangordna med lägst CO2e först. I reasoning: ange explicit hur alternativet jämför mot baslinjen (t.ex. "−45% CO2e, och nordisk leverantör").
 """
 
     # Project-level needs (user-approved) — overarching framing for the whole

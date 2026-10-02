@@ -53,6 +53,11 @@ LOCATION_NAMES: dict[int, dict[str, str]] = {
 # hitta annonsen", and /web/listing/<id> redirects a logged-out browser to the
 # login form. To recheck: GET /api/v2/shop/organization?name=<slug> (public)
 # and isGlobalStoreConnected in /api/v2/vendors (logged in).
+# Rechecked logged in 2026-10-01: 0 of 346 furniture listings in the public
+# store. /api/v2/target-groups shows why: the furniture group is targetType
+# "private" with defaultArchiveType INTERNAL_REUSE, while byggmaterial is
+# "public" with SOLD. The furniture is Sola's internal reuse channel for the
+# municipality's own units, by design, not a missed setting.
 SHOP_SLUGS: dict[str, str] = {
     "ve_01ka8cx0n1fckb4pyzv43gk3mf": "solabyggaterbruk-byggmaterial",
 }
@@ -417,6 +422,14 @@ def _normalize_to_aida_subcategory(category: str, text: str) -> str:
         # under" is a parquet floor (found in review, del 3).
         from aida.data.climate_data import levelling_compound
         return "avjämning" if levelling_compound(text) else ""
+    if category == "fast_inredning":
+        # Built-in storage before the keyword table, HENRIC-3394: "Platsbyggd
+        # garderob med skjutluckor" is a wardrobe, not the kitchen front its
+        # bare "luckor" would make it. A kitchen cabinet is not storage to the
+        # furniture reader, so "Platsbyggt köksskåp" stays köksskåp.
+        from aida.data.climate_data import names_built_in_storage
+        if names_built_in_storage(text):
+            return "förvaring"
     if category == "ventilation" and _names_ventilation_part(text):
         # A part for a unit is not a unit: "Ljuddämpare till aggregat" and
         # "Spjäll aggregat LB01" are duct-side parts of tens of kg, and must
@@ -915,7 +928,11 @@ def search_listings_for_component(
         return []
 
     target_subcategory = component_subcategory(component_name, target_category)
-    strict = target_category in STRICT_SUBCATEGORY_CATEGORIES
+    # Built-in storage is strict too (HENRIC-3394): a used worktop or sink is
+    # no reuse option for a built-in wardrobe, and fast_inredning's other
+    # listings are exactly those.
+    strict = (target_category in STRICT_SUBCATEGORY_CATEGORIES
+              or (target_category, target_subcategory) == ("fast_inredning", "förvaring"))
     if strict and not target_subcategory:
         return []
 

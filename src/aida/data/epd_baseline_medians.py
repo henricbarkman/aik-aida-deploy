@@ -505,6 +505,15 @@ def _group_rows(epds: list[dict]) -> dict[tuple[str, str, str], Rows]:
         grouped.setdefault((cat, sub, unit), []).append((float(gwp), e))
         if (cat, sub, unit) == ("ventilation", "aggregat", "st"):
             _add_aggregat_keys(grouped, float(gwp), e)
+        elif (cat, sub) == ("stomme", "konstruktionsstål"):
+            # Counted a second time in its profile form, so an HEA meets beam
+            # EPDs and a VKR tube EPDs (_profile_typvärde; HENRIC-3390). The
+            # family key stays complete: it is the fallback.
+            from aida.data.steel_profiles import epd_form, form_subcategory
+            form = epd_form(e.get("name", ""))
+            if form:
+                grouped.setdefault((cat, form_subcategory(sub, form), unit), []).append(
+                    (float(gwp), e))
     return grouped
 
 
@@ -868,14 +877,21 @@ def _profile_typvärde(category: str, name: str, unit: str,
     Returns the kg payload rescaled, with `geometry` naming the profile and its
     weight and source, `per_kg` the unscaled value, or None.
     """
-    from aida.data.steel_profiles import profile_mass
+    from aida.data.steel_profiles import form_subcategory, profile_mass
 
     if (unit or "").strip().lower() not in ("lm", "m", "meter", "löpmeter"):
         return None
     profile, _ = profile_mass(name)
     if not profile or profile.family != subcategory:
         return None
-    kg_data = get_baseline_typvärde(category, "kg", subcategory)
+    # The EPDs of the profile's own form when that key is published (open
+    # sections for an HEA, hollow for a VKR), else the whole family.
+    kg_data = None
+    if profile.form:
+        kg_data = get_baseline_typvärde(category, "kg", form_subcategory(subcategory, profile.form))
+    form_used = bool(kg_data)
+    if not kg_data:
+        kg_data = get_baseline_typvärde(category, "kg", subcategory)
     if not kg_data:
         return None
     bridged = dict(kg_data)
@@ -883,6 +899,10 @@ def _profile_typvärde(category: str, name: str, unit: str,
         if isinstance(kg_data.get(key), (int, float)):
             bridged[key] = round(kg_data[key] * profile.kg_per_m, 4)
     bridged["geometry"] = f"profil {profile.label}"
+    if form_used:
+        bridged["geometry"] += (", typvärdet för " + ("öppna profiler (balkar, U och vinklar)"
+                                if profile.form == "öppen" else "rör"))
+    bridged["profile_form"] = profile.form if form_used else ""
     bridged["per_kg"] = kg_data["baseline_co2e_per_unit"]
     return bridged
 

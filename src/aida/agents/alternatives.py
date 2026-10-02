@@ -2302,11 +2302,28 @@ def _palats_candidates(
     # weight there is no figure, and a default would be a number with no
     # basis: 2 kg CO2e per metre of stud is more than a new stud. The
     # listings are named in an info row instead, with the reason.
-    if category == "stomme":
-        from aida.data.stomme_reuse import family_label, reuse_figure
+    # Each listing is weighed with its own size when its title states one
+    # ("Reglar 45x120"), else with the component's (HENRIC-3395). A listing
+    # with no weight either way is named in the info row instead.
+    if category == "stomme" and unique:
+        from aida.data.stomme_reuse import (
+            family_label,
+            listing_reuse_figure,
+            reuse_figure,
+        )
 
+        weighed = [(listing, coverage) for listing, coverage in unique
+                   if listing_reuse_figure(component_name, listing.title,
+                                           project_unit).per_unit is not None]
+        if weighed and len(weighed) < len(unique):
+            logger.info("Palats: %d stomme listings for %r dropped, no weight "
+                        "from title or component", len(unique) - len(weighed),
+                        component_name)
         figure = reuse_figure(component_name, project_unit)
-        if figure.per_unit is None:
+        if not weighed:
+            if figure.per_unit is not None:
+                figure = listing_reuse_figure(component_name, unique[0][0].title,
+                                              project_unit)
             label = family_label(target_subcat)
             one = len(unique) == 1
             listed = "; ".join(
@@ -2330,6 +2347,7 @@ def _palats_candidates(
                 ),
                 alternative_type="info",
             )
+        unique = weighed
     return unique, None
 
 
@@ -2366,9 +2384,10 @@ def _reuse_figures(
 
     stomme_note = ""
     if category == "stomme":
-        from aida.data.stomme_reuse import reuse_figure
+        from aida.data.stomme_reuse import listing_reuse_figure
 
-        figure = reuse_figure(component_name, project_unit)
+        figure = listing_reuse_figure(component_name, getattr(listing, "title", ""),
+                                      project_unit)
         co2e_per_unit = figure.per_unit
         stomme_note = figure.note
     else:

@@ -234,6 +234,9 @@ produkt ENBART när den faktiskt ÄR komponentens standardmaterial:
   standardprofil i namnet ("HEA 200", "VKR 100x100x5", "Stålregel 70"): vikten per
   meter tas ur standardtabeller. Konstruktionsstål matchar "Konstruktionsstål, alla
   sorter, 80 % primär råvara".
+  Och prefabricerade betongelement: håldäck matchar "Hålbjälklag, HD/F", massiva
+  bjälklag "Massivplattor, RD, RD/F", betongbalkar och pelare "Balkar B". Systemet
+  räknar om dem till m² eller löpmeter ur tjockleken, tvärsnittet eller vikten i namnet.
 - Mineralull som isolering matchar en mineralullsprodukt. OK.
 
 Låna ALDRIG en produkt av annan typ bara för att den delar basmaterial. Det ger en
@@ -500,6 +503,96 @@ def _apply_profile_mass(r: BaselineResult, comp, product, extra: dict) -> bool:
     return True
 
 
+# Boverket's precast element records, by the element kind they are
+# (betongstomme.element_kind). A record of another kind is left alone: its
+# weight per m² or metre is not the component's.
+_CONCRETE_BOVERKET_PREFIXES = {"håldäck": "hålbjälklag", "massiv": "massivplattor",
+                               "balk": "balkar"}
+
+
+def _apply_concrete_element(r: BaselineResult, comp, product, extra: dict) -> bool:
+    """Redo a precast concrete Boverket baseline per m² or löpmeter (in-place).
+    True when the product is a precast element record of the component's kind.
+
+    Boverket declares hollow-core, solid slabs and beams per kg, and a slab is
+    counted in m². Until 2026-10-02 the model did that conversion with a
+    weight of its own choosing (270 kg/m² for a 200 mm hollow-core slab on
+    stage), while the alternatives use only weights a name or an EPD states
+    (betongstomme). The same rule now holds for the baseline (HENRIC-3395):
+
+    - A hollow-core slab uses the weight per m² its name states, else
+      Boverket's own conversion for the record (kg/m³ times the height, which
+      is what the record's kg value is declared against), and the row gives
+      Svensk Betong's span for the height, since makers' voids differ.
+    - A solid slab or a beam uses 2 500 kg/m³ times the thickness or section,
+      as the alternatives do (Svensk Betong's element table).
+    Without the thickness or section the model's figure stays, labelled.
+    """
+    from aida.data import betongstomme as bs
+
+    if extra.get("category") != "Betong":
+        return False
+    kind = bs.element_kind(comp.name)
+    prefix = _CONCRETE_BOVERKET_PREFIXES.get(kind)
+    if not prefix or not (product.name or "").strip().lower().startswith(prefix):
+        return False
+    kg_value = product.co2e_per_unit
+    aside = ""
+    if kind == bs.BALK:
+        section = bs.beam_section_mm(comp.name) if comp.unit == "lm" else None
+        if not section:
+            if comp.unit == "lm":
+                note = (" Namnet anger inget tvärsnitt, så omräkningen från kg bygger "
+                        "på ett antaget tvärsnitt.")
+                if note.strip() not in (r.description or ""):
+                    r.description = (r.description or "").rstrip() + note
+            return True
+        w, h = section
+        weight = w / 1000 * h / 1000 * bs.SOLID_DENSITY_KG_M3
+        how = (f"tvärsnitt {w:g}×{h:g} mm × 2 500 kg/m³ ({bs.SOLID_DENSITY_SOURCE}) "
+               f"= {weight:g} kg/lm")
+    elif comp.unit != "m2":
+        return True
+    else:
+        thickness = bs.slab_thickness_mm(comp.name)
+        stated = bs.stated_kg_per_m2(comp.name) if kind == bs.HÅLDÄCK else None
+        if stated:
+            weight = stated
+            how = f"vikten {stated:g} kg/m² som står i namnet"
+        elif not thickness:
+            note = (" Namnet anger ingen tjocklek, så omräkningen från kg bygger på "
+                    "en antagen vikt per m².")
+            if kind == bs.HÅLDÄCK:
+                note += f" {bs.hdf_weight_text(200)}."
+            if note.strip() not in (r.description or ""):
+                r.description = (r.description or "").rstrip() + note
+            return True
+        elif kind == bs.HÅLDÄCK:
+            density = extra.get("density_kg_m3")
+            if not density:
+                return True
+            weight = round(density * thickness[0] / 1000, 1)
+            how = (f"{weight:g} kg/m², Boverkets omräkning för {product.name.strip()} "
+                   f"({density:g} kg/m³ × {thickness[0]:g} mm)")
+            aside = (f" {bs.hdf_weight_text(thickness[0])}, så leverantörens vikt i "
+                     f"namnet (\"Håldäck {thickness[0]:g} mm, XXX kg/m2\") ger en "
+                     f"säkrare siffra.")
+        else:
+            weight = thickness[0] / 1000 * bs.SOLID_DENSITY_KG_M3
+            how = (f"{thickness[1]} × 2 500 kg/m³ ({bs.SOLID_DENSITY_SOURCE}) "
+                   f"= {weight:g} kg/m²")
+    per_unit = round(kg_value * weight, 4)
+    r.co2e_per_unit = per_unit
+    r.unit = comp.unit
+    r.quantity = comp.quantity
+    r.co2e_kg = round(per_unit * comp.quantity, 1)
+    r.description = (r.description or "").rstrip() + (
+        f" Omräknat ur elementets vikt: {kg_value} kg CO2e/kg (Boverket) × {how}. "
+        f"Det ger {per_unit} kg CO2e/{comp.unit}.{aside}"
+    )
+    return True
+
+
 def _apply_ceiling_board(r: BaselineResult, comp, product, extra: dict) -> None:
     """Redo a gypsum ceiling's Boverket baseline per m² (in-place).
 
@@ -579,6 +672,8 @@ def _apply_member_geometry(results: list[BaselineResult], project: Project,
             _apply_ceiling_board(r, comp, product, extra)
             continue
         if _apply_profile_mass(r, comp, product, extra):
+            continue
+        if _apply_concrete_element(r, comp, product, extra):
             continue
         density = extra.get("density_kg_m3")
         if extra.get("category") not in _GEOMETRY_BOVERKET_CATEGORIES or not density:
@@ -822,6 +917,14 @@ def _apply_epd_median_fallback(results: list[BaselineResult], project: Project) 
         # (HENRIC-3290 del 3).
         if material_subtype and subcategory not in _SPLIT_SUBCATEGORIES.get(category, {}):
             subcategory = material_subtype
+        if (category, subcategory, comp.unit) == ("stomme", "konstruktionsstål", "kg"):
+            # A named profile in kg meets the EPDs of its own form, as it does
+            # in löpmeter (_profile_typvärde; HENRIC-3390).
+            from aida.data.steel_profiles import form_subcategory, profile_mass
+            profile, _ = profile_mass(comp.name)
+            if profile and profile.form and get_baseline_typvärde(
+                    category, "kg", form_subcategory(subcategory, profile.form)):
+                subcategory = form_subcategory(subcategory, profile.form)
         typvärde_data = get_baseline_typvärde(category, comp.unit, subcategory)
 
         # kg->st bridge: count-denominated components (a toilet, a radiator) are

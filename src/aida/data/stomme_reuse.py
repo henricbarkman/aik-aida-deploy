@@ -237,3 +237,82 @@ def reuse_figure(component_name: str, unit: str) -> ReuseFigure:
         f"via lager till byggplatsen) = {_sv(per_unit)} kg CO2e/{unit}. Sträckan "
         f"för just den här annonsen är okänd, och nedmontering och upprustning "
         f"ingår inte"))
+
+
+def _states_own_size(family: str, title: str, unit: str) -> bool:
+    """Whether a listing's title states a size of its own for this unit (a
+    section, a thickness, a profile or a weight), weighable or not."""
+    from aida.data.unit_conversion import member_volume_per_unit
+
+    if family in ("virke", "limträ", "konstruktionsskiva"):
+        return bool(member_volume_per_unit(title, unit))
+    if family in ("konstruktionsstål", "stålregel"):
+        from aida.data.steel_profiles import names_steel_profile
+        return bool(names_steel_profile(title))
+    if family == "betong":
+        from aida.data import betongstomme as bs
+        return bool(bs.slab_thickness_mm(title) or bs.beam_section_mm(title)
+                    or bs.stated_kg_per_m2(title))
+    return False
+
+
+def listing_reuse_figure(component_name: str, listing_title: str, unit: str) -> ReuseFigure:
+    """The transport figure for one listing (HENRIC-3395).
+
+    A listing that states its own size ("Reglar 45x120" against the component
+    "Reglar 45x95") is weighed with that size, since that is the member that
+    would travel. The material (which Boverket record) is still the
+    component's. A title that states a size the weight cannot be read from
+    (a hollow-core slab's height without its weight per m²) gives no figure
+    rather than the component's weight for another size. A title without a
+    size of its own falls back to the component's name (reuse_figure).
+    """
+    from aida.data.palats_client import component_subcategory
+
+    unit_n = (unit or "").strip().lower()
+    title = listing_title or ""
+    family = component_subcategory(component_name, "stomme")
+    if unit_n == "kg" or not title or not _states_own_size(family, title, unit_n):
+        return reuse_figure(component_name, unit)
+    if unit_n in ("st", "styck", "pcs", "stk"):
+        return reuse_figure(component_name, unit)
+    if family in ("virke", "limträ", "konstruktionsskiva"):
+        # The size from the title; the material from the title when it names
+        # one ("Plywood 12 mm"), else from the component ("OSB-skiva 12 mm"
+        # against a listing "Skivor 12 mm").
+        from aida.data.unit_conversion import member_volume_per_unit
+
+        res = (_timber_resource(family, title.lower())
+               or _timber_resource(family, (component_name or "").lower()))
+        factor, label = member_volume_per_unit(title, unit_n)
+        if res is None or res.density_kg_m3 is None:
+            kg, how = None, ("Boverket anger ingen densitet för materialet"
+                             if res else "materialet framgår inte")
+        else:
+            kg = factor * res.density_kg_m3
+            how = (f"{label} × {_sv(res.density_kg_m3)} kg/m³ (Boverket) = "
+                   f"{_sv(round(kg, 3))} kg/{unit_n}")
+    else:
+        kg, res, how = _mass_per_unit(family, title, unit_n)
+    if family == "betong":
+        from aida.data import betongstomme as bs
+        if bs.element_kind(title) and bs.element_kind(title) != bs.element_kind(component_name):
+            kg = None
+            how = "annonsen gäller en annan sorts betongelement än komponenten"
+        elif kg is None and not bs.stated_kg_per_m2(title):
+            # Same height as the component, which states the weight: the
+            # component's figure is the listing's.
+            own, comp_t = bs.slab_thickness_mm(title), bs.slab_thickness_mm(component_name)
+            if own and comp_t and abs(own[0] - comp_t[0]) <= bs.THICKNESS_TOLERANCE_MM:
+                return reuse_figure(component_name, unit)
+    if kg is None or res is None:
+        return ReuseFigure(None, (f"Annonsen \"{title}\" anger en egen storlek, och "
+                                  f"vikten går inte att räkna ur den: {how}"))
+    per_unit = round(kg * res.a4_per_kg, 4)
+    return ReuseFigure(per_unit, (
+        f"Klimatvärdet för återbruket är transporten till bygget, räknad på "
+        f"annonsens egen storlek: {how} × {_sv(res.a4_per_kg)} kg CO2e/kg "
+        f"(Boverkets klimatdatabas {BOVERKET_VERSION}, {res.name}, modul A4: "
+        f"typisk transport från fabrik via lager till byggplatsen) = "
+        f"{_sv(per_unit)} kg CO2e/{unit_n}. Sträckan för just den här annonsen är "
+        f"okänd, och nedmontering och upprustning ingår inte"))

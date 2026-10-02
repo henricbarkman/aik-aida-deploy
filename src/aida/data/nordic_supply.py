@@ -27,9 +27,11 @@ from __future__ import annotations
 import re
 
 # Legal forms and country words. `AB`/`Ab` Swedish and Åland, `A/S`/`ApS` Danish
-# and Norwegian, `AS` Norwegian, `Oy`/`Oyj` Finnish.
+# and Norwegian, `AS`/`ASA` Norwegian, `Oy`/`Oyj` Finnish. ASA added
+# 2026-10-02 (HENRIC-3392): Moelven Industrier ASA, nine facade rows, read as
+# a foreign supplier.
 _LEGAL_FORM = re.compile(
-    r"(\bAB\b|\bA/S\b|\bAS\b|\bOy\b|\bOyj\b|\bApS\b|\bAb\b"
+    r"(\bAB\b|\bA/S\b|\bAS\b|\bASA\b|\bOy\b|\bOyj\b|\bApS\b|\bAb\b"
     r"|Sweden|Denmark|Norway|Finland|Iceland"
     r"|Sverige|Danmark|Norge|Suomi|Ísland|Norden|Nordic)",
     re.I,
@@ -76,6 +78,9 @@ _KNOWN_NORDIC = (
     "sveden trä",       # Sveden Trä, träfasadpanel, SE
     "etri fönster",     # SSC Etri Fönster, SE
     "byggevarer",       # Saint-Gobain Byggevarer, NO
+    # 2026-10-02 (HENRIC-3392): the AIda stage probe offered Vedum's Ilse front
+    # as "utländsk leverantör". Environdec registers the owner without "AB".
+    "vedum",            # Vedum Kök & Bad, SE
 )
 
 # Companies the legal-form pattern matches for the wrong reason. `AS` is also the

@@ -23,9 +23,26 @@ What counts as a designation
   mass of a 100x100 tube is 11,9 to 27,4 kg/m depending on the wall, and a
   hot-finished and a cold-formed tube of the same size differ by their corner
   radii.
+- Hot-rolled channels and the heavy H series (HENRIC-3390): UPN ("UPN 200",
+  "UNP 200") and HE M ("HEM 200", "HE 200 M").
+- Angles (HENRIC-3390): equal and unequal, all three sides ("L 50x50x5",
+  "Vinkelstål 50x50x5", "VST 120x80x8"). Without the thickness, no figure.
+- Circular hollow sections (HENRIC-3390): outer diameter and wall after VKR,
+  KKR, KCKR or CHS ("VKR 114,3x5"). A round tube has no corner radius, so its
+  nominal mass is the same hot-finished (EN 10210-2) and cold-formed
+  (EN 10219-2), pi x (D - t) x t x 7,85 kg/dm3; the table is Tibnor's
+  cold-formed one, the only one with 114,3, and serves both.
 - Thin-sheet studs: a steel stud ("Stålregel", "C-regel", "C 70") of width
-  45, 70 or 95 mm. A förstärkningsregel (1,0 mm sheet) has its own row. A
-  stated sheet thickness the table does not confirm gives no figure.
+  45, 70, 95, 120, 145 or 160 mm. A förstärkningsregel (1,0 mm sheet) has its
+  own row. A standard stud is 0,5 mm sheet; a name stating another thickness
+  between 0,4 and 1,0 mm ("Stålregel 70 0,7 mm") gets the 0,5 mm stud's
+  weight scaled by the thickness, said in the row: the profile's developed
+  width is the same, and a thin-walled section's mass is that width times
+  the sheet. No maker publishes a 0,7 mm stud's weight (Lindab's RdB7 had
+  none and is no longer sold), so this is the figure there is.
+
+Every profile also has a form, "öppen" (I, H, U, angle) or "rör" (hollow),
+which the baseline uses to pick the EPDs of its own form (HENRIC-3390).
 
 Sources, every row
 ------------------
@@ -43,10 +60,23 @@ Sources, every row
   7,85 kg/dm3), which is how Tibnor's table is computed; a row that misreads
   the PDF fails that check.
 - Norgips, "Produktkatalog april 2023", column VIKT KG/M: C 45 regel 0,49
-  (page 20), C 70 0,59 (page 22), C 95 0,68 (page 24); förstärkningsregel
-  CF 45 1,13, CF 70 1,62, CF 95 1,85, godstjocklek 1,0 mm. The traditional
-  stud with flange 35/37 mm, the one every Swedish maker sells under its own
-  name (Lindab RE, Gyproc ER); Lindab's RE 70 is listed at the same 0,59 kg/m.
+  (page 20), C 70 0,59 (page 22), C 95 0,68 (page 24), C 120 0,78 (page 26);
+  C 145 dB+ 0,88 and C 160 dB+ 0,94 (page 28, Norgips makes 145 and 160 only
+  as dB+); förstärkningsregel CF 45 1,13, CF 70 1,62, CF 95 1,85, CF 120
+  1,71, CF 145 1,93, CF 160 2,10, godstjocklek 1,0 mm. The same pages in the
+  February and May 2024 editions. The traditional stud has flange 35/37 mm,
+  the one every Swedish maker sells under its own name (Lindab RE, Gyproc
+  ER), at slightly different weights: Lindab RE 70 is 0,536 kg/m by its own
+  article weights (Construline EPD list, 2026), Gyproc ER 0,46 mm sheet.
+  Sheet 0,5 mm: Norgips "Produktdatablad C profiler dB+" 01/2020, column
+  TJOCKLEK, 0,5 for every width 45 to 160 at the catalogue's weights. (Until
+  2026-10-02 this said Lindab's RE 70 was listed at 0,59 kg/m; no Lindab
+  source says so.)
+- ArcelorMittal 2024-1 as above: UPN on pdf page 100, HE M on 54-61, equal
+  angles (EN 10056-1:2017) on 102-109, unequal on 110. Read 2026-10-02.
+- Tibnor 2023 as above: KCKR-rör, runda kallformade, SS-EN 10219, pages
+  30-31; vinkelstång liksidig, pages 40-43, for the small and odd sizes
+  ArcelorMittal does not roll. Read 2026-10-02.
 """
 
 from __future__ import annotations
@@ -75,6 +105,18 @@ SOURCES: dict[str, str] = {
     "norgips-cf45": "Norgips produktkatalog april 2023, förstärkningsregel CF 45, s. 20",
     "norgips-cf70": "Norgips produktkatalog april 2023, förstärkningsregel CF 70, s. 22",
     "norgips-cf95": "Norgips produktkatalog april 2023, förstärkningsregel CF 95, s. 24",
+    "am-upn": "ArcelorMittal, Sections and Merchant bars 2024-1, EN 10365, s. 100-101",
+    "am-vinkel-liksidig": "ArcelorMittal, Sections and Merchant bars 2024-1, EN 10056-1, s. 102-109",
+    "am-vinkel-oliksidig": "ArcelorMittal, Sections and Merchant bars 2024-1, EN 10056-1, s. 110-111",
+    "tibnor-vinkel": "Tibnors konstruktionstabeller 2023, vinkelstång liksidig, s. 40-43",
+    "tibnor-kckr": ("Tibnors konstruktionstabeller 2023, KCKR-rör EN 10219, s. 30-31 "
+                    "(runt rör, samma nominella vikt varm- och kallformat)"),
+    "norgips-c120": "Norgips produktkatalog april 2023, standardregel C 120, s. 26",
+    "norgips-c145": "Norgips produktkatalog april 2023, C 145 dB+, s. 28",
+    "norgips-c160": "Norgips produktkatalog april 2023, C 160 dB+, s. 28",
+    "norgips-cf120": "Norgips produktkatalog april 2023, förstärkningsregel CF 120, s. 26",
+    "norgips-cf145": "Norgips produktkatalog april 2023, förstärkningsregel CF 145, s. 28",
+    "norgips-cf160": "Norgips produktkatalog april 2023, förstärkningsregel CF 160, s. 28",
 }
 
 # Hot-rolled sections, kg/m by nominal height, one source per series.
@@ -100,6 +142,17 @@ HOT_ROLLED: dict[str, tuple[str, dict[int, float]]] = {
         80: 7.9, 100: 9.8, 120: 12.1, 140: 14.5, 160: 17.0, 180: 19.7,
         200: 22.8, 220: 26.6, 240: 30.2, 270: 35.2, 300: 44.4, 330: 53.2,
         360: 61.2, 400: 72.2,
+    }),
+    "HEM": ("am-he", {
+        100: 41.8, 120: 52.1, 140: 63.2, 160: 76.2, 180: 88.9, 200: 103,
+        220: 117, 240: 157, 260: 172, 280: 189, 300: 238, 320: 245, 340: 248,
+        360: 250, 400: 256, 450: 263, 500: 270, 550: 278, 600: 285, 650: 293,
+        700: 301, 800: 317, 900: 333, 1000: 349,
+    }),
+    "UPN": ("am-upn", {
+        50: 5.6, 65: 7.1, 80: 8.6, 100: 10.6, 120: 13.4, 140: 16.0, 160: 18.8,
+        180: 22.0, 200: 25.3, 220: 29.4, 240: 33.2, 260: 37.9, 280: 41.8,
+        300: 46.2, 320: 59.5, 350: 60.6, 380: 63.1, 400: 71.8,
     }),
 }
 
@@ -381,6 +434,86 @@ HOLLOW: dict[str, dict[tuple[int, int, float], float]] = {
     },
 }
 
+# Angles, kg/m by (a, b, t) in mm, long leg first; lookup tries both orders.
+ANGLES: dict[str, dict[tuple[int, int, float], float]] = {
+    "am-vinkel-liksidig": {
+        (45, 45, 4): 2.74, (50, 50, 4): 3.06, (50, 50, 5): 3.77,
+        (50, 50, 6): 4.47, (60, 60, 4): 3.7, (60, 60, 5): 4.57,
+        (60, 60, 6): 5.42, (60, 60, 8): 7.09, (75, 75, 4): 4.65,
+        (75, 75, 5): 5.76, (75, 75, 6): 6.85, (75, 75, 7): 7.93,
+        (75, 75, 8): 8.99, (75, 75, 10): 11.1, (80, 80, 5): 6.17,
+        (80, 80, 6): 7.34, (80, 80, 7): 8.49, (80, 80, 8): 9.63,
+        (80, 80, 10): 11.9, (90, 90, 6): 8.3, (90, 90, 7): 9.61,
+        (90, 90, 8): 10.9, (90, 90, 9): 12.2, (90, 90, 10): 13.4,
+        (90, 90, 11): 14.7, (100, 100, 7): 10.7, (100, 100, 8): 12.2,
+        (100, 100, 10): 15, (100, 100, 12): 17.8, (120, 120, 8): 14.7,
+        (120, 120, 10): 18.2, (120, 120, 11): 19.9, (120, 120, 12): 21.6,
+        (120, 120, 13): 23.3, (120, 120, 15): 26.6, (130, 130, 10): 19.8,
+        (130, 130, 11): 21.7, (130, 130, 12): 23.6, (130, 130, 13): 25.4,
+        (130, 130, 14): 27.2, (130, 130, 15): 29, (130, 130, 16): 30.8,
+        (140, 140, 9): 19.3, (140, 140, 10): 21.4, (140, 140, 11): 23.4,
+        (140, 140, 12): 25.4, (140, 140, 13): 27.5, (140, 140, 14): 29.4,
+        (140, 140, 15): 31.4, (140, 140, 16): 33.3, (140, 140, 18): 37.2,
+        (150, 150, 10): 23, (150, 150, 12): 27.3, (150, 150, 13): 29.5,
+        (150, 150, 14): 31.6, (150, 150, 15): 33.8, (150, 150, 16): 35.9,
+        (150, 150, 18): 40.1, (150, 150, 20): 44.2, (160, 160, 12): 29.3,
+        (160, 160, 14): 33.9, (160, 160, 15): 36.2, (160, 160, 16): 38.4,
+        (160, 160, 17): 40.7, (160, 160, 18): 42.9, (160, 160, 19): 45.1,
+        (160, 160, 20): 47.3, (180, 180, 13): 35.7, (180, 180, 14): 38.3,
+        (180, 180, 15): 40.9, (180, 180, 16): 43.5, (180, 180, 17): 46,
+        (180, 180, 18): 48.6, (180, 180, 19): 51.1, (180, 180, 20): 53.7,
+        (180, 180, 22): 58.6, (200, 200, 13): 39.8, (200, 200, 15): 45.6,
+        (200, 200, 16): 48.5, (200, 200, 17): 51.4, (200, 200, 18): 54.2,
+        (200, 200, 19): 57.1, (200, 200, 20): 59.9, (200, 200, 21): 62.8,
+        (200, 200, 22): 65.6, (200, 200, 23): 68.3, (200, 200, 24): 71.1,
+        (200, 200, 25): 73.9, (200, 200, 26): 76.6, (200, 200, 28): 82,
+        (250, 250, 17): 64.4, (250, 250, 18): 68.1, (250, 250, 19): 71.7,
+        (250, 250, 20): 75.3, (250, 250, 21): 78.9, (250, 250, 22): 82.5,
+        (250, 250, 23): 86.1, (250, 250, 24): 89.7, (250, 250, 25): 93.2,
+        (250, 250, 26): 96.7, (250, 250, 27): 101, (250, 250, 28): 104,
+        (250, 250, 29): 107, (250, 250, 30): 111, (250, 250, 31): 114,
+        (250, 250, 32): 118, (250, 250, 33): 121, (250, 250, 34): 124,
+        (250, 250, 35): 128, (300, 300, 27): 121, (300, 300, 28): 125,
+        (300, 300, 29): 129, (300, 300, 30): 133, (300, 300, 31): 138,
+        (300, 300, 32): 142, (300, 300, 33): 146, (300, 300, 34): 150,
+        (300, 300, 35): 154,
+    },
+    "tibnor-vinkel": {
+        (15, 15, 3): 0.64, (20, 20, 3): 0.88, (20, 20, 4): 1.14,
+        (25, 25, 3): 1.12, (25, 25, 4): 1.45, (25, 25, 5): 1.77,
+        (30, 30, 3): 1.36, (30, 30, 4): 1.78, (30, 30, 5): 2.18,
+        (35, 35, 3): 1.6, (35, 35, 4): 2.1, (35, 35, 5): 2.57,
+        (40, 40, 3): 1.84, (40, 40, 4): 2.42, (40, 40, 5): 2.97,
+        (40, 40, 6): 3.52, (40, 40, 8): 4.55, (45, 45, 5): 3.38,
+        (45, 45, 7): 4.6, (50, 50, 7): 5.15, (50, 50, 8): 5.82,
+        (55, 55, 6): 4.95, (60, 60, 10): 8.69, (65, 65, 7): 6.83,
+        (70, 70, 7): 7.38, (70, 70, 9): 9.34, (80, 80, 12): 14.1,
+        (100, 100, 14): 20.6, (110, 110, 10): 16.6, (110, 110, 12): 19.7,
+        (140, 140, 13): 27.5, (180, 180, 18): 48.6, (200, 200, 18): 54.3,
+    },
+    "am-vinkel-oliksidig": {
+        (120, 80, 8): 12.2, (120, 80, 10): 15, (120, 80, 12): 17.8,
+        (200, 100, 10): 23, (200, 100, 12): 27.3, (200, 100, 14): 31.6,
+        (200, 100, 15): 33.7, (200, 100, 16): 35.9, (250, 90, 12): 31.2,
+        (250, 90, 14): 36.1, (250, 90, 16): 40.9,
+    },
+}
+
+# Circular hollow sections, kg/m by (D, t) in mm.
+CHS: dict[tuple[float, float], float] = {
+    (42.4, 3): 2.91, (42.4, 4): 3.79, (48.3, 3): 3.35, (48.3, 4): 4.37,
+    (60.3, 3): 4.24, (60.3, 4): 5.55, (76.1, 4): 7.11, (76.1, 5): 8.77,
+    (88.9, 4): 8.38, (88.9, 5): 10.3, (101.6, 4): 9.63, (101.6, 5): 11.9,
+    (101.6, 6): 14.1, (114.3, 4): 10.9, (114.3, 5): 13.5, (139.7, 4): 13.4,
+    (139.7, 6): 19.8, (139.7, 8): 26, (168.3, 4): 16.2, (168.3, 6): 24,
+    (168.3, 8): 31.6, (193.7, 6): 27.8, (193.7, 8): 36.6, (193.7, 10): 45.3,
+    (193.7, 12.5): 55.9, (219.1, 6): 31.5, (219.1, 8): 41.6, (219.1, 10): 51.6,
+    (219.1, 12.5): 63.7, (244.5, 6): 35.3, (244.5, 8): 46.7, (244.5, 10): 57.8,
+    (244.5, 12.5): 71.5, (273, 8): 52.3, (273, 10): 64.9, (273, 12.5): 80.3,
+    (323.9, 10): 77.4, (323.9, 12.5): 96,
+}
+CHS_SOURCE = "tibnor-kckr"
+
 # Which standard each hollow table is: VKR is hot-finished (EN 10210), KKR
 # cold-formed (EN 10219).
 HOLLOW_KIND = {key: ("VKR" if "-vkr-" in key else "KKR") for key in HOLLOW}
@@ -388,13 +521,25 @@ HOLLOW_KIND = {key: ("VKR" if "-vkr-" in key else "KKR") for key in HOLLOW}
 # Thin-sheet studs: (kg/m, source, sheet thickness in mm or None when the
 # source does not state it), by kind and web width.
 STUDS: dict[tuple[str, int], tuple[float, str, float | None]] = {
-    ("regel", 45): (0.49, "norgips-c45", None),
-    ("regel", 70): (0.59, "norgips-c70", None),
-    ("regel", 95): (0.68, "norgips-c95", None),
+    ("regel", 45): (0.49, "norgips-c45", 0.5),
+    ("regel", 70): (0.59, "norgips-c70", 0.5),
+    ("regel", 95): (0.68, "norgips-c95", 0.5),
+    ("regel", 120): (0.78, "norgips-c120", 0.5),
+    ("regel", 145): (0.88, "norgips-c145", 0.5),
+    ("regel", 160): (0.94, "norgips-c160", 0.5),
     ("förstärkningsregel", 45): (1.13, "norgips-cf45", 1.0),
     ("förstärkningsregel", 70): (1.62, "norgips-cf70", 1.0),
     ("förstärkningsregel", 95): (1.85, "norgips-cf95", 1.0),
+    ("förstärkningsregel", 120): (1.71, "norgips-cf120", 1.0),
+    ("förstärkningsregel", 145): (1.93, "norgips-cf145", 1.0),
+    ("förstärkningsregel", 160): (2.10, "norgips-cf160", 1.0),
 }
+STUD_WIDTHS = "45, 70, 95, 120, 145 eller 160 mm"
+# The sheet a standard stud's weight may be scaled to (see the docstring).
+SCALABLE_SHEET_MM = (0.4, 1.0)
+
+OPEN = "öppen"
+HOLLOW_FORM = "rör"
 
 
 @dataclass(frozen=True)
@@ -405,6 +550,7 @@ class ProfileMass:
     family: str  # STRUCTURAL or STUD
     kg_per_m: float
     source: str  # the citation, in Swedish, from SOURCES
+    form: str = ""  # OPEN or HOLLOW_FORM for structural steel, "" for a stud
 
     @property
     def label(self) -> str:
@@ -429,17 +575,30 @@ _END = r"(?!\d|[.,]\d|\s*[x×*]\s*\d)"
 # "HEA 200", "HEA200", "HEA-200", "IPE 200". Not inside a word. An "x" after
 # it is a length ("HEA 200 x 6 m"): no hot-rolled designation has a second
 # dimension, so only a decimal or more digits end the match (review 2026-10-01).
-_HOT_RE = re.compile(r"(?<![a-zåäö0-9])(hea|heb|ipe|upe)\s*-?\s*(\d{2,4})(?!\d|[.,]\d)")
+_HOT_RE = re.compile(
+    r"(?<![a-zåäö0-9])(hea|heb|hem|ipe|upe|upn|unp)\s*-?\s*(\d{2,4})(?!\d|[.,]\d)")
 # Ipe (ipé) is also a tropical hardwood sold as decking: "Trall ipe 28 mm" and
 # "Ipe 80 trall" are wood. An IPE next to one of these words is not read.
 _WOOD_RE = re.compile(r"trall|trä|virke|decking|bräd|panel|golv|wood|timber|hardwood|lumber")
 # "HE 200 A", "HE200B", the designation EN 10365 itself uses.
-_HE_RE = re.compile(r"(?<![a-zåäö0-9])he\s*-?\s*(\d{3,4})\s*([ab])(?![a-zåäö0-9])")
+_HE_RE = re.compile(r"(?<![a-zåäö0-9])he\s*-?\s*(\d{3,4})\s*([abm])(?![a-zåäö0-9])")
 # "VKR 100x100x5", "KKR-rör 120x80x4,0", "VKR 100x100 t=5", "VKR 100x100 t5".
 _HOLLOW_RE = re.compile(
     r"(?<![a-zåäö0-9])(vkr|kkr)(?:\s*-?\s*rör)?\s*(\d{2,3})\s*[x×*]\s*(\d{2,3})"
     r"(?:\s*[x×*]\s*" + _NUM + r"|\s*,?\s*t\s*=?\s*" + _NUM + r")?" + _END)
 _HOLLOW_WORD_RE = re.compile(r"(?<![a-zåäö0-9])(vkr|kkr)(?![a-zåäö])")
+# A round tube: "VKR 114,3x5", "KCKR 114,3x5,0", "CHS 168,3x8". Only a
+# diameter the table lists counts as one, so "VKR 100x50" (a rectangle missing
+# its wall) is still the rectangular reader's to answer.
+_CHS_RE = re.compile(
+    r"(?<![a-zåäö0-9])(vkr|kkr|kckr|vckr|chs|cfchs|hfchs)(?:\s*-?\s*rör)?\s*"
+    r"(\d{2,3}(?:[.,]\d)?)\s*[x×*]\s*" + _NUM + _END)
+# "L 50x50x5", "Vinkelstål 120x80x8", "VST 50x50x5". The bare "L" needs all
+# three numbers; the words alone are enough to be asked for the thickness.
+_ANGLE_RE = re.compile(
+    r"(?<![a-zåäö0-9])(l|vst|vinkelstål|vinkelstång|vinkeljärn)\s*-?\s*(\d{2,3})"
+    r"\s*[x×*]\s*(\d{2,3})(?:\s*[x×*]\s*" + _NUM + r")?" + _END)
+_ANGLE_WORD_RE = re.compile(r"vinkelstål|vinkelstång|vinkeljärn|(?<![a-zåäö])vst(?![a-zåäö])")
 # A stud's web width, alone or after its maker's letters ("C70", "CF 70",
 # "RE 70"). Not a cross-section ("45x70"), not a decimal ("2,7"), and not a
 # count or a length ("12 st", "3 m", "2700").
@@ -461,7 +620,9 @@ def names_steel_profile(text: str) -> bool:
     """True when `text` carries a hot-rolled or hollow-section designation
     ("HEA 200", "VKR 100x100x5"), the thing itself and so stomme."""
     t = _fold(text)
-    return bool(_hot_matches(t) or _HE_RE.search(t) or _HOLLOW_WORD_RE.search(t))
+    return bool(_hot_matches(t) or _HE_RE.search(t) or _HOLLOW_WORD_RE.search(t)
+                or _chs_matches(t) or _ANGLE_WORD_RE.search(t)
+                or any(m.group(4) for m in _ANGLE_RE.finditer(t)))
 
 
 def _hot_matches(t: str) -> list[re.Match]:
@@ -483,17 +644,20 @@ def _hot_rolled(t: str) -> tuple[ProfileMass | None, str]:
         names = ", ".join(f"{s} {h}" for s, h in sorted(found))
         return None, f"Namnet anger flera profiler ({names}), så vikten per meter är inte entydig."
     series, height = found.pop()
+    series = "UPN" if series == "UNP" else series
     source_key, table = HOT_ROLLED[series]
     kg = table.get(height)
     if kg is None:
         return None, (f"{series} {height} finns inte i standardtabellen (EN 10365), "
                       f"så vikten per meter är okänd.")
-    return ProfileMass(f"{series} {height}", STRUCTURAL, kg, SOURCES[source_key]), ""
+    return ProfileMass(f"{series} {height}", STRUCTURAL, kg, SOURCES[source_key], OPEN), ""
 
 
 def _hollow(t: str) -> tuple[ProfileMass | None, str]:
     matches = list(_HOLLOW_RE.finditer(t))
     if not matches:
+        if _chs_matches(t):
+            return None, ""  # a round tube, _chs answers it
         if _HOLLOW_WORD_RE.search(t):
             return None, ("Ett VKR- eller KKR-rör behöver ytterdimension och väggtjocklek "
                           "i namnet, till exempel \"VKR 100x100x5\".")
@@ -514,8 +678,62 @@ def _hollow(t: str) -> tuple[ProfileMass | None, str]:
             continue
         kg = table.get((b, h, wall)) or table.get((h, b, wall))
         if kg is not None:
-            return ProfileMass(f"{kind} {b}x{h}x{_sv(wall)}", STRUCTURAL, kg, SOURCES[key]), ""
+            return ProfileMass(f"{kind} {b}x{h}x{_sv(wall)}", STRUCTURAL, kg, SOURCES[key],
+                               HOLLOW_FORM), ""
     return None, (f"{kind} {b}x{h}x{_sv(wall)} finns inte i tabellen över standardrör, "
+                  f"så vikten per meter är okänd.")
+
+
+_CHS_DIAMETERS = {d for d, _ in CHS}
+
+
+def _chs_matches(t: str) -> set[tuple[str, float, float]]:
+    found = set()
+    for m in _CHS_RE.finditer(t):
+        d = _num(m.group(2))
+        if d in _CHS_DIAMETERS:
+            found.add((m.group(1).upper(), d, _num(m.group(3))))
+    return found
+
+
+def _chs(t: str) -> tuple[ProfileMass | None, str]:
+    found = _chs_matches(t)
+    if not found:
+        return None, ""
+    if len({(d, w) for _, d, w in found}) > 1:
+        return None, "Namnet anger flera rördimensioner, så vikten per meter är inte entydig."
+    kind, d, wall = found.pop()
+    kg = CHS.get((d, wall))
+    designation = f"{kind} {_sv(d)}x{_sv(wall)}"
+    if kg is None:
+        return None, (f"{designation} finns inte i tabellen över runda standardrör, "
+                      f"så vikten per meter är okänd.")
+    return ProfileMass(designation, STRUCTURAL, kg, SOURCES[CHS_SOURCE], HOLLOW_FORM), ""
+
+
+def _angle(t: str) -> tuple[ProfileMass | None, str]:
+    matches = [m for m in _ANGLE_RE.finditer(t)
+               if m.group(4) or m.group(1) != "l"]
+    if not matches:
+        if _ANGLE_WORD_RE.search(t):
+            return None, ("Ett vinkelstål behöver skänklar och godstjocklek i namnet, "
+                          "till exempel \"Vinkelstål 50x50x5\".")
+        return None, ""
+    found = {(int(m.group(2)), int(m.group(3)), _num(m.group(4)) if m.group(4) else None)
+             for m in matches}
+    if len(found) > 1:
+        return None, "Namnet anger flera vinkelstål, så vikten per meter är inte entydig."
+    a, b, wall = found.pop()
+    if wall is None:
+        return None, (f"Vinkelstål {a}x{b} saknar godstjocklek, och vikten per meter beror "
+                      f"på den. Ange den i namnet, till exempel \"L {a}x{b}x5\".")
+    for key, table in ANGLES.items():
+        kg = table.get((a, b, wall)) or table.get((b, a, wall))
+        if kg is not None:
+            long, short = max(a, b), min(a, b)
+            return ProfileMass(f"L {long}x{short}x{_sv(wall)}", STRUCTURAL, kg, SOURCES[key],
+                               OPEN), ""
+    return None, (f"L {a}x{b}x{_sv(wall)} finns inte i tabellen över standardvinklar, "
                   f"så vikten per meter är okänd.")
 
 
@@ -532,17 +750,26 @@ def _stud(t: str) -> tuple[ProfileMass | None, str]:
     if len(widths) != 1 or not known:
         if not widths:
             return None, ("Namnet anger inte regelns bredd. Ange den, till exempel "
-                          "\"Stålregel 70\" (45, 70 eller 95 mm).")
+                          f"\"Stålregel 70\" ({STUD_WIDTHS}).")
         return None, ("Regelns bredd går inte att läsa entydigt ur namnet, eller är ingen "
-                      "av standardbredderna 45, 70 och 95 mm.")
+                      f"av standardbredderna {STUD_WIDTHS}.")
     width = known.pop()
     kg, source_key, sheet = STUDS[(kind, width)]
-    stated = [_num(a or b) for a, b in _SHEET_RE.findall(t)]
-    if stated and (sheet is None or any(abs(s - sheet) > 1e-9 for s in stated)):
-        return None, ("Namnet anger en plåttjocklek som tabellen inte kan bekräfta, så "
-                      "vikten per meter är okänd.")
     prefix = "CF" if kind == "förstärkningsregel" else "C"
-    return ProfileMass(f"{prefix} {width}", STUD, kg, SOURCES[source_key]), ""
+    stated = {_num(a or b) for a, b in _SHEET_RE.findall(t)}
+    if not stated or (sheet is not None and stated == {sheet}):
+        return ProfileMass(f"{prefix} {width}", STUD, kg, SOURCES[source_key]), ""
+    low, high = SCALABLE_SHEET_MM
+    if len(stated) == 1 and kind == "regel" and sheet:
+        thickness = next(iter(stated))
+        if low <= thickness <= high:
+            # Same profile, other sheet: the developed width times the sheet.
+            scaled = round(kg * thickness / sheet, 3)
+            source = (f"{SOURCES[source_key]}, {_sv(kg)} kg/m vid {_sv(sheet)} mm plåt, "
+                      f"räknat om till {_sv(thickness)} mm")
+            return ProfileMass(f"{prefix} {width} {_sv(thickness)} mm", STUD, scaled, source), ""
+    return None, ("Namnet anger en plåttjocklek som tabellen inte kan bekräfta, så "
+                  "vikten per meter är okänd.")
 
 
 def profile_mass(name: str) -> tuple[ProfileMass | None, str]:
@@ -550,10 +777,41 @@ def profile_mass(name: str) -> tuple[ProfileMass | None, str]:
     (None, reason). The reason is "" when the name names no steel profile at
     all, and otherwise a Swedish sentence saying what is missing."""
     t = _fold(name)
-    answers = [a for a in (reader(t) for reader in (_hot_rolled, _hollow, _stud))
+    answers = [a for a in (reader(t) for reader in (_hot_rolled, _hollow, _chs, _angle, _stud))
                if a[0] or a[1]]
     if len(answers) > 1:
         # "HEA 200 + VKR 100x100x5": two kinds of profile in one component,
         # and no single weight per metre (review 2026-10-01).
         return None, "Namnet anger flera profiler, så vikten per meter är inte entydig."
     return answers[0] if answers else (None, "")
+
+
+# What an EPD in konstruktionsstål declares, by its name (HENRIC-3390). Open
+# sections are mostly rolled from scrap in an electric furnace, hollow
+# sections mostly formed from hot-rolled coil, so the two sit apart in the
+# catalog: upper-half medians 2,05 and 2,78 kg CO2e/kg on 2026-10-02, the
+# family 2,63. A name naming both, or neither (fabricated components,
+# "structural steel" as such, galvanized assemblies), has no form and counts
+# only in the family.
+_EPD_HOLLOW_RE = re.compile(r"hollow|tube|\brör\b|pipe", re.I)
+_EPD_OPEN_RE = re.compile(
+    r"beam|merchant bar|angle|channel|i-section|\bh, i, u\b|steel profiles|steel sections",
+    re.I)
+
+
+def epd_form(name: str) -> str:
+    """OPEN, HOLLOW_FORM or "" for a structural steel EPD's name."""
+    hollow = bool(_EPD_HOLLOW_RE.search(name or ""))
+    open_ = bool(_EPD_OPEN_RE.search(name or ""))
+    if hollow == open_:
+        return ""
+    return HOLLOW_FORM if hollow else OPEN
+
+
+_FORM_LABEL = {OPEN: "öppna profiler", HOLLOW_FORM: "rör"}
+
+
+def form_subcategory(subcategory: str, form: str) -> str:
+    """The typvärde key of a family's form: "konstruktionsstål (öppna profiler)".
+    Read as it stands in a row's text, so it is written for a reader."""
+    return f"{subcategory} ({_FORM_LABEL[form]})"

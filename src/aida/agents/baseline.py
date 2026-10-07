@@ -227,8 +227,8 @@ produkt ENBART när den faktiskt ÄR komponentens standardmaterial:
 - Träreglar och konstruktionsvirke matchar "Sågat virke, u 16 %, barrträ" eller
   "Hyvlat virke, u 16 %, barrträ", OSB-skiva matchar "OSB" (trä är trä). OK.
   Systemet räknar själv om ett kg-värde för stommens trä och skivor, för skivan i ett
-  gipstak och för en träpanel på fasad ("Hyvlat virke", panelen utan läkt och målning,
-  22 mm om namnet inte anger tjocklek), till löpmeter eller m² ur tvärsnittet eller
+  gipstak och för en träpanel på fasad ("Hyvlat virke", 22 mm om namnet inte anger
+  tjocklek, och lägger själv till två strykningar utomhusfärg; läkt ingår inte), till löpmeter eller m² ur tvärsnittet eller
   tjockleken i komponentens namn, så räkna inte om de raderna själv. Andra skivor, t.ex. gips på en innervägg, räknar du om
   själv enligt STEG 3.
   Detsamma gäller stålbalkar, stålpelare och stålreglar i löpmeter med en
@@ -643,7 +643,48 @@ def _apply_ceiling_board(r: BaselineResult, comp, product, extra: dict) -> None:
 _FACADE_PANEL_DEFAULT_MM = 22.0
 
 
-def _apply_facade_panel(r: BaselineResult, comp, product, extra: dict) -> None:
+# The paint a wood facade's baseline carries (Henric 2026-10-07, Till dig
+# d-20261004-123129-2f896d: most Swedish wood facades are painted, and with the
+# bare panel as baseline every wood panel in the catalog sat above it, so a
+# wood facade was only ever offered reuse). Boverket's own exterior paint per
+# kg, times the catalog's farg bridge (unit_conversion.AREAL_DENSITY_KG_M2,
+# two coats), so painting a square metre costs the same inside this baseline
+# as it does as a farg component of its own.
+_FACADE_PAINT_BOVERKET = "utomhusfärg, vattenburen akryl"
+_FACADE_WORDS = ("fasad", "utvändig", "utomhus", "exteriör")
+_PAINT_WORDS = ("målning", "färg", "lasyr")
+
+
+def _facade_paint_kg_m2() -> float | None:
+    """Applied paint in kg/m2, two coats: the farg bridge's own rate."""
+    from aida.data.unit_conversion import areal_density_for_product
+
+    return areal_density_for_product("farg", "färg")
+
+
+def _paints_the_facade(project: Project, panel) -> bool:
+    """True when the project counts the facade's paint as a component of its
+    own ("Fasadmålning"), so the panel's baseline must not count it again.
+
+    Read from the name as well as the category: "Ommålning fasad" without a
+    declared category resolves to yttervägg, and a farg component is not the
+    facade's because it says panel ("Målning panel innertak"). Found in review.
+    """
+    for c in project.components or []:
+        if c.id == panel.id:
+            continue
+        name = (c.name or "").lower()
+        category = resolve_category(c.name, c.category)
+        if category == "fasadskikt":
+            continue  # another cladding ("Målad träpanel fasad"), not its paint
+        paint = category == "farg" or any(w in name for w in _PAINT_WORDS)
+        if paint and any(w in name for w in _FACADE_WORDS):
+            return True
+    return False
+
+
+def _apply_facade_panel(r: BaselineResult, comp, product, extra: dict,
+                        paint=None, painted_separately: bool = False) -> None:
     """Redo a wood facade cladding's Boverket baseline per m² (in-place).
 
     HENRIC-3410. "Träpanel fasad", 150 m² in a school, got 1,61, 1,75, 5,83
@@ -651,9 +692,12 @@ def _apply_facade_panel(r: BaselineResult, comp, product, extra: dict) -> None:
     "Hyvlat virke" per kg and converted to m² in its head, each time with its
     own panel volume, with or without battens and paint. The conversion is the
     frame's: Boverket's figure per kg × Boverket's density × the panel's
-    thickness, from the name ("22 mm", "22x145") or 22 mm. The panel only:
-    paint is its own component (farg), and the cladding EPDs it is compared
-    with declare the board without battens.
+    thickness, from the name ("22 mm", "22x145") or 22 mm.
+
+    A painted panel since 2026-10-07: two coats of Boverket's exterior paint
+    (`paint`) are added, unless the project lists the facade's paint as its
+    own farg component (`painted_separately`). Battens stay out: the cladding
+    EPDs it is compared with declare the board without them.
     """
     from aida.data.climate_data import component_facade_kind
     from aida.data.unit_conversion import cross_section_mm, thickness_mm
@@ -672,17 +716,34 @@ def _apply_facade_panel(r: BaselineResult, comp, product, extra: dict) -> None:
     assumed = mm is None
     if assumed:
         mm = _FACADE_PANEL_DEFAULT_MM
-    per_unit = round(product.co2e_per_unit * density * mm / 1000, 4)
+    panel = round(product.co2e_per_unit * density * mm / 1000, 4)
+    paint_kg = _facade_paint_kg_m2()
+    paint_m2 = 0.0
+    if painted_separately:
+        scope = ("Bara panelen: målningen är en egen komponent i projektet och "
+                 "räknas där. Läkt ingår inte.")
+    elif paint is None or not paint_kg or (paint.unit or "").lower() != "kg":
+        scope = "Bara panelen: läkt och målning ingår inte."
+    else:
+        paint_m2 = round(paint.co2e_per_unit * paint_kg, 4)
+        scope = (f"Målad panel, två strykningar: {paint.co2e_per_unit:g} kg CO2e/kg "
+                 f"({paint.name}, Boverket) × {paint_kg:g} kg färg/m² = {paint_m2:g} kg "
+                 f"CO2e/m². Läkt ingår inte. Aida lägger inte målning på "
+                 f"alternativen: för en panel som levereras omålad eller bara "
+                 f"grundad och målas på plats är besparingen så mycket mindre "
+                 f"än raden visar.")
+    per_unit = round(panel + paint_m2, 4)
     r.co2e_per_unit = per_unit
     r.unit = comp.unit
     r.quantity = comp.quantity
     r.co2e_kg = round(per_unit * comp.quantity, 1)
     why = (f" Namnet anger ingen paneltjocklek, så en vanlig fasadpanel på "
            f"{mm:g} mm antas." if assumed else "")
+    total = f" Tillsammans {per_unit:g} kg CO2e/m²." if paint_m2 else ""
     r.description = (r.description or "").rstrip() + (
         f" Omräknat ur panelen, {mm:g} mm: {product.co2e_per_unit} kg CO2e/kg × "
-        f"{density:g} kg/m³ (Boverket) × {mm / 1000:g} m = {per_unit} kg CO2e/m². "
-        f"Bara panelen: läkt och målning ingår inte.{why}"
+        f"{density:g} kg/m³ (Boverket) × {mm / 1000:g} m = {panel} kg CO2e/m². "
+        f"{scope}{total}{why}"
     )
 
 
@@ -723,7 +784,10 @@ def _apply_member_geometry(results: list[BaselineResult], project: Project,
             _apply_ceiling_board(r, comp, product, extra)
             continue
         if category == "fasadskikt":
-            _apply_facade_panel(r, comp, product, extra)
+            _apply_facade_panel(
+                r, comp, product, extra,
+                paint=by_name.get(_FACADE_PAINT_BOVERKET),
+                painted_separately=_paints_the_facade(project, comp))
             continue
         if _apply_profile_mass(r, comp, product, extra):
             continue

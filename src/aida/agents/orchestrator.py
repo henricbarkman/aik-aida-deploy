@@ -39,11 +39,19 @@ from aida.data.climate_data import normalize_component_name
 logger = logging.getLogger(__name__)
 
 # Intent classification runs on every routed message (hot path), and is a simple
-# discriminated choice — Haiku 4.5 handles it accurately (verified against the
-# crash inputs + mutation-imperative probe) at lower latency/cost than Sonnet.
+# discriminated choice, so it runs on Haiku rather than Opus.
 # Advisory answering needs grounded synthesis, so it stays on the default
 # model (DEFAULT_MODEL, Opus 5.5 since 2026-09-23).
-CLASSIFIER_MODEL = "anthropic/claude-haiku-4.5"
+#
+# Haiku 5.5 since 2026-10-08 (from 4.5, a tenth of the price). Measured on the
+# 71 user messages in saved conversations plus 24 probes: the two models agree
+# on advisory-or-not in 92 of 95, and in the 3 where they differ 5.5 follows
+# this prompt's own rule ("ge fler förslag på X" asks Aida to DO something).
+# Haiku 5.5 thinks by default, but a forced tool_choice skips thinking on this
+# model, so max_tokens=300 stays enough and the call needs no thinking or effort
+# parameter. It also rejects temperature/top_p/top_k other than the defaults:
+# do not add one here. Outside _ADAPTIVE_MODELS on purpose (test_model_gate.py).
+CLASSIFIER_MODEL = "anthropic/claude-haiku-5.5"
 ADVISORY_MODEL = DEFAULT_MODEL
 
 # Intent taxonomy for increment 1. Deliberately coarse: we only need to peel off

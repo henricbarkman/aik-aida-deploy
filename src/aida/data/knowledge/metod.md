@@ -10,6 +10,8 @@ Du beskriver projektet med egna ord, till exempel "byta golv i korridoren, 240 m
 - **Alternativen**: verkliga produkter med miljödeklaration (EPD) och deras klimatpåverkan för samma mängd.
 - **Skillnaden**: hur mycket ett alternativ minskar eller ökar klimatpåverkan jämfört med baslinjen, och vad det kostar.
 
+Väljer du inget alternativ för en byggdel räknas den som baslinjen, alltså konventionellt material, i summeringen och i rapporten. Rapporten säger vilka byggdelar det gäller.
+
 Resultatet är ett underlag för beslut, inte ett klimatbokslut.
 
 ## Klimatmåttet
@@ -85,6 +87,8 @@ När katalogen har jämförbara deklarationer men ingen av dem blir kvar som alt
 ### Återbruk
 
 Återbrukade produkter hämtas från Palats, Karlstads kommuns återbruksplattform, med upp till fem annonser per byggdel. Deras klimatpåverkan är en schablon per enhet för transport och enklare renovering, till exempel 0,5 kg CO2e per m² golv och 10 kg CO2e per fönster. Priset är annonsens pris.
+
+En annons som täcker under 20 procent av behovet visas inte, utan raden säger att det finns för lite. Det gäller när annonsens mängd och behovet går att jämföra i samma enhet: i styck alltid, i m² och löpmeter när annonsen anger sin yta eller längd. Palats anger antal artiklar, och anger annonsen inte hur mycket en artikel täcker är täckningen okänd. Då visas annonsen, och raden säger att täckningen är okänd i stället för att jämföra antal artiklar med kvadratmeter.
 
 Återbrukad stomme (reglar, balkar, skivor och betongelement) har ingen schablon. Där räknas klimatpåverkan som transporten till bygget: komponentens vikt gånger Boverkets värde för transport (modul A4) för samma material. Vikten räknas på samma sätt som baslinjen, ur tvärsnittet eller tjockleken i namnet och Boverkets densitet för trä och skivor, ur standardprofilens vikt per meter för stål och ur 2 500 kg/m³ för massiv betong. En regel 45x95 väger 1,9 kg per löpmeter och får 0,04 kg CO2e per löpmeter som återbrukad, mot 0,12 som ny. Boverkets transportvärde gäller en ny produkt från fabriken via lager till byggplatsen. Anger annonsen en egen storlek, till exempel "Reglar 45x120" när komponenten är "Reglar 45x95", vägs den med annonsens storlek, eftersom det är den som transporteras. Materialet är komponentens om annonsen inte säger något annat. Ett håldäck med en annan höjd än komponentens och utan egen vikt får ingen siffra. Sträckan för en viss annons är okänd, och nedmontering och upprustning räknas inte med. Går vikten inte att få fram, till exempel för en regel utan tvärsnitt eller ett håldäck utan leverantörens vikt per m², visas annonsen utan klimatsiffra och med en förklaring.
 

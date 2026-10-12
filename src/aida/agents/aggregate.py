@@ -46,6 +46,44 @@ def article_price(alt: dict | None) -> float:
     return cost if legacy and cost is not None and cost > 0 else 0.0
 
 
+def fill_default_selections(payload: dict | None, project: Project,
+                            baseline: dict | None) -> dict:
+    """The selections payload with the baseline standing in for every project
+    component that has no choice, marked `by_default`.
+
+    Testgruppen 2026-10-12: the report needed a choice on every component, and
+    a component without one counted as nothing at all. Now it counts as the
+    conventional material, and the report says which components stand there by
+    default. The browser fills the components it has alternatives for
+    (selectionsWithDefaults); this fills the rest from the baseline, such as a
+    component whose alternatives step failed. Before the overrides are laid on,
+    so a manual baseline figure reaches a default the same way it reaches a
+    chosen "Baslinje". A component without a baseline figure stays unchosen.
+    """
+    comps = [c for c in (payload or {}).get("components") or [] if isinstance(c, dict)]
+    chosen = {c.get("id") for c in comps}
+    figures = {}
+    for b in (baseline or {}).get("components") or []:
+        if isinstance(b, dict) and b.get("component_id"):
+            figures[b["component_id"]] = b
+    for pc in project.components:
+        b = figures.get(pc.id)
+        if pc.id in chosen or b is None or _number(b.get("co2e_kg")) is None:
+            continue
+        cost = _number(b.get("cost_sek")) or 0
+        comps.append({
+            "id": pc.id,
+            "name": pc.name,
+            "selected_alternative": {
+                "name": "Baslinje", "co2e_kg": b["co2e_kg"], "cost_sek": cost,
+                "source": "NollCO2", "by_default": True,
+            },
+            "baseline_co2e_kg": b["co2e_kg"],
+            "baseline_cost_sek": cost,
+        })
+    return {**(payload or {}), "components": comps}
+
+
 def compute_aggregate(project: Project, selections: Selections) -> AggregateResult:
     """Compute aggregate totals from component selections."""
     total_co2e = 0.0
@@ -131,14 +169,27 @@ def compute_aggregate(project: Project, selections: Selections) -> AggregateResu
             # assumes more stock than Palats holds. None for non-reuse picks
             # and for analyses saved before 2026-08-15.
             "tillgangligt_antal": alt.get("available_quantity"),
+            # The listing's amount in the need's own unit when it states an
+            # area or length (listing_amount), None otherwise.
+            "tillganglig_mangd": alt.get("available_amount"),
             "behov_antal": next(
                 (c.quantity for c in project.components if c.id == sel.id), None
+            ),
+            # The need's unit. Palats counts listed articles, so "1 av 20" is
+            # only a comparison when the need is counted in st too (Matilda,
+            # 2026-10-12: one listing against 20 m² of floor).
+            "behov_enhet": next(
+                (c.unit for c in project.components if c.id == sel.id), ""
             ),
             "prisunderlag": alt.get("price_basis", ""),
             # "ghg" when the figure rests on GWP-GHG instead of GWP-fossil, so
             # the report can say so in words rather than leaving "(GWP-GHG)"
             # sitting in the source column as jargon.
             "gwp_underlag": alt.get("gwp_basis", ""),
+            # True when the component stands on its baseline because nothing
+            # was chosen (fill_default_selections, the browser's
+            # selectionsWithDefaults), so the report can name those.
+            "standardval": bool(alt.get("by_default")),
         })
 
     # Project order, so the report lists the gaps the way the table shows them.

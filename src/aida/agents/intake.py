@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 import sys
 import time
 
@@ -20,6 +21,7 @@ from aida.api_client import (
 )
 from aida.data.climate_data import canonical_category
 from aida.llm_json import ModelOutputError, extract_json_object
+from aida.models import construction_year
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,7 @@ Svara ALLTID med giltig JSON i detta format:
   "building_type": "string",
   "area_bta": number,
   "storeys": number,
+  "construction_year": number eller null,
   "name": "projektnamn om nämnt",
   "components": [
     {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm|kg", "category": "kategori", "quantity_source": "user_specified" eller "estimated"}
@@ -72,6 +75,7 @@ Regler:
   - Installationer: tar beskrivningen upp dem, ta med var och en som egen komponent i sin kategori (ventilation för kanaler, don och aggregat; vvs; el; radiator; belysning; kylanläggning; hiss), även när resten av beskrivningen handlar om ytskikt.
   - Ventilationsaggregat (FTX-aggregat, från- och tilluftsaggregat, luftbehandlingsaggregat) räknas i st. Anger beskrivningen aggregatets luftflöde, skriv det i namnet ("FTX-aggregat 3 000 m³/h"; l/s och m³/s går också bra). Framgår det att aggregatet sitter i varje lägenhet, eller att det betjänar hela byggnaden, skriv det också i namnet ("FTX-aggregat, ett per lägenhet", "Centralt FTX-aggregat") och likaså en systembeteckning ("Luftbehandlingsaggregat LB01"). Anges inget av det: gissa inget flöde och fråga inte efter det, lägg bara till aggregatet.
 - Om area inte anges, uppskatta baserat på byggnadstyp och komponenter
+- `construction_year` är året byggnaden uppfördes, som ett heltal, när beskrivningen anger det ("byggår 1974", "byggd 1974", "uppförd 1962"). Anges det inte: null, och gissa inte. Ett årtal för en tidigare renovering eller ett material ("plastgolv från 2003") är inte byggåret.
 - Svara på svenska
 
 QUANTITY_SOURCE — sätt per komponent:
@@ -269,6 +273,46 @@ def _call_intake(client, messages: list[dict], timeout: float | None = None,
     )
 
 
+_YEAR = r"(?:ca\.?\s*|cirka\s*|omkring\s*|år\s+)?(1[0-9]{3}|20[0-9]{2})\b"
+_CONSTRUCTION_YEAR_RES = (
+    # "byggår 1974", "byggnadsåret är 1974", "Byggår: 1974"
+    re.compile(r"\bbygg(?:nads)?år(?:et)?\s*(?:är\s+|var\s+|:\s*|=\s*)?" + _YEAR, re.I),
+    # "byggd 1974", "byggdes år 1974", "uppförd 1962", "byggt i 1974"
+    re.compile(r"\b(?:byggd(?:es)?|byggt|uppförd(?:es)?|uppfört)\s+(?:i\s+|på\s+)?" + _YEAR, re.I),
+)
+
+
+def construction_year_from_text(text: str) -> int | None:
+    """The building year the user wrote, read with a pattern, or None.
+
+    The model is asked for the year, but Sara's "byggår 1974." came back as an
+    unknown year in October 2026, and that sentence is not a judgement call. So
+    an explicit mention is read here too and fills in when the model left the
+    field empty. Only explicit forms count: "plastgolv från 2003" is the year of
+    a floor, not of the building.
+
+    "byggår" beats "byggdes": the second can be about any part ("huset
+    byggdes 1920, garaget byggdes 2015", "tillbyggnad uppförd 2015, huset
+    byggt 1960"), and the pattern cannot tell the building from an extension
+    or a correction, so "byggdes" mentions that disagree give None: a wrong
+    year is worse than "inte angivet". Among "byggår" mentions the last wins,
+    since a correction is written after what it corrects. Aida's own questions
+    in the intake log ("Aida: Stämmer byggår 1962?") are not the user's answer
+    and are skipped.
+    """
+    text = "\n".join(line for line in (text or "").split("\n")
+                     if not line.lstrip().startswith("Aida:"))
+    explicit, built = (
+        [construction_year(int(m.group(1))) for m in pattern.finditer(text)]
+        for pattern in _CONSTRUCTION_YEAR_RES
+    )
+    explicit = [y for y in explicit if y]
+    built = [y for y in built if y]
+    if explicit:
+        return explicit[-1]
+    return built[0] if built and len(set(built)) == 1 else None
+
+
 def _finish(data: dict, description: str) -> dict:
     """The list as the rest of Aida expects it, before usage_context is added.
 
@@ -281,6 +325,10 @@ def _finish(data: dict, description: str) -> dict:
     # answer per round on the gruppboende. The browser replaces it with the
     # user's own words (intake_log); this is the fallback for other callers.
     data.setdefault("description", description)
+    # The model's year first: after a correction ("byggåret är 1980, inte 1974")
+    # it has the new one, and the text still holds the old.
+    data["construction_year"] = (construction_year(data.get("construction_year"))
+                                 or construction_year_from_text(description))
     return fix_envelope_quantities(canonicalize_categories(data))
 
 

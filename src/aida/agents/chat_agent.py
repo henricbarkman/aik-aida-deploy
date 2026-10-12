@@ -348,6 +348,8 @@ def _format_state(project, baseline, alternatives, selections) -> str:
         lines.append(f"PROJEKT: {project.get('building_type', '?')}, {project.get('area_bta', '?')} m² BTA")
         if project.get("name"):
             lines.append(f"Namn: {project['name']}")
+        if project.get("construction_year"):
+            lines.append(f"Byggår: {project['construction_year']}")
         lines.append("KOMPONENTER:")
         for c in project.get("components", []):
             lines.append(

@@ -33,6 +33,7 @@ from aida.data.climate_data import (
     normalize_component_name,
     resolve_category,
 )
+from aida.data.material_type import material_type
 from aida.data.nordic_supply import availability_label, nordic_supplier
 from aida.errors import UserFacingError
 from aida.llm_json import extract_json_object, extract_json_value
@@ -425,7 +426,7 @@ _FAMILY_LABELS = {
 }
 
 _LENGTH_UNITS = {"lm", "m", "meter", "löpmeter"}
-_COUNT_UNITS = {"st", "styck", "pcs"}
+_COUNT_UNITS = {"st", "styck", "stk", "pcs"}
 
 
 def _is_frame_component(proj_comp, category: str) -> bool:
@@ -2140,11 +2141,100 @@ def _reuse_coverage(available: int | None, need: float, units_match: bool) -> fl
     return available / need
 
 
-def _coverage_label(available: int, need: float, coverage: float) -> str:
-    """'3 av 30 (10 %)', or 'hela behovet' once the stock covers it."""
+def _coverage_label(available: float, need: float, coverage: float, unit: str = "") -> str:
+    """'3 av 30 (10 %)', or 'hela behovet' once the stock covers it. With a
+    unit ('25 av 40 m²') when the amount is an area or a length."""
+    unit = {"m2": "m²", "m3": "m³"}.get(unit, unit)
+    amount = f"{_sv_num(round(available, 1))} av {_sv_num(round(need, 1))}"
+    if unit:
+        amount += f" {unit}"
     if coverage >= 1:
-        return f"{available} av {int(need)} (hela behovet)"
-    return f"{available} av {int(need)} ({coverage * 100:.0f} %)"
+        return f"{amount} (hela behovet)"
+    return f"{amount} ({coverage * 100:.0f} %)"
+
+
+def _coverage_note(listing, need: float, project_unit: str, coverage: float | None) -> str:
+    """'Täckning: ...' for a listing whose price is not a total."""
+    if coverage is None:
+        if (project_unit or "").lower() in _COUNT_UNITS:
+            return "Täckning: okänd"
+        return f"Täckning: okänd (antal per {project_unit} saknas)"
+    amount, _ = listing_amount(listing, project_unit)
+    unit = "" if (project_unit or "").lower() in _COUNT_UNITS else project_unit
+    return f"Täckning: {_coverage_label(amount or 0, need, coverage, unit)}"
+
+
+# A figure as a Swedish listing writes it: "1 250" or "1.250" (thousands, with
+# a space, a no-break space or a narrow no-break space), "2,5" or "2.5"
+# (decimals). Three digits after a separator are thousands unless the figure
+# starts with 0 ("0.250 m2" is a quarter). Never the tail of a longer number:
+# "Art 9010 123 m²" is 123.
+_THOUSANDS = r"[1-9]\d{0,2}(?:[ \u00a0\u202f.]\d{3})+(?:,\d+)?"
+_NUM_BARE = rf"{_THOUSANDS}|\d+(?:[.,]\d+)?"
+# Not after a word character, a comma or a digit and a dot; "ca.12 m²" is 12.
+_NUM = rf"(?<![\w,])(?<!\d\.)(?:{_NUM_BARE})"
+# "25 m²", and "2x3 m²" as one area of 6. The second factor is a plain figure:
+# "Klinker 30x30 120 m²" is not 30 times 30 120.
+_AREA_RE = re.compile(rf"({_NUM})(?:\s*[x×]\s*(\d+(?:[.,]\d+)?))?\s*(?:m2|m²|kvm|kvadratmeter)(?![\w²])",
+                      re.IGNORECASE)
+_LENGTH_RE = re.compile(rf"({_NUM})\s*(?:lm|löpmeter|löpm|meter|m)(?![\w²³/])", re.IGNORECASE)
+# The figure is the listing's whole amount, not one article's, when the word
+# sits next to it: "120 m² totalt", "totalt ca 120 m²". Elsewhere in the text
+# it is about something else ("0,36 m² per platta, 100 plattor totalt").
+_TOTAL_AFTER = re.compile(r"\s*,?\s*(?:totalt|sammanlagt|allt som allt|tot\.)(?!\s*:?\s*\d)",
+                          re.IGNORECASE)
+_TOTAL_BEFORE = re.compile(r"(?:totalt|sammanlagt|allt som allt|tot\.)\s*:?\s*(?:ca\.?|cirka)?\s*$",
+                           re.IGNORECASE)
+
+
+def _sv_float(text: str) -> float:
+    text = text.replace("\u00a0", " ").replace("\u202f", " ")
+    if re.fullmatch(_THOUSANDS, text):
+        text = text.replace(" ", "").replace(".", "")
+    return float(text.replace(",", "."))
+
+
+def listing_amount(listing, project_unit: str) -> tuple[float | None, bool]:
+    """(how much the listing holds in the component's unit, whether the two
+    are in the same unit).
+
+    Palats counts articles. That compares with a need in st directly. For a
+    need in m² or löpmeter it compares only when the listing states its area
+    or length ("Linoleummatta 25 m²"). Each figure counts once per article
+    listed unless "totalt" sits next to it ("120 m² totalt"). Once the title
+    states a figure, the description adds only its totals ("Kakel 0,36 m²",
+    "Totalt 100 m² kvar"): its other figures can be the building the listing
+    came from ("från kontorshus 3 000 m2").
+    Where the text is ambiguous the larger reading is taken, so a doubt shows
+    a listing rather than hides it. No figure: (None, False), and the coverage
+    stays unknown, which never hides anything.
+    """
+    unit = (project_unit or "").strip().lower()
+    listed_unit = (getattr(listing, "unit", "") or "st").strip().lower()
+    articles = getattr(listing, "quantity", None)
+    if unit in _COUNT_UNITS:
+        return articles, listed_unit in _COUNT_UNITS
+    if listed_unit == unit:
+        return articles, True
+    rx = _AREA_RE if unit in _AREA_UNITS else _LENGTH_RE if unit in _LENGTH_UNITS else None
+    if rx is None:
+        return None, False
+    stated = 0.0
+    for text in (getattr(listing, "title", "") or "", getattr(listing, "description", "") or ""):
+        from_title = stated
+        for m in rx.finditer(text):
+            value = _sv_float(m.group(1))
+            if rx is _AREA_RE and m.group(2):
+                value *= _sv_float(m.group(2))
+            if value <= 0:
+                continue
+            whole = _TOTAL_AFTER.match(text, m.end()) or _TOTAL_BEFORE.search(text, 0, m.start())
+            if from_title > 0 and not whole:
+                continue
+            stated = max(stated, value if whole else value * max(articles or 1, 1))
+    if stated <= 0:
+        return None, False
+    return stated, True
 
 
 # Cap on Palats listings shown per component. Five, as before the unified
@@ -2254,25 +2344,28 @@ def _palats_candidates(
     if not matched:
         return [], None
 
-    units_match = project_unit.lower() in ("st", "styck", "stk")
-
     # Coverage gate, applied before the cap so a listing that covers the need
     # is not crowded out by five that cover a sliver of it. Each hidden find
     # is logged with its ratio; the ratio also reaches the table for every
     # shown find, so the threshold can be audited from the output alone.
+    # Applies in every unit where the listing's amount and the need are both
+    # known in it (listing_amount): st always, m² and löpmeter when the listing
+    # states its area or length. Until 2026-10-12 it applied to st only.
     shown: list[tuple[PalatsListing, float | None]] = []
-    hidden_finds: list[tuple[PalatsListing, float]] = []
+    hidden_finds: list[tuple[PalatsListing, float, float]] = []
+    unit_label = "" if project_unit.lower() in _COUNT_UNITS else project_unit
     for listing in matched:
-        coverage = _reuse_coverage(listing.quantity, quantity, units_match)
+        amount, same_unit = listing_amount(listing, project_unit)
+        coverage = _reuse_coverage(amount, quantity, same_unit)
         if coverage is not None and coverage < MIN_REUSE_COVERAGE:
-            hidden_finds.append((listing, coverage))
+            hidden_finds.append((listing, coverage, amount))
         else:
             shown.append((listing, coverage))
-    for listing, coverage in hidden_finds:
+    for listing, coverage, amount in hidden_finds:
         logger.info(
             "Palats-fynd dolt för %r: %s täcker %s, under tröskeln %.0f %%",
             component_name, listing.title,
-            _coverage_label(listing.quantity, quantity, coverage),
+            _coverage_label(amount, quantity, coverage, unit_label),
             MIN_REUSE_COVERAGE * 100,
         )
     if not shown:
@@ -2280,8 +2373,8 @@ def _palats_candidates(
         # so with the numbers, in the same info form as the subcategory miss
         # above, rather than showing nothing and looking like an empty search.
         ratios = "; ".join(
-            f"{listing.title}: {_coverage_label(listing.quantity, quantity, coverage)}"
-            for listing, coverage in hidden_finds
+            f"{listing.title}: {_coverage_label(amount, quantity, coverage, unit_label)}"
+            for listing, coverage, amount in hidden_finds
         )
         one = len(hidden_finds) == 1
         count_label = "1 annons" if one else f"{len(hidden_finds)} annonser"
@@ -2447,21 +2540,19 @@ def _reuse_figures(
         cost_is_estimate = False
     elif listing.price > 0:
         # Units don't match: the price is for one article, and how much of the
-        # need an article covers is unknown, so there is no total to give.
+        # need an article covers is unknown, so there is no total to give. The
+        # coverage is known only when the listing states its area or length.
         total_cost = 0
         price_note = (
             f"Pris: {listing.price:.0f} SEK/st ({listing.quantity} tillgängliga)"
-            " — yta per artikel okänd | Täckning: okänd (antal per "
-            f"{project_unit} saknas)"
+            " — yta per artikel okänd | "
+            + _coverage_note(listing, quantity, project_unit, coverage)
         )
         cost_is_estimate = True
     else:
         total_cost = 0
-        price_note = f"{listing.quantity} tillgängliga"
-        if coverage is not None:
-            price_note += f" | Täckning: {_coverage_label(listing.quantity, quantity, coverage)}"
-        else:
-            price_note += " | Täckning: okänd"
+        price_note = (f"{listing.quantity} tillgängliga | "
+                      + _coverage_note(listing, quantity, project_unit, coverage))
         cost_is_estimate = False
 
     # A category without its own reuse figure gets the default, and the row
@@ -2488,6 +2579,10 @@ def _reuse_figures(
     detail = " | ".join(p for p in [price_note, default_note, location_note, url_note] if p)
     total = round(total_co2e, 1) if total_co2e is not None else None
     return total, round(total_cost), detail, cost_is_estimate
+
+
+def _sv_num(value: float) -> str:
+    return f"{value:g}".replace(".", ",")
 
 
 def _reuse_alternative(
@@ -2527,6 +2622,10 @@ def _reuse_alternative(
     display_name = f"{listing.title} ({where}, annons {listing.id})" if listing.id else f"{listing.title} ({where})"
     if cost_is_estimate:
         display_name += " *"
+    # The amount the coverage was read from, so the stock note under the name
+    # and the report say what the "Täckning" in the detail says.
+    amount, same_unit = listing_amount(listing, project_unit)
+    in_count = (project_unit or "").strip().lower() in _COUNT_UNITS
 
     return Alternative(
         name=display_name,
@@ -2536,9 +2635,13 @@ def _reuse_alternative(
         reasoning=text,
         alternative_type="reuse",
         available_quantity=listing.quantity,
+        # Palats' 0 means "not stated", never "none in stock".
+        available_amount=amount if same_unit and not in_count and amount and amount > 0 else None,
         price_basis="listing" if listing.price > 0 else "",
         url=listing.url or "",
         article_price_sek=round(listing.price) if cost_is_estimate else 0,
+        material_type=material_type(listing.category or category, listing.subcategory,
+                                    listing.title),
     )
 
 
@@ -3643,6 +3746,9 @@ Inga återbruksannonser på Palats matchar denna komponent just nu, så listan b
             reasoning=reasoning,
             alternative_type="climate_optimized",
             gwp_basis=gwp_basis,
+            material_type=material_type(matched.get("category") or category,
+                                        matched.get("subcategory"),
+                                        str(matched.get("name") or alt_name)),
         ))
 
     # Candidates the model left out. The prompt asks for every one of

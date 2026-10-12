@@ -47,7 +47,7 @@ Varje rapport ska följa denna rubrikstruktur exakt:
 Kort projektbeskrivning, total klimatbesparing (kg CO2e och %), kostnadsjämförelse. Max 4-5 meningar.
 
 ## Projektförutsättningar
-Byggnadstyp, area, antal komponenter. Kort och sakligt.
+Byggnadstyp, area, byggår, antal komponenter. Kort och sakligt. Byggåret står i prompten; skriv aldrig att det är okänt när det anges där.
 
 ## Baslinjeberäkning
 Vad baslinjen representerar (konventionella material, NollCO2-metod). Totalt baslinjevärde.
@@ -76,6 +76,7 @@ REGLER:
 
 def generate_report_markdown(
     project: Project, selections: Selections, overrides: dict | None = None,
+    baseline: dict | None = None,
 ) -> str:
     """Generate a markdown report from project and selections.
 
@@ -112,6 +113,7 @@ def generate_report_markdown(
     price_gap = build_missing_price_caveat(aggregate)
     estimated_prices = build_estimated_price_caveats(aggregate.components)
     override_rows = overrides_mod.listing(project.to_dict(), overrides)
+    defaults = build_default_choices(aggregate, baseline)
 
     saving_pct_total = (
         aggregate.co2e_savings_kg / aggregate.baseline_total_co2e_kg * 100
@@ -132,6 +134,7 @@ def generate_report_markdown(
 Projektnamn: {report_title(project)}
 Projekttyp: {project.building_type}
 Area: {project.area_bta} m² BTA
+{_construction_year_line(project)}
 Datum: {date.today().isoformat()}
 
 Sammanställning:
@@ -143,12 +146,15 @@ Komponenttabell:
 | Komponent | Valt alternativ | CO2e (kg) | Baslinje (kg) | Besparing | Kostnad (SEK) | Källa |
 |-----------|----------------|-----------|---------------|-----------|---------------|-------|
 {component_table}
-{_missing_selection_prompt_block(no_choice)}{_caveat_prompt_block(stock_caveats)}{_price_gap_prompt_block(price_gap)}{_estimated_price_prompt_block(estimated_prices)}{_override_prompt_block(override_rows)}
+{_default_choice_prompt_block(defaults)}{_missing_selection_prompt_block(no_choice)}{_caveat_prompt_block(stock_caveats)}{_price_gap_prompt_block(price_gap)}{_estimated_price_prompt_block(estimated_prices)}{_override_prompt_block(override_rows)}
 Skriv en komplett rapport i markdown. Inkludera disclaimer om att detta är uppskattningar för beslutsstöd."""
         }],
     )
 
     markdown = with_title(extract_text(response), project)
+    if defaults:
+        markdown = markdown.rstrip() + "\n\n" + render_default_choices(
+            defaults, len(project.components) or len(aggregate.components))
     if no_choice:
         markdown = markdown.rstrip() + "\n\n" + render_missing_selection_caveat(
             no_choice, len(aggregate.components))
@@ -163,6 +169,67 @@ Skriv en komplett rapport i markdown. Inkludera disclaimer om att detta är upps
     if override_rows:
         markdown = markdown.rstrip() + "\n\n" + render_override_caveats(override_rows)
     return markdown
+
+
+# Components without a choice count as their baseline (testgruppen
+# 2026-10-12). `baseline` is the analysis' baseline as the browser holds it,
+# read only for the material each default stands for.
+def _baseline_by_id(baseline: dict | None) -> dict:
+    out = {}
+    for b in (baseline or {}).get("components") or []:
+        if isinstance(b, dict) and b.get("component_id"):
+            out[b["component_id"]] = b
+    return out
+
+
+def _assumed_material(b: dict | None) -> str:
+    """What the conventional baseline stands for, in words."""
+    if not b:
+        return "Vanligt standardmaterial för komponenten"
+    return (b.get("assumed_material") or b.get("boverket_product")
+            or "Vanligt standardmaterial för komponenten")
+
+
+def _unit(unit: str) -> str:
+    return {"m2": "m²", "m3": "m³"}.get(unit or "", unit or "")
+
+
+def build_default_choices(aggregate, baseline: dict | None) -> list[dict]:
+    """Components standing on the baseline because nothing was chosen."""
+    by_id = _baseline_by_id(baseline)
+    return [{"komponent": c.get("name", ""), "material": _assumed_material(by_id.get(c.get("id")))}
+            for c in aggregate.components if c.get("standardval")]
+
+
+def _default_choice_prompt_block(rows: list[dict]) -> str:
+    if not rows:
+        return ""
+    return (
+        "\nKomponenter utan aktivt val (viktigt, nämn i sammanfattningen):\n"
+        + "\n".join(f"- {r['komponent']} (konventionellt: {r['material']})" for r in rows)
+        + "\nDe ingår i summorna som konventionellt material, alltså baslinjen, "
+        "utan besparing. Skriv inte att ett alternativ valdes för dem.\n"
+    )
+
+
+def render_default_choices(rows: list[dict], total: int) -> str:
+    lines = "\n".join(f"| {cell(r['komponent'])} | {cell(r['material'])} |" for r in rows)
+    return (
+        "## Komponenter som räknas som konventionella\n\n"
+        f"För {len(rows)} av {total} komponenter valdes inget alternativ. De ingår i "
+        "summorna som konventionellt material, alltså med baslinjens klimatpåverkan "
+        "och kostnad, och ger därför ingen besparing.\n\n"
+        "| Komponent | Konventionellt material i baslinjen |\n|---|---|\n"
+        f"{lines}\n"
+    )
+
+
+def _construction_year_line(project: Project) -> str:
+    """The building year for the prompt. Sara's "byggår 1974." became "byggåret
+    är okänt" in October 2026 because this line did not exist."""
+    if project.construction_year:
+        return f"Byggår: {project.construction_year}"
+    return "Byggår: anges inte i projektbeskrivningen"
 
 
 def report_title(project: Project) -> str:
@@ -192,28 +259,64 @@ def build_stock_caveats(components: list[dict]) -> list[dict]:
     currently lists.
 
     Returns one entry per affected component: name, chosen alternative, units
-    in stock, units needed.
+    in stock, units needed. Palats counts listed articles, so the two are only
+    compared when the need is counted in st, or in m² and löpmeter when the
+    listing stated its area or length (`tillganglig_mangd`). Otherwise the
+    entry says the coverage is unknown instead (`jamforbar` False): "1 av 20"
+    for one listing against 20 m² of floor was Matilda's reading on
+    2026-10-12, and it compared articles with square metres.
     """
     caveats = []
     for comp in components:
         available = comp.get("tillgangligt_antal")
         needed = comp.get("behov_antal")
+        unit = str(comp.get("behov_enhet") or "st").strip().lower()
+        comparable = unit in _COUNT_UNITS
+        # A listing that states its area or length has a known amount in the
+        # need's own unit, the one the table's "Täckning" shows.
+        amount = comp.get("tillganglig_mangd")
+        from_amount = (not comparable and isinstance(amount, (int, float))
+                       and not isinstance(amount, bool) and amount > 0)
+        if from_amount:
+            available, comparable = amount, True
         if available is None or needed is None:
             continue
         try:
-            available = int(available)
+            available = float(available) if from_amount else int(available)
             needed = float(needed)
         except (TypeError, ValueError):
             continue
-        if needed <= 0 or available >= needed:
+        if needed <= 0 or (comparable and available >= needed):
+            continue
+        # Palats reports 0 when the listing states no quantity. That is no fact
+        # at all, so no row claims "0 artiklar" or "0 av 5", the same as the
+        # table's stock note.
+        if available <= 0:
             continue
         caveats.append({
             "komponent": comp.get("name", ""),
             "alternativ": comp.get("valt_alternativ", ""),
             "tillgangligt": available,
             "behov": needed,
+            "enhet": unit,
+            "jamforbar": comparable,
         })
     return caveats
+
+
+_COUNT_UNITS = ("st", "styck", "stk", "pcs")
+
+
+def _stock_cells(c: dict) -> tuple[str, str]:
+    """(in stock, need) as table cells, in their own units."""
+    unit = c.get("enhet", "st")
+    need = f"{_fmt(c['behov'], 2)} {_unit(unit)}".strip()
+    if not c.get("jamforbar", True):
+        word = "artikel" if c["tillgangligt"] == 1 else "artiklar"
+        return f"{c['tillgangligt']} {word}, täckning okänd", need
+    if unit in _COUNT_UNITS:
+        return str(c["tillgangligt"]), f"{c['behov']:.0f}"
+    return f"{_fmt(c['tillgangligt'], 1)} {_unit(unit)}", need
 
 
 def build_missing_selection_caveat(project: Project, aggregate) -> list[str]:
@@ -538,8 +641,16 @@ def _caveat_prompt_block(caveats: list[dict]) -> str:
     if not caveats:
         return ""
     lines = "\n".join(
-        f"- {c['komponent']}: valt återbruk \"{c['alternativ']}\" har "
-        f"{c['tillgangligt']} artiklar i lager mot ett behov på {c['behov']:.0f}."
+        (f"- {c['komponent']}: valt återbruk \"{c['alternativ']}\" har "
+         f"{c['tillgangligt']} artiklar i lager mot ett behov på {c['behov']:.0f}.")
+        if c.get("jamforbar", True) and c.get("enhet", "st") in _COUNT_UNITS else
+        (f"- {c['komponent']}: valt återbruk \"{c['alternativ']}\" räcker till "
+         f"{_stock_cells(c)[0]} av behovet på {_stock_cells(c)[1]}.")
+        if c.get("jamforbar", True) else
+        (f"- {c['komponent']}: valt återbruk \"{c['alternativ']}\" har "
+         f"{c['tillgangligt']} annonserade artiklar, men annonsen anger inte hur "
+         f"mycket av behovet ({_stock_cells(c)[1]}) en artikel täcker. Täckningen "
+         f"är okänd; jämför inte antalet artiklar med mängden.")
         for c in caveats
     )
     return (
@@ -554,7 +665,7 @@ def render_stock_caveats(caveats: list[dict]) -> str:
     """The appendix that always lands, regardless of what the model wrote."""
     rows = "\n".join(
         f"| {cell(c['komponent'])} | {cell(c['alternativ'])} "
-        f"| {cell(c['tillgangligt'])} | {c['behov']:.0f} |"
+        f"| {cell(_stock_cells(c)[0])} | {cell(_stock_cells(c)[1])} |"
         for c in caveats
     )
     return (

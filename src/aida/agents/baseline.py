@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import sys
@@ -1279,14 +1280,7 @@ def _complete_baseline(project: Project, boverket_products, match=None) -> list[
             "Baseline match left out %d of %d components (%s); asking again for those",
             len(missing), len(project.components), ", ".join(c.id for c in missing),
         )
-        sub = Project(
-            building_type=project.building_type,
-            area_bta=project.area_bta,
-            components=missing,
-            name=project.name,
-            description=project.description,
-            needs_analysis=project.needs_analysis,
-        )
+        sub = _sub_project(project, missing)
         missing_ids = {c.id for c in missing}
         results += [r for r in match(sub, boverket_products)
                     if r.component_id in missing_ids and r.component_id not in have]
@@ -1333,14 +1327,9 @@ class _Truncated(Exception):
 
 
 def _sub_project(project: Project, components: list) -> Project:
-    return Project(
-        building_type=project.building_type,
-        area_bta=project.area_bta,
-        components=list(components),
-        name=project.name,
-        description=project.description,
-        needs_analysis=project.needs_analysis,
-    )
+    # replace, not a field-by-field copy: the copy dropped every field added
+    # after it was written (the building year, 2026-10-12).
+    return dataclasses.replace(project, components=list(components))
 
 
 def _match_components_to_boverket(project: Project, boverket_products) -> list[BaselineResult]:
@@ -1426,7 +1415,7 @@ def _match_chunk(project: Project, boverket_products) -> list[BaselineResult]:
         system=MATCH_SYSTEM_PROMPT,
         messages=[{
             "role": "user",
-            "content": f"""Projekt: {project.building_type}, {project.area_bta} m² BTA
+            "content": f"""Projekt: {project.facts_line()}
 
 KOMPONENTER:
 {comp_list}

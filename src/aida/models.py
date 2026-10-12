@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -71,6 +72,29 @@ class NeedsAnalysis:
         )
 
 
+def construction_year(value) -> int | None:
+    """A building year as an int, or None when there is no plausible one.
+
+    Sara wrote "byggår 1974." in October 2026 and the analysis said the year was
+    unknown: the project had nowhere to keep it. A year outside 1000-2100 is a
+    misread figure, not a building year.
+    """
+    if isinstance(value, bool):
+        return None
+    try:
+        if isinstance(value, str):
+            # Four digits and no fifth: "1974" and "1974-05-01", not "19745".
+            m = re.match(r"\s*(\d{4})(?!\d)", value)
+            if not m:
+                return None
+            year = int(m.group(1))
+        else:
+            year = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return year if 1000 <= year <= 2100 else None
+
+
 @dataclass
 class Project:
     building_type: str
@@ -79,6 +103,16 @@ class Project:
     name: str = ""
     description: str = ""
     needs_analysis: NeedsAnalysis = field(default_factory=NeedsAnalysis)
+    # The year the building was built, when the description gives it. None is
+    # "not stated", which the prompts say in words rather than as "okänt".
+    construction_year: int | None = None
+
+    def facts_line(self) -> str:
+        """"Kontor, 120 m² BTA, byggår 1974": the project in one line for a prompt."""
+        line = f"{self.building_type}, {self.area_bta} m² BTA"
+        if self.construction_year:
+            line += f", byggår {self.construction_year}"
+        return line
 
     def to_dict(self) -> dict:
         return {
@@ -86,6 +120,7 @@ class Project:
             "area_bta": self.area_bta,
             "name": self.name,
             "description": self.description,
+            "construction_year": self.construction_year,
             "components": [c.to_dict() for c in self.components],
             "needs_analysis": self.needs_analysis.to_dict(),
         }
@@ -103,6 +138,7 @@ class Project:
             description=data.get("description", ""),
             components=components,
             needs_analysis=NeedsAnalysis.from_dict(data.get("needs_analysis")),
+            construction_year=construction_year(data.get("construction_year")),
         )
 
     @classmethod
@@ -209,6 +245,11 @@ class Alternative:
     # silently implying the stock is there. None for non-reuse alternatives and
     # for analyses saved before 2026-08-15.
     available_quantity: int | None = None
+    # How much a reuse listing holds in the component's own unit when that is
+    # an area or a length the listing states ("Linoleummatta 25 m²"), the same
+    # amount the table's "Täckning" reads. None in st, where available_quantity
+    # is the amount, and when the listing does not say.
+    available_amount: float | None = None
     # How the price was arrived at: "listing" (a real Palats asking price),
     # "market_estimate" (web-searched installed price for the material type),
     # or "" (unknown). Two very different kinds of number that the comparison
@@ -233,6 +274,12 @@ class Alternative:
     # prints this field as "725 kr/st *". 0 for every other row. Rows saved
     # before 2026-09-30 lack the key; aggregate.article_price() reads those.
     article_price_sek: float = 0
+    # The kind of material the row is ("Gummigolv", "Linoleum", "Träpanel"),
+    # from the catalog's own category and subtype (data/material_type.py).
+    # The alternatives view groups by it. "" when nothing recognises the
+    # product, which the view shows under "Övrigt", and for rows saved before
+    # 2026-10-12.
+    material_type: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)

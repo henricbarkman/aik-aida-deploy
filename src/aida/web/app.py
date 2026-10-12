@@ -637,22 +637,26 @@ def api_aggregate():
 @require_auth
 @rate_limited
 def api_report():
+    from aida.agents.aggregate import fill_default_selections
     from aida.overrides import apply_to_selections_payload
 
     data = request.json or {}
     try:
         project = Project.from_dict(data.get('project', {}))
         overrides = data.get('overrides') or {}
-        payload = apply_to_selections_payload(data.get('selections', {}), overrides)
+        baseline = data.get('baseline') if isinstance(data.get('baseline'), dict) else None
+        # A component without a choice counts as its baseline, marked as such.
+        payload = fill_default_selections(data.get('selections', {}), project, baseline)
+        payload = apply_to_selections_payload(payload, overrides)
         selections = Selections.from_dict(payload)
         if not selections.components:
-            return jsonify({'error': 'Inga komponenter valda'}), 400
+            return jsonify({'error': 'Inga komponenter att rapportera'}), 400
         # The overrides go in twice on purpose: once folded into the figures, so
         # every total is the one on screen, and once as a list, so the report can
         # say which numbers are not Aida's own. Word gets nothing but the
         # markdown, so a marking that is not in the text does not exist.
         markdown = generate_report_markdown(
-            project, selections, overrides=data.get('overrides'),
+            project, selections, overrides=data.get('overrides'), baseline=baseline,
         )
         return jsonify({'markdown': markdown})
     except _TIMEOUT_ERRORS:
@@ -1631,9 +1635,13 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .msg table th, .msg table td { padding: 4px 8px; border: 1px solid var(--kk-gray-200); text-align: left; }
 .msg table th { background: var(--kk-gray-50); font-weight: 600; }
 .msg blockquote { border-left: 3px solid var(--kk-gray-300); margin: 6px 0; padding: 2px 10px; color: var(--kk-gray-500); }
-.chat-input { padding: 12px 16px; border-top: 1px solid var(--kk-gray-200); background: white; display: flex; align-items: center; gap: 8px; }
-.chat-input input { flex: 1; padding: 10px 16px; border: 1px solid var(--kk-gray-200); border-radius: 24px; font-size: 13px; font-family: inherit; background: white; outline: none; }
-.chat-input input:focus { border-color: var(--kk-dark-red); box-shadow: 0 0 0 2px rgba(181,32,31,0.15); }
+/* The message field grows with the text up to about seven lines, then
+   scrolls (testgruppen 2026-10-12: a one-line field hid most of a long
+   project description while it was being written). Buttons keep to the
+   bottom edge as it grows. */
+.chat-input { padding: 12px 16px; border-top: 1px solid var(--kk-gray-200); background: white; display: flex; align-items: flex-end; gap: 8px; }
+.chat-input textarea { flex: 1; padding: 10px 16px; border: 1px solid var(--kk-gray-200); border-radius: 20px; font-size: 13px; line-height: 1.4; font-family: inherit; background: white; outline: none; resize: none; max-height: 160px; overflow-y: auto; }
+.chat-input textarea:focus { border-color: var(--kk-dark-red); box-shadow: 0 0 0 2px rgba(181,32,31,0.15); }
 .chat-input button { width: 40px; height: 40px; border-radius: 50%; background: var(--kk-charcoal); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; flex-shrink: 0; }
 .chat-input button:hover:not(:disabled) { background: var(--kk-dark-red); }
 .chat-input button:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -1651,7 +1659,7 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .att-tray { max-height: 112px; overflow-y: auto; flex-shrink: 0; }
 /* A flex item's min-width defaults to its intrinsic size, so without this the
    text field refuses to give up the room the paperclip needs at narrow widths. */
-.chat-input input { min-width: 0; }
+.chat-input textarea { min-width: 0; }
 .att-tray:not(:empty) + .chat-input { border-top: none; }
 .att-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 28px; padding: 3px 3px 3px 9px; border: 1px solid var(--kk-gray-200); border-radius: 999px; background: var(--kk-gray-50); font-size: 12px; line-height: 1.3; color: var(--kk-text); }
 .att-chip svg { flex-shrink: 0; color: var(--kk-gray-500); }
@@ -1692,6 +1700,22 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .alt-row:hover { background: var(--kk-gray-50); }
 .alt-row.selected { background: var(--kk-gold-light) !important; }
 .alt-row input[type=radio] { accent-color: var(--kk-charcoal); }
+/* A material type: the range over its products, which fold out under it. */
+.alt-group { cursor: pointer; background: var(--kk-gray-100); }
+.alt-group:hover { background: var(--kk-gray-200); }
+.alt-group td { border-top: 1px solid var(--kk-gray-200); }
+/* Gold edge: your choice is in here, even with the type folded away. */
+.alt-group.has-choice td:first-child { box-shadow: inset 3px 0 0 var(--kk-gold); }
+.group-sub { font-size: 12px; color: var(--kk-gray-500); }
+.group-toggle { background: none; border: none; padding: 2px 6px; font: inherit; font-size: 12px; color: var(--kk-charcoal); cursor: pointer; display: inline-block; transition: transform 0.15s; }
+.group-toggle[aria-expanded="true"] { transform: rotate(90deg); }
+.group-toggle:focus-visible { outline: 2px solid var(--kk-charcoal); outline-offset: 2px; }
+.choice-status { margin-top: 4px; font-size: 12px; color: var(--kk-gray-500); }
+.undo-choice { background: none; border: none; padding: 0; font: inherit; font-size: 12px; color: var(--kk-charcoal); text-decoration: underline; cursor: pointer; }
+.undo-choice:focus-visible { outline: 2px solid var(--kk-charcoal); outline-offset: 2px; }
+.undo-choice:disabled { opacity: .4; cursor: not-allowed; }
+.default-choice-note { font-size: 12px; color: var(--kk-gray-500); margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { .group-toggle { transition: none; } }
 /* Per-component usage_context — subtle callout under component name in tables */
 .usage-context { margin-top: 6px; padding: 8px 12px 8px 14px; background: var(--kk-gray-50); border-left: 2px solid var(--kk-gray-300); border-radius: 0 3px 3px 0; font-size: 12.5px; line-height: 1.5; color: var(--kk-gray-500); font-style: normal; }
 .usage-context-label { display: block; font-size: 9.5px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; color: var(--kk-gray-500); margin: 0 0 3px; }
@@ -2270,7 +2294,7 @@ a.palats-link { color: inherit; text-decoration: underline; }
       <div class="chat-input">
         {% if has_supabase %}<button id="attachBtn" class="attach-btn" type="button" onclick="document.getElementById('attachInput').click()" aria-label="Bifoga filer" title="Bifoga PDF, bild, Word eller Excel"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
         <input id="attachInput" type="file" multiple hidden accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.docx,.xlsx,.csv,.txt" onchange="uploadAttachments(this.files); this.value=''">{% endif %}
-        <input id="userInput" type="text" placeholder="Skriv ditt meddelande..." onkeydown="if(event.key==='Enter')sendMessage()">
+        <textarea id="userInput" rows="1" placeholder="Skriv ditt meddelande..." aria-label="Meddelande" onkeydown="chatKeydown(event)" oninput="autoGrow(this)"></textarea>
         <button id="sendBtn" onclick="sendMessage()" aria-label="Skicka">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
@@ -2409,6 +2433,15 @@ a.palats-link { color: inherit; text-decoration: underline; }
 if (typeof marked !== 'undefined') {
   marked.setOptions({ breaks: true, gfm: true });
 }
+
+// Errors shown in the chat, counted where every error path ends up (addMsg and
+// addReply), so sendMessage can tell whether the call its message started
+// failed without each handler having to report back.
+let _sendFailures = 0;
+let _lastSentText = null;
+// Material-type groups the user has folded out, "<component id>\u0001<label>",
+// so a redraw (a choice undone, a rerun) does not fold them back.
+const _openAltGroups = new Set();
 
 let _step = 'idle';
 let state = {
@@ -2779,6 +2812,7 @@ function forgetLlmContext() {
 }
 
 function addMsg(text, cls, role, attachments) {
+  if (cls === 'system' && /^Fel\b/.test(String(text))) _sendFailures++;
   const entry = role ? {text, cls, role} : {text, cls};
   // Which files went with this message, for the transcript only: llmHistory()
   // sends text, and the files reach the model through attachmentRefs().
@@ -2801,7 +2835,10 @@ function addMsg(text, cls, role, attachments) {
 // the question it failed to answer is still the open one in her history.
 function addReply(reply) {
   const text = String(reply == null ? '' : reply).trim();
-  if (!text) return addMsg('Jag fick inte ihop något svar den här gången. Skriv frågan igen, så försöker jag på nytt.', 'system');
+  if (!text) {
+    _sendFailures++;
+    return addMsg('Jag fick inte ihop något svar den här gången. Skriv frågan igen, så försöker jag på nytt.', 'system');
+  }
   return addMsg(text, 'bot', 'assistant');
 }
 
@@ -2822,7 +2859,9 @@ function shownQuestions(project) {
 }
 function intakeSummary(project) {
   const compList = (project.components || []).map(c => '- ' + c.name + ' (' + c.quantity + ' ' + c.unit + ')').join('\n');
-  let text = '**' + project.building_type + '**, ' + project.area_bta + ' m²\n\n**Komponenter:**\n' + compList;
+  let text = '**' + project.building_type + '**, ' + project.area_bta + ' m²'
+    + (project.construction_year ? ', byggår ' + project.construction_year : '')
+    + '\n\n**Komponenter:**\n' + compList;
   const asks = shownQuestions(project);
   let hint;
   if (asks.length) {
@@ -2866,15 +2905,23 @@ function removeConfirmButtons() {
   });
 }
 
+// `name` is one step, or several that run at the same time: the alternatives
+// call searches reuse and new products in one request, so both pills are lit
+// for as long as it runs. Until 2026-10-12 a timer moved the rail from
+// Återbruk to Nyproduktion after two seconds, whatever the server was doing.
 function setProgressStep(name) {
   const order = ['planering','baslinje','aterbruk','nyproduktion','sammanstallning','uppfoljning'];
   const STEP_TAB = {planering:'projekt',baslinje:'baslinje',aterbruk:'alternativ',nyproduktion:'alternativ',sammanstallning:'alternativ',uppfoljning:'rapport'};
-  const ni = order.indexOf(name);
+  const names = Array.isArray(name) ? name : [name];
+  const idx = names.map(n => order.indexOf(n)).filter(i => i >= 0);
+  const ni = idx.length ? Math.min.apply(null, idx) : -1;
+  const last = idx.length ? Math.max.apply(null, idx) : -1;
+  name = names[0];
   order.forEach((s, i) => {
     const pill = document.getElementById('st-' + s);
     if (!pill) return;
     const isDone = i < ni;
-    pill.className = 'step-item' + (isDone ? ' done' : i === ni ? ' active' : '');
+    pill.className = 'step-item' + (isDone ? ' done' : (i >= ni && i <= last) ? ' active' : '');
     // Only a finished step is somewhere you can go back to, and a disabled
     // button drops out of the tab order, so the rail never offers a keyboard
     // stop that does nothing.
@@ -2910,7 +2957,8 @@ let _loadingStart = null;
 let _runInFlight = false;
 function setLoading(on) {
   _runInFlight = on;
-  if (typeof setCellsDisabled === 'function') setCellsDisabled(on);
+  // A cell edit can still be in flight when a run ends.
+  if (typeof setCellsDisabled === 'function') setCellsDisabled(on || _mutationInFlight);
   document.getElementById('sendBtn').disabled = on;
   document.getElementById('userInput').disabled = on;
   // Always clean up previous loading state first (prevents duplicates)
@@ -3130,6 +3178,12 @@ function scrollToSection(key) {
 const ADVANCE_RE = /\b(vidare|nästa|fortsätt|gå vidare|next|confirm|bekräfta)\b/i;
 const ADVANCE_EXACT_RE = /^(ok|okej|ja)$/i;
 const CORRECTION_RE = /\b(ändra|nej|fel|byt|korrigera|gör om|uppdatera|ta bort|lägg till|ändring|rätta|fixa|nytt? antal|inte \d|ska vara|stämmer inte|borde vara)\b/i;
+// Adding a component once alternatives exist. Matilda's "lägg till krokar i
+// fikarummet" (2026-10-12) was caught as a correction and reran the whole
+// alternatives search with the sentence as feedback; nothing was added. The
+// chat agent's add_component adds it and asks for its baseline and
+// alternatives only, so the other choices stay.
+const ADD_RE = /\b(lägg|lägga|lägger) till\b/i;
 
 // Build the context string we feed back into intake when the user makes a
 // correction. Includes everything intake might otherwise re-ask about:
@@ -3552,7 +3606,55 @@ function setupAttachmentInputs() {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setupAttachmentInputs);
 else setupAttachmentInputs();
 
+// Enter sends, Shift+Enter starts a new line. Not while an input method is
+// composing a character, where Enter confirms the character.
+function chatKeydown(e) {
+  if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+  e.preventDefault();
+  sendMessage();
+}
+
+function autoGrow(el) {
+  if (!el || !el.style) return;
+  el.style.height = 'auto';
+  // scrollHeight leaves out the border, and box-sizing is border-box: without
+  // it the box is two pixels short and shows a scrollbar on the first line.
+  const border = (el.offsetHeight || 0) - (el.clientHeight || 0);
+  el.style.height = Math.min(el.scrollHeight + Math.max(border, 0), 160) + 'px';
+}
+
+// The message reached the server and took effect. From here a failure belongs
+// to something it set off (a rerun after an added component), and putting the
+// text back would send the same edit twice.
+function messageTaken() { _lastSentText = null; }
+
+// A message whose call failed goes back in the field, so it can be sent again
+// without retyping (testgruppen 2026-10-12: a long description was lost to a
+// timeout). Not into another analysis, and never over something already typed.
+function restoreUnsent(text, failuresBefore, epoch) {
+  if (!text || _sendFailures <= failuresBefore || epoch !== analysisEpoch) return false;
+  const input = document.getElementById('userInput');
+  if (!input || input.value.trim()) return false;
+  input.value = text;
+  autoGrow(input);
+  return true;
+}
+
 async function sendMessage() {
+  const epoch = analysisEpoch;
+  const before = _sendFailures;
+  _lastSentText = null;
+  try {
+    await _sendMessage();
+  } catch (e) {
+    _sendFailures++;
+    throw e;
+  } finally {
+    restoreUnsent(_lastSentText, before, epoch);
+  }
+}
+
+async function _sendMessage() {
   const input = document.getElementById('userInput');
   if (!input.value.trim() && !_pendingAttachmentIds.length && !_uploadsInFlight.length) return;
   // Read before the first await. Every step below must run against the
@@ -3575,9 +3677,11 @@ async function sendMessage() {
   const sentFiles = (state.attachments || []).filter(a => _pendingAttachmentIds.indexOf(a.id) !== -1)
     .map(a => ({id: a.id, name: a.name, mime: a.mime}));
   if (!text && !sentFiles.length) return;
+  _lastSentText = text;
   if (!text) text = 'Bifogat: ' + sentFiles.map(a => a.name).join(', ');
   _pendingAttachmentIds = [];
   input.value = '';
+  autoGrow(input);
   // Keep the entry: whether this message becomes a turn the model remembers
   // depends on which branch below handles it (advisory and chat do, intake and
   // "kör vidare" do not — same split the in-memory chatHistory had).
@@ -3587,6 +3691,11 @@ async function sendMessage() {
   // Detect "advance to next step" intent at confirmation gates
   const wantsAdvance = ADVANCE_RE.test(text) || ADVANCE_EXACT_RE.test(text.trim());
   const wantsCorrection = CORRECTION_RE.test(text);
+  // After the alternatives, "lägg till X" / "kan du lägga till X?" adds a
+  // component through the chat agent, which also answers it if it was a
+  // question. Not routed: the router would answer "lägga till" as a question,
+  // and an answer changes nothing. Earlier steps keep their own paths.
+  const wantsAdd = ADD_RE.test(text) && (state.step === 'alternatives_done' || state.step === 'report_done');
 
   // Orchestration increment 1: route advisory questions to a server-side answer
   // before the flow switch. This is the missing "question" branch — without it a
@@ -3605,7 +3714,7 @@ async function sendMessage() {
   // 2026-09-30 because the router never saw the question it answered.
   const answersIntake = !!state.pendingIntake && (state.step === 'idle' || !!state.pendingIntake.question)
     && text.indexOf('?') === -1;
-  if (!wantsAdvance && !wantsCorrection && !answersIntake) {
+  if (!wantsAdvance && !wantsCorrection && !wantsAdd && !answersIntake) {
     try {
       const routed = await routeMessage(text);
       // No setLoading: the indicator belongs to the analysis now on screen.
@@ -3633,6 +3742,7 @@ async function sendMessage() {
     addMsg('Uppdaterar projektbeskrivning...', 'system');
     await correctionIntake(text, [state.pendingIntake.question]);
     if (before !== 'intake_done' && epoch === analysisEpoch && state.step === 'intake_done') {
+      messageTaken();
       await runBaseline();
       if (before === 'report_done' && epoch === analysisEpoch && state.step === 'baseline_done') {
         await runAlternatives();
@@ -3669,6 +3779,7 @@ async function sendMessage() {
         addMsg('Uppdaterar projektet och r\u00e4knar om baslinjen...', 'system');
         await correctionIntake(text);
         if (epoch === analysisEpoch && state.step === 'intake_done') {
+          messageTaken();
           await runBaseline();
         }
       } else {
@@ -3676,14 +3787,12 @@ async function sendMessage() {
       }
       break;
     case 'alternatives_done':
-      if (wantsAdvance) {
-        const allSel = state.alternatives && state.alternatives.components.every(c => state.selections[c.component_id]);
-        if (!allSel) {
-          const missing = state.alternatives.components.filter(c => !state.selections[c.component_id]).map(c => c.component_name);
-          addMsg('Välj alternativ för alla komponenter först: ' + missing.join(', '), 'system');
-          setLoading(false);
-          break;
-        }
+      if (wantsAdd) {
+        // Before the advance: "lägg till krokar innan vi går vidare" is an add.
+        await runChat(text, userEntry);
+      } else if (wantsAdvance) {
+        // No choice on a component is no reason to stop: it counts as
+        // conventional, and the report says so (testgruppen 2026-10-12).
         setLoading(false);
         generateReport();
       } else if (wantsCorrection) {
@@ -3695,11 +3804,14 @@ async function sendMessage() {
       }
       break;
     case 'report_done':
-      if (wantsCorrection) {
+      if (wantsAdd) {
+        await runChat(text, userEntry);
+      } else if (wantsCorrection) {
         // Re-run from intake with correction
         addMsg('G\u00f6r om analysen med dina kommentarer...', 'system');
         await correctionIntake(text);
         if (epoch === analysisEpoch && state.step === 'intake_done') {
+          messageTaken();
           await runBaseline();
           if (epoch === analysisEpoch && state.step === 'baseline_done') {
             await runAlternatives();
@@ -3728,17 +3840,7 @@ function confirmStep() {
   document.getElementById('confirmBarBtn').style.opacity = '0.5';
   if (state.step === 'intake_done') runBaseline();
   else if (state.step === 'baseline_done') runAlternatives();
-  else if (state.step === 'alternatives_done') {
-    const allSel = state.alternatives && state.alternatives.components.every(c => state.selections[c.component_id]);
-    if (!allSel) {
-      const missing = state.alternatives.components.filter(c => !state.selections[c.component_id]).map(c => c.component_name);
-      addMsg('Välj alternativ för alla komponenter först: ' + missing.join(', '), 'system');
-      document.getElementById('confirmBarBtn').disabled = false;
-      document.getElementById('confirmBarBtn').style.opacity = '';
-      return;
-    }
-    generateReport();
-  }
+  else if (state.step === 'alternatives_done') generateReport();
 }
 
 // === Pipeline: Intake ===
@@ -4050,23 +4152,76 @@ function bindIntent(comp, altName, pickIntent, need) {
     pickIntent.slice(0, -1).forEach(p => { requested[normAltName(p.altName)] = Number(p.quantity); });
     return combinedSelection(comp, allocatePicks(comp, names, total, requested), total);
   }
-  if (altName === 'Baslinje') {
-    return {id: comp.component_id, name: comp.component_name,
-      selected_alternative: {name: 'Baslinje', co2e_kg: comp.baseline_co2e_kg,
-        cost_sek: comp.baseline_cost_sek, source: 'NollCO2'},
-      baseline_co2e_kg: comp.baseline_co2e_kg, baseline_cost_sek: comp.baseline_cost_sek};
-  }
+  if (altName === 'Baslinje') return baselineSelection(comp, false);
   const want = normAltName(altName);
   const alt = (comp.alternatives || []).find(a => normAltName(a.name) === want);
   if (!alt) return null;
-  // Same shape as selectAlt, per-article price included.
+  return altSelection(comp, alt);
+}
+
+// The selection for "Baslinje": the conventional material, chosen or standing
+// in because nothing was chosen. `byDefault` marks the second, so the summary
+// and the report can say which components stand on the baseline by default
+// (testgruppen 2026-10-12: a report needed a choice on every component, and an
+// unchosen one counted as nothing at all).
+function baselineSelection(comp, byDefault) {
+  const alt = {name: 'Baslinje', co2e_kg: comp.baseline_co2e_kg,
+    cost_sek: comp.baseline_cost_sek, source: 'NollCO2'};
+  if (byDefault) alt.by_default = true;
+  return {id: comp.component_id, name: comp.component_name, selected_alternative: alt,
+    baseline_co2e_kg: comp.baseline_co2e_kg, baseline_cost_sek: comp.baseline_cost_sek};
+}
+
+// The selection for one alternative row. One shape for the row click and for
+// the rebind after a rerun. available_quantity and price_basis travel so the
+// report can state the stock assumption behind a reuse figure; a per-article
+// reuse price travels in its own field, never as the component's cost, also
+// for rows saved before 2026-09-30.
+function altSelection(comp, alt) {
   return {id: comp.component_id, name: comp.component_name,
     selected_alternative: {name: alt.name, co2e_kg: alt.co2e_kg,
       cost_sek: articlePrice(alt) > 0 ? 0 : alt.cost_sek, article_price_sek: articlePrice(alt),
       source: alt.source,
       available_quantity: (alt.available_quantity === undefined ? null : alt.available_quantity),
+      available_amount: (typeof alt.available_amount === 'number' ? alt.available_amount : null),
       price_basis: alt.price_basis || '', gwp_basis: alt.gwp_basis || ''},
     baseline_co2e_kg: comp.baseline_co2e_kg, baseline_cost_sek: comp.baseline_cost_sek};
+}
+
+// The selections the summary and the report count: every choice made, and the
+// baseline for every component without one. Never written back to state, so a
+// default never turns into a choice the user did not make.
+function selectionsWithDefaults(st) {
+  const out = Object.assign({}, st.selections || {});
+  const has = id => Object.prototype.hasOwnProperty.call(out, id);
+  const isFigure = v => typeof v === 'number' && Number.isFinite(v);
+  const comps = (st.alternatives && Array.isArray(st.alternatives.components)) ? st.alternatives.components : [];
+  comps.forEach(c => {
+    if (!has(c.component_id) && isFigure(c.baseline_co2e_kg)) out[c.component_id] = baselineSelection(c, true);
+  });
+  // A component the alternatives never reached (its step failed, or it was
+  // just added in the chat) stands on its baseline too, the same rule as the
+  // server's fill_default_selections, so the cards and the report agree.
+  const names = new Map(((st.project && st.project.components) || []).map(p => [p.id, p.name]));
+  ((st.baseline && Array.isArray(st.baseline.components)) ? st.baseline.components : []).forEach(b => {
+    if (!b || !names.has(b.component_id) || has(b.component_id) || !isFigure(b.co2e_kg)) return;
+    out[b.component_id] = baselineSelection({component_id: b.component_id, component_name: names.get(b.component_id),
+      baseline_co2e_kg: b.co2e_kg, baseline_cost_sek: isFigure(b.cost_sek) ? b.cost_sek : 0}, true);
+  });
+  return out;
+}
+
+// Undo a choice: the component goes back to standing on the baseline by
+// default. The intent goes too, or the next rerun would rebind it.
+function clearSelection(compId) {
+  // Not while a run or an edit is out: its answer holds the selections as they
+  // were sent and would bring the choice back (setCellsDisabled greys the button).
+  if (cellsLocked()) return;
+  if (!state.selections || !Object.prototype.hasOwnProperty.call(state.selections, compId)) return;
+  delete state.selections[compId];
+  if (state.selectionIntent) delete state.selectionIntent[compId];
+  refreshResults();
+  scheduleAutoSave();
 }
 
 // The one owner of "does this selection survive a rerun". Runs AFTER the
@@ -4138,18 +4293,20 @@ function reportReconcile(res) {
 }
 
 // === Pipeline: Alternatives ===
+const ALTERNATIVES_DONE_MSG = 'Välj per komponent i resultatpanelen. En komponent du inte väljer för räknas som konventionellt. Skriv i chatten om du vill ha fler förslag eller lägga till en komponent.';
+const ALTERNATIVES_SEARCH_MSG = 'Söker återbruk på Palats och nya produkter med lägre klimatpåverkan i EPD-katalogen, för varje komponent...';
+
 async function runAlternatives(userFeedback) {
   // Selections made before intent tracking existed become intent now, so the
   // reconcile below has something to work from (increment 3).
   backfillIntent();
 
-  addMsg('S\u00f6ker alternativ...', 'system');
-  setProgressStep('aterbruk');
+  // What the step does, said once, and a rail that only shows what happens:
+  // one request searches both sources (Gunnar, 2026-10-12).
+  addMsg(ALTERNATIVES_SEARCH_MSG, 'system');
+  setProgressStep(['aterbruk', 'nyproduktion']);
   setLoading(true);
   clearActionRows();
-  const subStepTimer = setTimeout(() => {
-    setProgressStep('nyproduktion');
-  }, 2000);
   const epoch = analysisEpoch;
   try {
     const body = {project: state.project, baseline: state.baseline};
@@ -4158,10 +4315,8 @@ async function runAlternatives(userFeedback) {
     if (fb) body.user_feedback = fb;
     const r = await authFetch('/api/alternatives', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     const d = await r.json();
-    clearTimeout(subStepTimer);
     if (lateReply(epoch)) return;
     if (d.error) {
-      clearTimeout(subStepTimer);
       addMsg('Fel: ' + d.error, 'system');
       addConfirmMsg('S\u00f6kning av alternativ misslyckades.', 'F\u00f6rs\u00f6k igen \u2192', '');
       notifyStepDone('alternatives', false);
@@ -4188,13 +4343,12 @@ async function runAlternatives(userFeedback) {
     const commentary = d.commentary || '';
     if (commentary) {
       addMsg(commentary, 'bot');
-      addMsg('V\u00e4lj alternativ per komponent i resultatpanelen. Skriv i chatten om du vill ha fler f\u00f6rslag.', 'bot');
+      addMsg(ALTERNATIVES_DONE_MSG, 'bot');
     } else {
-      addMsg('Alternativ klara! V\u00e4lj per komponent i resultatpanelen.\n\nSkriv i chatten om du vill ha fler alternativ.', 'bot');
+      addMsg('Alternativ klara! ' + ALTERNATIVES_DONE_MSG, 'bot');
     }
     setLoading(false);
   } catch(e) {
-    clearTimeout(subStepTimer);
     if (lateReply(epoch)) return;
     addMsg('Fel: ' + e.message, 'system');
     addConfirmMsg('S\u00f6kning av alternativ misslyckades.', 'F\u00f6rs\u00f6k igen \u2192', '');
@@ -4207,26 +4361,25 @@ async function runAlternatives(userFeedback) {
 async function generateReport() {
   setProgressStep('uppfoljning');
   addMsg('Genererar rapport...', 'system');
-  // #reportBtn only exists while the Alternativ tab is rendered, but the sticky
-  // confirm bar can trigger this from any tab — null-guard to avoid a throw
-  // that leaves the UI stuck (the error paths below already guard the same way).
-  const rb0 = document.getElementById('reportBtn'); if (rb0) rb0.disabled = true;
   setLoading(true);
   const epoch = analysisEpoch;
   try {
-    const sels = {components: Object.values(state.selections)};
+    // Every component: the choices made, and the baseline, marked as standing
+    // in by default, for each one without a choice.
+    const sels = {components: Object.values(selectionsWithDefaults(state))};
     // The raw selections plus the overrides, not the overridden ones: the
     // server lays them on with the same function the report's appendix is
     // built from, so the totals and the list of manual figures cannot
-    // disagree about which numbers were replaced.
-    const r = await authFetch('/api/report', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({project: state.project, selections: sels, overrides: state.overrides})});
+    // disagree about which numbers were replaced. The baseline goes along so
+    // the server can fill in a component the browser had no alternatives for,
+    // and the report can name the material each default stands on.
+    const r = await authFetch('/api/report', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({project: state.project, selections: sels, overrides: state.overrides, baseline: state.baseline})});
     const d = await r.json();
     if (lateReply(epoch)) return;
     if (d.error) {
       addMsg('Fel: ' + d.error, 'system');
       addConfirmMsg('Rapportgenerering misslyckades.', 'Försök igen →', '');
       notifyStepDone('report', false);
-      const rb = document.getElementById('reportBtn'); if (rb) rb.disabled = false;
       setLoading(false);
       return;
     }
@@ -4243,7 +4396,6 @@ async function generateReport() {
     addMsg('Fel: ' + e.message, 'system');
     addConfirmMsg('Rapportgenerering misslyckades.', 'Försök igen →', '');
     notifyStepDone('report', false);
-    const rb = document.getElementById('reportBtn'); if (rb) rb.disabled = false;
     setLoading(false);
   }
 }
@@ -4358,6 +4510,7 @@ async function runChat(text, userEntry) {
   if (userEntry) userEntry.role = 'user';
   else console.warn('runChat utan conversation-entry: turen sparas inte i modellens kontext');
   const epoch = analysisEpoch;
+  const idsBefore = new Set(((state.project && state.project.components) || []).map(c => c.id));
   try {
     const body = {
       message: text,
@@ -4382,13 +4535,19 @@ async function runChat(text, userEntry) {
     applyAgentStateUpdates(d.state_updates);
 
     addReply(d.reply);
+    // Taken when Aida answered, and also when she acted without a word: sent
+    // again, "lägg till golvlist" would add a second one.
+    // The server sends only the keys a tool touched.
+    const su = d.state_updates || {};
+    const acted = Object.keys(su).length > 0;
+    if (acted || String(d.reply == null ? '' : d.reply).trim()) messageTaken();
 
     // Chat agent may have requested baseline/alternatives reruns. Execute them
     // sequentially so each action sees state from the previous one's merge.
     // Keep loading true throughout so the user cannot send a second message
     // mid-rerun and race the state.baseline / state.alternatives merge.
-    const pendingActions = d.state_updates && d.state_updates.pending_actions;
-    if (Array.isArray(pendingActions) && pendingActions.length > 0) {
+    const pendingActions = withRunsForAdded(d.state_updates && d.state_updates.pending_actions, idsBefore, state);
+    if (pendingActions.length > 0) {
       await processPendingActions(pendingActions);
     }
     if (epoch === analysisEpoch) setLoading(false);
@@ -4396,6 +4555,28 @@ async function runChat(text, userEntry) {
     if (lateReply(epoch)) return;
     addMsg('Fel: ' + e.message, 'system'); setLoading(false);
   }
+}
+
+// A component the chat added after the baseline has no baseline and no
+// alternatives until they are run for it. The chat agent is told to ask for
+// both in the same turn; this makes sure of it, so the component never sits in
+// the project without figures (testgruppen 2026-10-12). Scoped to the new ids,
+// so every other choice stays. Before the baseline step there is nothing to
+// run: the new component is simply part of the project.
+function withRunsForAdded(actions, idsBefore, st) {
+  const list = Array.isArray(actions) ? actions.slice() : [];
+  if (!st.baseline) return list;
+  const added = ((st.project && st.project.components) || []).map(c => c.id).filter(id => !idsBefore.has(id));
+  if (!added.length) return list;
+  const covered = (type, id) => list.some(a => a.type === type && Array.isArray(a.component_ids)
+    && (a.component_ids.length === 0 || a.component_ids.indexOf(id) >= 0));
+  const baseline = added.filter(id => !covered('rerun_baseline', id));
+  if (baseline.length) list.push({type: 'rerun_baseline', component_ids: baseline, reason: 'ny komponent'});
+  if (st.alternatives) {
+    const alts = added.filter(id => !covered('rerun_alternatives', id));
+    if (alts.length) list.push({type: 'rerun_alternatives', component_ids: alts, reason: 'ny komponent'});
+  }
+  return list;
 }
 
 // Execute reruns requested by the chat agent. Full reruns (empty component_ids)
@@ -5149,7 +5330,10 @@ function projektHtml(st, cfg) {
   const d = st.project;
   let html = (cfg && cfg.hideTitle) ? '' : '<div class="section-title">Projektinformation</div>';
   html += renderNeedsAnalysis(d.needs_analysis);
-  html += '<div class="comp-card"><div class="comp-card-header"><h3>' + esc(d.building_type) + ', ' + esc(d.area_bta) + ' m\u00b2 BTA' + (d.name ? ' (' + esc(d.name) + ')' : '') + '</h3></div>';
+  html += '<div class="comp-card"><div class="comp-card-header"><h3>' + esc(d.building_type) + ', ' + esc(d.area_bta) + ' m\u00b2 BTA' + (d.name ? ' (' + esc(d.name) + ')' : '') + '</h3>'
+    // The building year, or that none was given. Sara's "bygg\u00e5r 1974." read as
+    // unknown in October 2026, and an absent line could not show it either way.
+    + '<div class="alt-qty-line" id="projectYear">Bygg\u00e5r: ' + (d.construction_year ? esc(d.construction_year) : 'inte angivet') + '</div></div>';
   const edit = !!(cfg && cfg.editable);
   html += '<table class="comp-table"><thead><tr><th>Komponent</th><th>Antal</th><th>Enhet</th><th>Kategori</th><th>K\u00e4lla</th>' + (edit ? '<th></th>' : '') + '</tr></thead><tbody>';
   d.components.forEach(c => {
@@ -5207,7 +5391,11 @@ let _mutationInFlight = false;
 function cellsLocked() { return _mutationInFlight || _runInFlight; }
 
 function setCellsDisabled(on) {
-  document.querySelectorAll('.cell-input, .cell-remove, #addCompBtn').forEach(el => { el.disabled = on; });
+  // "Ångra val" and the choice controls too: a chat reply in flight carries
+  // the selections as they were sent, and would put back an undone choice or
+  // take away a new one when it lands.
+  document.querySelectorAll('.cell-input, .cell-remove, #addCompBtn, .undo-choice, '
+    + '.alt-row input[type=radio], .pick-toggle input, input.pick-qty').forEach(el => { el.disabled = on; });
 }
 
 function bindCells() {
@@ -5765,25 +5953,241 @@ function rankedAlternatives(comp) {
   return rest.concat(info);
 }
 
+// === Alternatives by material type ===
+// Henric, 2026-10-12: alternatives are presented by material type first
+// (Linoleum, Gummigolv, Vinylgolv), each with the range of climate impact and
+// cost across the products under it, and the products are seen only when a
+// type is folded out. The tool plans early, and a list of product names read
+// as a shopping list. Built as its own pieces (groupByMaterial for the data,
+// materialGroupHtml for the markup) so another view can reuse them.
+//
+// The type is the catalog's own (alt.material_type, set on the server from the
+// row's subtype). Reuse is a group of its own whatever the material: its figure
+// is a fixed per-unit schablon, and a range spanning it and declared products
+// would describe neither. A product with no known type goes under "Övrigt".
+const REUSE_GROUP = 'Återbruk från Palats';
+const OTHER_GROUP = 'Övrigt';
+
+function groupByMaterial(comp, entries) {
+  const groups = [];
+  const byLabel = new Map();
+  (entries || []).forEach(e => {
+    const label = e.alt.alternative_type === 'reuse' ? REUSE_GROUP
+      : (String(e.alt.material_type || '').trim() || OTHER_GROUP);
+    if (!byLabel.has(label)) {
+      const g = {label: label, entries: []};
+      byLabel.set(label, g);
+      groups.push(g);
+    }
+    byLabel.get(label).entries.push(e);
+  });
+  // In the order of each group's best product, which is the table's own sort
+  // (kr per saved kg). Övrigt last: it is not a choice of material.
+  const ordered = groups.filter(g => g.label !== OTHER_GROUP).concat(groups.filter(g => g.label === OTHER_GROUP));
+  // "Övrigt" means "the rest"; alone, there is no rest to speak of.
+  if (ordered.length === 1 && ordered[0].label === OTHER_GROUP) ordered[0].label = 'Alla produkter';
+  const isFigure = v => typeof v === 'number' && Number.isFinite(v);
+  ordered.forEach(g => {
+    const co2 = g.entries.map(e => e.alt.co2e_kg).filter(isFigure);
+    g.co2Min = co2.length ? Math.min.apply(null, co2) : null;
+    g.co2Max = co2.length ? Math.max.apply(null, co2) : null;
+    // A per-article Palats price is not the component's cost, the same rule
+    // as the summary: it stays out of the range and is counted apart.
+    const costs = g.entries.filter(e => e.alt.cost_sek > 0 && !(articlePrice(e.alt) > 0)).map(e => e.alt.cost_sek);
+    g.costMin = costs.length ? Math.min.apply(null, costs) : null;
+    g.costMax = costs.length ? Math.max.apply(null, costs) : null;
+    g.unpriced = g.entries.length - costs.length;
+    const bl = comp && comp.baseline_co2e_kg;
+    g.savingMin = (bl > 0 && g.co2Max !== null) ? Math.round((1 - g.co2Max / bl) * 100) : null;
+    g.savingMax = (bl > 0 && g.co2Min !== null) ? Math.round((1 - g.co2Min / bl) * 100) : null;
+  });
+  return ordered;
+}
+
+// "120-340" or "120" when the two ends round to the same number.
+function rangeText(lo, hi) {
+  const a = Math.round(lo), b = Math.round(hi);
+  return a === b ? a.toLocaleString('sv') : a.toLocaleString('sv') + '-' + b.toLocaleString('sv');
+}
+
+// "↓40-80 %", "↑5 %", or "↓10 % till ↑5 %" when the range crosses the baseline.
+function savingRangeText(lo, hi) {
+  if (lo === null || hi === null) return '';
+  const part = v => (v >= 0 ? '↓' : '↑') + Math.abs(v);
+  if (lo >= 0 || hi < 0) {
+    const a = Math.min(Math.abs(lo), Math.abs(hi)), b = Math.max(Math.abs(lo), Math.abs(hi));
+    return (lo >= 0 ? '↓' : '↑') + (a === b ? a : a + '-' + b) + ' %';
+  }
+  return part(hi) + ' % till ' + part(lo) + ' %';
+}
+
+function materialGroupHtml(g, ctx) {
+  const key = String(ctx.comp.component_id) + '\u0001' + g.label;
+  const open = _openAltGroups.has(key);
+  const chosen = g.entries.filter(e => altIsSelected(ctx, e.alt)).map(e => e.alt.name);
+  const sub = groupSubText(g.entries.length, chosen);
+  const co2 = g.co2Min === null ? '<span style="color:var(--kk-gray-500)">-</span>'
+    : rangeText(g.co2Min, g.co2Max) + (g.savingMin !== null
+      ? ' <span style="color:' + (g.savingMin >= 0 ? 'var(--green-saving)' : 'var(--kk-red-orange)') + ';font-size:11px">' + savingRangeText(g.savingMin, g.savingMax) + '</span>'
+      : '');
+  const cost = g.costMin === null
+    ? '<span style="color:var(--kk-gray-500)">Pris saknas</span>'
+    : rangeText(g.costMin, g.costMax) + ' kr'
+      + (g.unpriced ? '<div style="font-size:10px;color:var(--kk-gray-500)">' + g.unpriced + ' utan totalpris</div>' : '');
+  const badge = g.label === REUSE_GROUP ? getTypeBadge(g.entries[0].alt) : '';
+  const gattr = ' data-comp="' + ctx.cid + '" data-group="' + esc(g.label) + '"';
+  let html = '<tr class="alt-group' + (chosen.length ? ' has-choice' : '') + '"' + gattr + ' aria-expanded="' + open + '">'
+    + '<td><button type="button" class="group-toggle" aria-expanded="' + open + '" aria-label="' + (open ? 'Dölj' : 'Visa') + ' produkterna i ' + esc(g.label) + '">▸</button></td>'
+    + '<td>' + badge + '</td>'
+    + '<td><div style="font-weight:600">' + esc(g.label) + '</div><div class="group-sub">' + esc(sub) + '</div></td>'
+    + '<td></td>'
+    + '<td style="text-align:right">' + co2 + '</td>'
+    + '<td style="text-align:right">' + cost + '</td>'
+    + '<td></td><td></td></tr>';
+  g.entries.forEach(e => { html += altProductRowHtml(e, ctx, gattr, open); });
+  return html;
+}
+
+function groupSubText(n, chosen) {
+  return n + (n === 1 ? ' produkt' : ' produkter')
+    + (chosen && chosen.length ? '. Ditt val: ' + chosen.join(', ') : '');
+}
+
+// A choice made in a row updates the table in place (selectAlt), so the type
+// headers follow it here instead of through a redraw that would lose the scroll.
+function refreshGroupHeaders() {
+  if (!state.alternatives) return;
+  document.querySelectorAll('tr.alt-group').forEach(row => {
+    const comp = state.alternatives.components.find(c => String(c.component_id) === row.dataset.comp);
+    if (!comp) return;
+    const sel = state.selections[comp.component_id];
+    const ctx = {sel: sel, curPicks: (sel && sel.selected_alternative && Array.isArray(sel.selected_alternative.picks))
+      ? sel.selected_alternative.picks : []};
+    const g = groupByMaterial(comp, rankedAlternatives(comp).filter(e => e.alt.alternative_type !== 'info'))
+      .find(x => x.label === row.dataset.group);
+    if (!g) return;
+    const chosen = g.entries.filter(e => altIsSelected(ctx, e.alt)).map(e => e.alt.name);
+    row.classList.toggle('has-choice', chosen.length > 0);
+    const sub = row.querySelector('.group-sub');
+    if (sub) sub.textContent = groupSubText(g.entries.length, chosen);
+  });
+}
+
+function altIsSelected(ctx, alt) {
+  if (ctx.curPicks.some(p => normAltName(p.name) === normAltName(alt.name))) return true;
+  return !!(ctx.sel && ctx.sel.selected_alternative && ctx.sel.selected_alternative.name === alt.name);
+}
+
+// One product under its type: the row the table always had, folded away.
+function altProductRowHtml(entry, ctx, gattr, open) {
+  const alt = entry.alt, i = entry.i, comp = ctx.comp, pc = ctx.pc, cid = ctx.cid;
+  const rowId = cid + '_' + i;
+  const hidden = open ? '' : ' style="display:none"';
+  const saving = comp.baseline_co2e_kg > 0 ? Math.round((1 - alt.co2e_kg / comp.baseline_co2e_kg) * 100) : 0;
+  const pickIdx = ctx.curPicks.findIndex(p => normAltName(p.name) === normAltName(alt.name));
+  const isSel = altIsSelected(ctx, alt);
+  const pickable = canCombine(alt, pc);
+  // Decompose total for reuse alternatives where units match (no trailing *).
+  // Lets the user see e.g. "45 st × 320 kr = 14 400 kr" inline rather than
+  // hidden in Visa mer — answers Johanna's "varför 45 lampor" without exposing
+  // adjustability yet.
+  const showBreakdown = alt.alternative_type === 'reuse' && !alt.name.endsWith('*') && pc && pc.quantity > 0 && alt.cost_sek > 0;
+  const perUnit = showBreakdown ? Math.round(alt.cost_sek / pc.quantity) : 0;
+  // The per-article price is shown for what it is, and first: on current
+  // rows cost_sek is 0, so the "Pris saknas" branch would otherwise hide it.
+  const perArticle = articlePrice(alt);
+  const costCell = perArticle > 0
+    ? Math.round(perArticle).toLocaleString('sv') + ' kr/st *'
+    : (!(alt.cost_sek > 0)
+      ? formatCost(alt)
+      : (showBreakdown
+        ? '<div style="line-height:1.3">' + Math.round(alt.cost_sek).toLocaleString('sv') + ' kr<div style="font-size:10px;color:var(--kk-gray-500)">' + esc(String(pc.quantity)) + ' × ' + perUnit.toLocaleString('sv') + ' kr annonspris</div></div>'
+        : '<div style="line-height:1.3">' + Math.round(alt.cost_sek).toLocaleString('sv') + ' kr' + priceBasisNote(alt) + '</div>'));
+  let html = '<tr class="alt-row group-item' + (isSel ? ' selected' : '') + '" data-alt="' + i + '"' + gattr + hidden + '>' +
+    '<td><input type="radio" name="' + cid + '"' + (isSel && pickIdx < 0 ? ' checked' : '') + '></td>' +
+    '<td>' + getTypeBadge(alt) + '</td>' +
+    '<td style="font-weight:500;padding-left:22px">' + esc(alt.name) + stockNote(alt, pc) + pickControls(cid, i, alt, pickable, pickIdx, ctx.curPicks, pc) + '</td>' +
+    '<td style="font-size:11px">' + gwpBasisBadge(alt) + formatSource(alt.source, alt.url) + '</td>' +
+    '<td style="text-align:right">' + Math.round(alt.co2e_kg) + ' <span style="color:' + (saving >= 0 ? 'var(--green-saving)' : 'var(--kk-red-orange)') + ';font-size:11px">' + (saving >= 0 ? '↓' : '↑') + Math.abs(saving) + '%</span></td>' +
+    '<td style="text-align:right">' + costCell + '</td>' +
+    '<td style="text-align:right;font-size:12px">' + formatValuePerKg(comp, alt) + '</td>' +
+    '<td>' + (alt.reasoning ? '<button class="reasoning-toggle" onclick="toggleReasoning(\'' + rowId + '\',event)">Visa mer</button>' : '') + '</td></tr>';
+  if (alt.reasoning) {
+    html += '<tr class="reasoning-row group-reasoning" id="reasoning-' + rowId + '"' + gattr + ' style="display:none"><td colspan="8">' + esc(alt.reasoning) + '</td></tr>';
+  }
+  return html;
+}
+
+// Fold a material type out or in. Rows are matched on their data attributes,
+// read back decoded, so a label or component id never has to be escaped into a
+// selector.
+function toggleAltGroup(row) {
+  const comp = row.dataset.comp, label = row.dataset.group;
+  const key = comp + '\u0001' + label;
+  const open = !_openAltGroups.has(key);
+  if (open) _openAltGroups.add(key); else _openAltGroups.delete(key);
+  row.setAttribute('aria-expanded', String(open));
+  const btn = row.querySelector('.group-toggle');
+  if (btn) {
+    btn.setAttribute('aria-expanded', String(open));
+    btn.setAttribute('aria-label', (open ? 'Dölj' : 'Visa') + ' produkterna i ' + label);
+  }
+  const body = row.closest('tbody');
+  if (!body) return;
+  body.querySelectorAll('tr.group-item, tr.group-reasoning').forEach(tr => {
+    if (tr.dataset.comp !== comp || tr.dataset.group !== label) return;
+    // Product rows follow the fold; an explanation stays shut until asked for.
+    if (tr.classList.contains('group-item')) tr.style.display = open ? '' : 'none';
+    else if (!open) tr.style.display = 'none';
+  });
+}
+
 // Reuse totals cover the whole component quantity even when Palats holds
 // fewer. That is the intended behaviour for an early-planning tool (stock turns
 // over long before procurement), but until 2026-08-15 the table said nothing
 // about it: a row could read "9 600 kr" for 30 windows off a listing with 3 in
 // stock. Show the gap instead of hiding it.
+// Palats counts listed articles, so stock and need are compared when the need
+// is counted in st, or in m² and löpmeter when the listing states its area or
+// length (available_amount, the amount the row's "Täckning" reads). Against 20
+// m² of floor, one listing read "1 av 20 i lager" (Matilda, 2026-10-12):
+// articles against square metres. Without a stated amount the coverage is
+// unknown, and the row says that instead.
+function countsInUnits(pc) {
+  // No unit is a count, as the report reads it (build_stock_caveats).
+  const unit = String((pc && pc.unit) || '').trim().toLowerCase() || 'st';
+  return ['st', 'styck', 'stk', 'pcs'].indexOf(unit) >= 0;
+}
+
 function stockShortfall(alt, pc) {
   if (alt.alternative_type !== 'reuse') return null;
-  if (alt.available_quantity === null || alt.available_quantity === undefined) return null;
   if (!pc || !(pc.quantity > 0)) return null;
-  if (alt.available_quantity >= pc.quantity) return null;
-  return { have: alt.available_quantity, need: pc.quantity };
+  const counted = countsInUnits(pc);
+  const have = counted ? alt.available_quantity : alt.available_amount;
+  // Palats' 0 means "not stated", never "none in stock".
+  if (typeof have !== 'number' || !Number.isFinite(have) || have <= 0) return null;
+  if (have >= pc.quantity) return null;
+  return { have: have, need: pc.quantity, unit: counted ? '' : pc.unit };
 }
 
 function stockNote(alt, pc) {
   const short = stockShortfall(alt, pc);
-  if (!short) return '';
-  return '<div style="font-size:10px;color:var(--kk-red-orange);margin-top:2px">'
-    + esc(String(short.have)) + ' av ' + esc(String(short.need))
-    + ' i lager. Siffrorna räknas på hela behovet.</div>';
+  if (short) {
+    const unit = short.unit ? ' ' + short.unit : '';
+    return '<div style="font-size:10px;color:var(--kk-red-orange);margin-top:2px">'
+      + esc(fmtNum(short.have)) + unit + ' av ' + esc(fmtNum(short.need)) + unit
+      + ' i lager. Siffrorna räknas på hela behovet.</div>';
+  }
+  // Palats reports 0 when a listing states no quantity: nothing to say then.
+  // A stated amount that covers the need is no gap either.
+  if (alt.alternative_type === 'reuse' && pc && !countsInUnits(pc) && alt.available_quantity > 0
+      && !(typeof alt.available_amount === 'number' && Number.isFinite(alt.available_amount))) {
+    const n = alt.available_quantity;
+    return '<div style="font-size:10px;color:var(--kk-gray-500);margin-top:2px">'
+      + esc(String(n)) + (n === 1 ? ' artikel' : ' artiklar') + ' i annonsen, hur mycket av '
+      + esc(fmtNum(pc.quantity)) + ' ' + esc(pc.unit) + ' de täcker är okänt.</div>';
+  }
+  return '';
 }
 
 // Three kinds of figure land in the same column and must not read alike.
@@ -5837,7 +6241,10 @@ function alternativHtml(st, cfg) {
         + esc(pc.unit) + ' ' + quantitySourceBadge(pc.quantity_source)
       : '';
     const usageBlock = (pc && pc.usage_context) ? '<div class="usage-context"><span class="usage-context-label">Användning</span>' + esc(pc.usage_context) + '</div>' : '';
-    const header = '<h3>' + esc(comp.component_name) + '</h3>' + (qtyLabel ? '<div class="alt-qty-line">Antal: ' + qtyLabel + '</div>' : '') + usageBlock;
+    // Whether the component has a choice, and the way back from one. No choice
+    // is a state of its own, not a gap: the component counts as conventional.
+    const choiceStatus = '<div class="choice-status" data-comp="' + esc(comp.component_id) + '">' + choiceStatusHtml(st, comp.component_id) + '</div>';
+    const header = '<h3>' + esc(comp.component_name) + '</h3>' + (qtyLabel ? '<div class="alt-qty-line">Antal: ' + qtyLabel + '</div>' : '') + choiceStatus + usageBlock;
     const curSel = st.selections[comp.component_id];
     const curPicks = (curSel && curSel.selected_alternative && Array.isArray(curSel.selected_alternative.picks))
       ? curSel.selected_alternative.picks : [];
@@ -5851,9 +6258,12 @@ function alternativHtml(st, cfg) {
     const blBaselineComp = (st.baseline && st.baseline.components) ? st.baseline.components.find(b => b.component_id === comp.component_id) : null;
     const blProduct = (blBaselineComp && blBaselineComp.boverket_product) ? blBaselineComp.boverket_product : '';
     const blSource = (blBaselineComp && blBaselineComp.source) ? blBaselineComp.source : 'NollCO2';
-    const blMaterialCell = blProduct
-      ? '<div style="font-weight:500">Konventionellt</div><div style="font-size:11px;color:var(--kk-gray-500);font-style:italic;margin-top:2px"><span style="font-style:normal;font-weight:500;color:var(--kk-gray-500);font-size:9.5px;letter-spacing:0.8px;text-transform:uppercase;display:block;margin-bottom:1px">Boverket-produkt</span>' + esc(blProduct) + '</div>'
-      : '<div style="font-weight:500">Konventionellt</div>';
+    // What "konventionellt" stands for here: the standard material the
+    // baseline was costed on. Gunnar, 2026-10-12: the word alone did not say
+    // whether it meant a vinyl floor or a parquet.
+    const blMaterialCell = '<div style="font-weight:500">Konventionellt</div>'
+      + subLine('Antaget standardmaterial', esc(baselineMeaning(blBaselineComp)))
+      + (blProduct ? subLine('Boverket-produkt', esc(blProduct)) : '');
     // component_id is LLM-generated and round-trips through user-editable
     // Supabase rows — escape it before interpolating into HTML attributes / ids.
     const cid = esc(comp.component_id);
@@ -5866,48 +6276,21 @@ function alternativHtml(st, cfg) {
       // leaves it out of the cost comparison, and the row must not say otherwise.
       '<td style="text-align:right">' + formatCost({cost_sek: comp.baseline_cost_sek}) + overrideBadge(comp.baseline_cost_override) + '</td>' +
       '<td style="text-align:right;color:var(--kk-gray-500)">referens</td><td></td></tr>';
-    rankedAlternatives(comp).forEach(entry => {
-      const alt = entry.alt, i = entry.i;
-      const rowId = cid + '_' + i;
-      if (alt.alternative_type === 'info') {
-        html += '<tr style="opacity:0.6">' +
-          '<td></td>' +
-          '<td>' + getTypeBadge(alt) + '</td>' +
-          '<td colspan="5" style="font-size:12px;color:var(--kk-gray-500)">' + esc(alt.name) + '</td>' +
-          '<td>' + (alt.reasoning ? '<button class="reasoning-toggle" onclick="toggleReasoning(\'' + rowId + '\',event)">Visa mer</button>' : '') + '</td></tr>';
-        if (alt.reasoning) {
-          html += '<tr class="reasoning-row" id="reasoning-' + rowId + '" style="display:none"><td colspan="8">' + esc(alt.reasoning) + '</td></tr>';
-        }
-        return;
-      }
-      const saving = comp.baseline_co2e_kg > 0 ? Math.round((1 - alt.co2e_kg / comp.baseline_co2e_kg) * 100) : 0;
-      const pickIdx = curPicks.findIndex(p => normAltName(p.name) === normAltName(alt.name));
-      const isSel = pickIdx >= 0 || (st.selections[comp.component_id] && st.selections[comp.component_id].selected_alternative.name === alt.name);
-      const pickable = canCombine(alt, pc);
-      // Decompose total for reuse alternatives where units match (no trailing *).
-      // Lets the user see e.g. "45 st \u00d7 320 kr = 14 400 kr" inline rather than
-      // hidden in Visa mer \u2014 answers Johanna's "varf\u00f6r 45 lampor" without exposing
-      // adjustability yet.
-      const showBreakdown = alt.alternative_type === 'reuse' && !alt.name.endsWith('*') && pc && pc.quantity > 0 && alt.cost_sek > 0;
-      const perUnit = showBreakdown ? Math.round(alt.cost_sek / pc.quantity) : 0;
-      // The per-article price is shown for what it is, and first: on current
-      // rows cost_sek is 0, so the "Pris saknas" branch would otherwise hide it.
-      const perArticle = articlePrice(alt);
-      const costCell = perArticle > 0
-        ? Math.round(perArticle).toLocaleString('sv') + ' kr/st *'
-        : (!(alt.cost_sek > 0)
-          ? formatCost(alt)
-          : (showBreakdown
-            ? '<div style="line-height:1.3">' + Math.round(alt.cost_sek).toLocaleString('sv') + ' kr<div style="font-size:10px;color:var(--kk-gray-500)">' + esc(String(pc.quantity)) + ' \u00d7 ' + perUnit.toLocaleString('sv') + ' kr annonspris</div></div>'
-            : '<div style="line-height:1.3">' + Math.round(alt.cost_sek).toLocaleString('sv') + ' kr' + priceBasisNote(alt) + '</div>'));
-      html += '<tr class="alt-row' + (isSel ? ' selected' : '') + '" data-comp="' + cid + '" data-alt="' + i + '">' +
-        '<td><input type="radio" name="' + cid + '"' + (isSel && pickIdx < 0 ? ' checked' : '') + '></td>' +
+    // By material type first (Henric, 2026-10-12): one row per type with the
+    // range of climate impact and cost across its products, the products
+    // themselves folded away under it. Info rows (nothing on Palats, no
+    // alternatives) stay as they were, after the groups.
+    const ranked = rankedAlternatives(comp);
+    const ctx = {comp: comp, pc: pc, cid: cid, curPicks: curPicks, sel: st.selections[comp.component_id]};
+    groupByMaterial(comp, ranked.filter(e => e.alt.alternative_type !== 'info')).forEach(g => {
+      html += materialGroupHtml(g, ctx);
+    });
+    ranked.filter(e => e.alt.alternative_type === 'info').forEach(entry => {
+      const alt = entry.alt, rowId = cid + '_' + entry.i;
+      html += '<tr style="opacity:0.6">' +
+        '<td></td>' +
         '<td>' + getTypeBadge(alt) + '</td>' +
-        '<td style="font-weight:500">' + esc(alt.name) + stockNote(alt, pc) + pickControls(cid, i, alt, pickable, pickIdx, curPicks, pc) + '</td>' +
-        '<td style="font-size:11px">' + gwpBasisBadge(alt) + formatSource(alt.source, alt.url) + '</td>' +
-        '<td style="text-align:right">' + Math.round(alt.co2e_kg) + ' <span style="color:' + (saving >= 0 ? 'var(--green-saving)' : 'var(--kk-red-orange)') + ';font-size:11px">' + (saving >= 0 ? '\u2193' : '\u2191') + Math.abs(saving) + '%</span></td>' +
-        '<td style="text-align:right">' + costCell + '</td>' +
-        '<td style="text-align:right;font-size:12px">' + formatValuePerKg(comp, alt) + '</td>' +
+        '<td colspan="5" style="font-size:12px;color:var(--kk-gray-500)">' + esc(alt.name) + '</td>' +
         '<td>' + (alt.reasoning ? '<button class="reasoning-toggle" onclick="toggleReasoning(\'' + rowId + '\',event)">Visa mer</button>' : '') + '</td></tr>';
       if (alt.reasoning) {
         html += '<tr class="reasoning-row" id="reasoning-' + rowId + '" style="display:none"><td colspan="8">' + esc(alt.reasoning) + '</td></tr>';
@@ -5934,10 +6317,36 @@ function alternativHtml(st, cfg) {
       + 'eftersom lagret oms\u00e4tts innan n\u00e5got handlas upp. St\u00e4m av tillg\u00e5ngen innan '
       + 'siffran g\u00e5r vidare till ett beslutsunderlag.</div>';
   }
+  // The report is generated from the confirm bar (Stegvis) or the sheet's
+  // Rapport section (Chatt). A third button here was the second "Generera
+  // rapport" on the same screen (testgruppen 2026-10-12).
   html += '<div id="summaryArea"></div>';
-  html += '<button class="btn" id="reportBtn" onclick="generateReport()" disabled title="V\u00e4lj ett alternativ per komponent">Generera rapport</button>';
-  html += '<div id="missingHint" style="font-size:12px;color:var(--kk-gray-500);margin-top:6px;font-style:italic"></div>';
   return html;
+}
+
+// The standard material a baseline stands for, in words.
+function baselineMeaning(bl) {
+  if (bl && bl.assumed_material) return bl.assumed_material;
+  if (bl && bl.boverket_product) return bl.boverket_product;
+  return 'Vanligt standardmaterial f\u00f6r komponenten (NollCO2-metoden)';
+}
+
+function choiceStatusHtml(st, compId) {
+  const has = st.selections && Object.prototype.hasOwnProperty.call(st.selections, compId);
+  if (!has) return '<span class="choice-default">Inget val: r\u00e4knas som konventionellt i summering och rapport</span>';
+  return '<button type="button" class="undo-choice" data-comp="' + esc(compId) + '">\u00c5ngra val</button>';
+}
+
+// The header line follows the choices without redrawing the table.
+function refreshChoiceStatus() {
+  document.querySelectorAll('.choice-status').forEach(el => {
+    el.innerHTML = choiceStatusHtml(state, el.dataset.comp);
+  });
+  document.querySelectorAll('.undo-choice').forEach(b => {
+    b.disabled = cellsLocked();
+    b.onclick = e => { if (e) e.stopPropagation(); clearSelection(b.dataset.comp); };
+  });
+  refreshGroupHeaders();
 }
 
 // The bindings live apart from the two callers (tab and sheet) so the markup has
@@ -5950,8 +6359,12 @@ function bindAltRows() {
       // A click on them is not a click on the row.
       if (e && e.target && typeof e.target.closest === 'function'
           && e.target.closest('.pick-toggle, .pick-qty, a')) return;
+      if (cellsLocked()) return;
       selectAlt(this.dataset.comp, this.dataset.alt, this);
     };
+  });
+  document.querySelectorAll('.alt-group').forEach(row => {
+    row.onclick = function() { toggleAltGroup(this); };
   });
   document.querySelectorAll('.pick-toggle input').forEach(box => {
     box.onchange = function() { togglePick(this.dataset.comp, this.dataset.alt); };
@@ -5960,7 +6373,10 @@ function bindAltRows() {
     el.onchange = function() { setPickQuantity(this.dataset.comp, this.dataset.alt, this.value); };
     el.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } };
   });
-  if (state.alternatives && Object.keys(state.selections).length > 0) updateSummary();
+  if (cellsLocked()) setCellsDisabled(true);
+  // Always, not only once something is chosen: an unchosen component counts
+  // as conventional, so there is a total to show from the start.
+  if (state.alternatives) updateSummary();
 }
 
 function renderAlternativContent() {
@@ -6281,9 +6697,10 @@ const SHEET_SECTIONS = [
    ready: st => !!st.baseline, action: {label: 'Sök alternativ', fn: 'runAlternatives'}},
   {key: 'rapport', title: 'Rapport', html: rapportHtml,
    has: st => !!st.reportMarkdown,
-   empty: 'Rapporten skrivs när varje komponent har ett val.',
-   ready: st => !!(st.alternatives && st.alternatives.components.length
-                   && st.alternatives.components.every(c => st.selections[c.component_id])),
+   // A component without a choice counts as conventional, so the report can
+   // be written as soon as there are alternatives (testgruppen 2026-10-12).
+   empty: 'Rapporten kan skrivas när alternativen är klara. En komponent utan val räknas som konventionellt.',
+   ready: st => !!(st.alternatives && st.alternatives.components.length),
    action: {label: 'Generera rapport', fn: 'generateReport'}},
 ];
 
@@ -6882,26 +7299,9 @@ function selectAlt(compId, altIdx, row) {
   row.classList.add('selected');
   row.querySelector('input[type=radio]').checked = true;
   const comp = state.alternatives.components.find(c => c.component_id === compId);
-  if (altIdx === 'baseline') {
-    state.selections[compId] = { id: compId, name: comp.component_name,
-      selected_alternative: {name:'Baslinje', co2e_kg: comp.baseline_co2e_kg, cost_sek: comp.baseline_cost_sek, source:'NollCO2'},
-      baseline_co2e_kg: comp.baseline_co2e_kg, baseline_cost_sek: comp.baseline_cost_sek };
-  } else {
-    const alt = comp.alternatives[parseInt(altIdx)];
-    state.selections[compId] = { id: compId, name: comp.component_name,
-      // available_quantity and price_basis travel with the selection so the
-      // report can state the stock assumption behind a reuse figure. The
-      // report is the artifact that leaves the tool, so the caveat has to
-      // reach it, not just the on-screen table. A per-article reuse price
-      // travels in its own field, never as the component's cost, also when the
-      // row comes from an analysis saved before 2026-09-30.
-      selected_alternative: {name: alt.name, co2e_kg: alt.co2e_kg,
-        cost_sek: articlePrice(alt) > 0 ? 0 : alt.cost_sek, article_price_sek: articlePrice(alt),
-        source: alt.source,
-        available_quantity: (alt.available_quantity === undefined ? null : alt.available_quantity),
-        price_basis: alt.price_basis || '', gwp_basis: alt.gwp_basis || ''},
-      baseline_co2e_kg: comp.baseline_co2e_kg, baseline_cost_sek: comp.baseline_cost_sek };
-  }
+  state.selections[compId] = altIdx === 'baseline'
+    ? baselineSelection(comp, false)
+    : altSelection(comp, comp.alternatives[parseInt(altIdx)]);
   // Durable intent, so a later rerun can rebind it (increment 3).
   rememberIntent(compId, comp.component_name, state.selections[compId].selected_alternative.name);
   // A row click ends a combination. The boxes are redrawn so none stays ticked.
@@ -7129,8 +7529,14 @@ function summaryTotals(allSels) {
 
 function updateSummary() {
   // Effective, not stored: the cards sit a screen away from the table and
-  // would otherwise show a total that no row on the page adds up to.
-  const sels = Object.values(effectiveState(state).selections || {});
+  // would otherwise show a total that no row on the page adds up to. And with
+  // the baseline standing in for every component without a choice, as the
+  // report counts them.
+  const area = document.getElementById('summaryArea');
+  if (!area || !state.alternatives) return;
+  const withDefaults = Object.assign({}, state, {selections: selectionsWithDefaults(state)});
+  const sels = Object.values(effectiveState(withDefaults).selections || {});
+  const byDefault = sels.filter(c => c.selected_alternative && c.selected_alternative.by_default).map(c => c.name);
   const t = summaryTotals(sels);
   const co2Diff = t.totalCo2 - t.blCo2;
   const co2Pct = t.blCo2 > 0 ? Math.round(Math.abs(co2Diff) / t.blCo2 * 100) : 0;
@@ -7166,23 +7572,19 @@ function updateSummary() {
     ? '<div style="grid-column:1/-1;font-size:11px;color:var(--kk-red-orange);margin-top:-4px">Saknar klimatv\u00e4rde: '
       + esc(t.noFigure.join(', '))
       + '. Komponenten r\u00e4knas inte med i summorna. V\u00e4lj alternativet igen.</div>'
+    : '')
+    + (byDefault.length
+    ? '<div class="default-choice-note" style="grid-column:1/-1;font-size:11px;color:var(--kk-gray-500);margin-top:-4px">Utan val, r\u00e4knas som konventionellt (baslinjen): '
+      + esc(byDefault.join(', ')) + '.</div>'
     : '');
-  document.getElementById('summaryArea').innerHTML =
+  area.innerHTML =
     '<div class="summary">' +
     '<div class="card' + (co2Diff <= 0 ? ' saving' : '') + '"><div class="card-title">Klimatp\u00e5verkan</div><div class="value">' + Math.round(t.totalCo2).toLocaleString('sv') + '</div><div class="sublabel">kg CO\u2082e (' + co2Arrow + co2Pct + '% vs baslinje)</div></div>' +
     '<div class="card' + (costKnown && !t.costIsPartial && costDiff <= 0 ? ' saving' : '') + '"><div class="card-title">' + costTitle + '</div><div class="value">' + costValue + '</div><div class="sublabel">' + costSub + '</div></div>' +
     '<div class="card"><div class="card-title">Baslinje</div><div class="value">' + Math.round(t.blCo2).toLocaleString('sv') + '</div><div class="sublabel">kg CO\u2082e | ' + Math.round(t.blCost).toLocaleString('sv') + ' SEK' + (t.blUnpricedCount ? ' (' + t.blUnpricedCount + ' utan pris)' : '') + '</div></div>' +
     costGap +
     '</div>';
-  const allSelected = state.alternatives.components.every(c => state.selections[c.component_id]);
-  document.getElementById('reportBtn').disabled = !allSelected;
-  const hintEl = document.getElementById('missingHint');
-  if (hintEl) {
-    if (!allSelected) {
-      const missing = state.alternatives.components.filter(c => !state.selections[c.component_id]).map(c => c.component_name);
-      hintEl.textContent = 'V\u00e4lj alternativ f\u00f6r: ' + missing.join(', ');
-    } else { hintEl.textContent = ''; }
-  }
+  refreshChoiceStatus();
 }
 
 // === Supabase auth + persistence ===
@@ -7720,6 +8122,7 @@ async function loadAnalysis(id, opts) {
     }
     currentAnalysisId = id;
     analysisEpoch++;
+    _openAltGroups.clear();
     _analysisUpdatedAt = data.updated_at || null;
     _saveRetryArmed = false;
     // A step still running belongs to the analysis left behind; its answer is
@@ -7889,6 +8292,7 @@ async function createNewProject(opts) {
   // previous project's saved chat log (which must survive switching back).
   currentAnalysisId = null;
   analysisEpoch++;
+  _openAltGroups.clear();
   _loadSeq++;
   _conflictReload = null;
   try { localStorage.removeItem(_chatStorageKey()); } catch(e) {}

@@ -3211,18 +3211,22 @@ function renderFound(found) {
 // turns are not in the model's history, so without them it cannot tell that
 // "Det finns problem med ljudöverföring" answers one of them.
 function pendingQuestions() {
-  if (state.step === 'idle' && state.pendingIntake && state.pendingIntake.question) {
-    return [state.pendingIntake.question];
-  }
+  if (state.pendingIntake && state.pendingIntake.question) return [state.pendingIntake.question];
   if (state.step === 'intake_done') return shownQuestions(state.project);
   return [];
+}
+
+// The intake log so far: a correction that asked something back holds its own
+// log (with the correction in it) until the answer comes.
+function currentIntakeLog() {
+  return state.pendingIntake ? state.pendingIntake.log.slice() : intakeLogOf(state.project);
 }
 
 // A correction to a project that already exists, through intake. `questions`
 // are the ones the confirm message asked, which the text may be answering.
 function correctionIntake(text, questions) {
   const qs = questions || [];
-  const log = intakeLogOf(state.project).concat([qs.length ? {q: qs.join(' '), a: text} : {a: text}]);
+  const log = currentIntakeLog().concat([qs.length ? {q: qs.join(' '), a: text} : {a: text}]);
   return runIntake(buildCorrectionContext(text, qs),
                    {log, found: foundOf(state.project && state.project.components)});
 }
@@ -3236,7 +3240,7 @@ function buildCorrectionContext(text, questions) {
   }
   let ctx = '';
   if (state.project.name) ctx += 'Projektnamn: ' + state.project.name + '.\n\n';
-  const log = intakeLogOf(state.project);
+  const log = currentIntakeLog();
   if (log.length) ctx += 'Projektbeskrivning:\n' + renderIntakeLog(log) + '\n\n';
   ctx += state.project.building_type + ', ' + state.project.area_bta + ' m2.' +
          renderFound(foundOf(state.project.components));
@@ -3604,7 +3608,8 @@ async function sendMessage() {
   // "Tack" must not start a new intake round. Matilda's "Det finns problem med
   // ljudöverföring till närliggande rum" went to the advisory branch on
   // 2026-09-30 because the router never saw the question it answered.
-  const answersIntake = state.step === 'idle' && !!state.pendingIntake && text.indexOf('?') === -1;
+  const answersIntake = !!state.pendingIntake && (state.step === 'idle' || !!state.pendingIntake.question)
+    && text.indexOf('?') === -1;
   if (!wantsAdvance && !wantsCorrection && !answersIntake) {
     try {
       const routed = await routeMessage(text);
@@ -3625,6 +3630,21 @@ async function sendMessage() {
   // A router that failed after a switch lands here too, and the step of the
   // analysis now on screen would take this message.
   if (lateReply(epoch)) return;
+
+  // The answer to a question a correction asked back. The project stayed (see
+  // runIntake), so this goes on as the correction would have.
+  if (answersIntake && state.project && state.step !== 'idle') {
+    const before = state.step;
+    addMsg('Uppdaterar projektbeskrivning...', 'system');
+    await correctionIntake(text, [state.pendingIntake.question]);
+    if (before !== 'intake_done' && epoch === analysisEpoch && state.step === 'intake_done') {
+      await runBaseline();
+      if (before === 'report_done' && epoch === analysisEpoch && state.step === 'baseline_done') {
+        await runAlternatives();
+      }
+    }
+    return;
+  }
 
   switch (state.step) {
     case 'idle':
@@ -3706,6 +3726,9 @@ function confirmStep() {
   // window. This is the click that starts the minutes-long work, so it is also
   // the moment where "säg till när du är klar" makes sense to her.
   maybeAskForNotifications();
+  // Going on past a question a correction asked back drops the question, so a
+  // later message is not taken as its answer.
+  if (state.project && state.pendingIntake) state.pendingIntake = null;
   document.getElementById('confirmBarBtn').disabled = true;
   document.getElementById('confirmBarBtn').style.opacity = '0.5';
   if (state.step === 'intake_done') runBaseline();
@@ -3750,6 +3773,14 @@ async function runIntake(desc, opts) {
     if (d.clarification_needed) {
       const nowFound = foundOf(d.components);
       state.pendingIntake = {log, found: nowFound.length ? nowFound : found, name, question: d.clarification_needed};
+      if (state.project && state.step !== 'idle') {
+        // A correction asked something back. The project, its baseline and the
+        // step stay as they were until the answer comes: before, the whole
+        // project was dropped and the chat started over from "Hittade hittills".
+        addMsg(d.clarification_needed, 'bot');
+        setLoading(false);
+        return;
+      }
       state.project = null;
       state.step = 'idle';
       if (d.components && d.components.length) {

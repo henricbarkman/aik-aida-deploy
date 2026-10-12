@@ -108,6 +108,7 @@ Vägledning:
 - Om ett projekt finns: en fråga om resonemang, material eller metod ("varför är betong sämre?", "vilket av alternativen är bäst för fukt?") → advisory_question.
 - Om ett projekt finns: en instruktion som ändrar projektet ("ta bort fönstren", "välj Tarkett", "byt golvet till parkett", "räkna om", "kör vidare", "tänk bredare på golv") → flow_action.
 - Tveksamt mellan advisory och flow_action: om meddelandet ber Aida GÖRA något med projektet → flow_action. Om det ber om KUNSKAP → advisory_question.
+- Ett tack, en hälsning eller en kommentar utan ny information om projektet ("Tack", "Okej", "Bra, då förstår jag") → advisory_question. Det ändrar ingenting i projektet.
 """
 
 _ADVISORY_SYSTEM = """Du är Aida, en byggnadsexpert som hjälper förvaltare och byggledare att hitta renoveringslösningar med kraftigt minskad klimatpåverkan utan att ge avkall på praktiska behov.
@@ -187,7 +188,9 @@ def classify_intent(
         state_note += (
             " Aida har just ställt de här frågorna om projektet: "
             + " | ".join(questions)
-            + ". Ett meddelande som svarar på dem eller ger ny information om projektet är flow_action."
+            + ". Ett meddelande som svarar på dem eller ger ny information om projektet är flow_action;"
+            " ett tack eller en kommentar utan ny information är det inte, och en fråga från"
+            " användaren (hur, varför, vad) är fortfarande advisory_question."
         )
     # Same boundary handling as run_chat_agent. This was survivable while the
     # history died on reload; from increment 4 it persists, so a single failed

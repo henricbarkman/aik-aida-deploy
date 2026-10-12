@@ -29,6 +29,7 @@ from aida import followup as followup_mod
 from aida import overrides as overrides_mod
 from aida.agents.aggregate import _number, article_price
 from aida.data.climate_data import canonical_category
+from aida.models import ANSWERED_MARK, ASKED_MARK
 
 # The units a component can be counted in. kg since HENRIC-3290 del 3: a
 # levelling compound or a liquid membrane is declared per kg, and converting
@@ -518,6 +519,81 @@ def _apply_rerun_alternatives(inp, project, baseline, alternatives, selections, 
     return f"Begärt: kör om alternativen för {scope}. Orsak: {reason}.{feedback_note}", True, set()
 
 
+_ANSWER_MAX = 300
+
+
+def _apply_answer_question(inp, project, baseline, alternatives, selections, pending_actions):
+    """The user's answer to what the alternatives step asked about a component.
+
+    Written onto the component, in its usage context, because that is in every
+    alternatives prompt for the component. As a wish on the rerun it would only
+    reach a scoped one: the next full run would not have it and would ask the
+    same thing again. Also added to the intake log, so an intake round that
+    builds the components anew still knows. Then the component's alternatives
+    are asked for again; the mark in the usage context is what tells the
+    ranking not to ask a second time.
+
+    The question is taken from the alternatives, not from the model, so what is
+    stored is what the user was actually asked.
+
+    The baseline is left as it is, on purpose: it is the conventional choice
+    for the building part, and the question is about which alternatives fit.
+    An answer that changes what the component is ("det är klinker, inte matta")
+    is a correction and goes through update_component.
+    """
+    cid = inp.get("component_id")
+    comp = _find_component(project, cid)
+    if comp is None:
+        return f"Okänt komponent-id: {cid}.", False, set()
+    name = comp.get("name") or cid
+    answer = " ".join(str(inp.get("answer") or "").split())[:_ANSWER_MAX]
+    if not answer:
+        return "Saknar answer. Vad svarade användaren?", False, set()
+    entry = _find_component_alternatives(alternatives, cid) or {}
+    question = " ".join(str(entry.get("question") or "").split())
+    if not question:
+        return (f"Aida har ingen öppen fråga om {name}. Är det ett önskemål om förslagen, "
+                f"använd rerun_alternatives med user_feedback.", False, set())
+    # A new answer to the same question replaces the old one: the rerun may
+    # have failed and the user said it again in other words.
+    asked_part = f"{ASKED_MARK} {question}"
+    usage = str(comp.get("usage_context") or "").split(asked_part)[0].strip()
+    comp["usage_context"] = f"{usage} {asked_part} {ANSWERED_MARK} {answer}".strip()
+
+    # Same fallback as the browser's intakeLogOf: the first entry is the
+    # description, so a log cannot be started with the answer.
+    log = project.get("intake_log")
+    if not (isinstance(log, list) and log):
+        needs = project.get("needs_analysis") or {}
+        first = str(needs.get("from_user") or project.get("description") or "").strip()
+        log = [{"a": first}] if first else []
+    entry_log = {"q": f"{name}: {question}", "a": answer}
+    if log:
+        project["intake_log"] = [
+            e for e in log[1:] if not (isinstance(e, dict) and e.get("q") == entry_log["q"])]
+        project["intake_log"] = log[:1] + project["intake_log"] + [entry_log]
+
+    # Already queued this turn (the model called rerun_alternatives first):
+    # the answer is still saved, and one rerun reads it. `answers` tells the
+    # browser the rerun is one component by construction, so that it is not
+    # held for a confirmation when the project has only that component.
+    for queued in pending_actions:
+        if queued.get("type") == "rerun_alternatives" and queued.get("component_ids") == [cid]:
+            queued["answers"] = True
+            break
+    else:
+        pending_actions.append({
+            "type": "rerun_alternatives",
+            "component_ids": [cid],
+            "reason": f"Svar på Aidas fråga om {name}",
+            "answers": True,
+        })
+    # Baseline and alternatives go back unchanged with the project: a project
+    # that comes back alone is read by the browser as "the figures are stale".
+    return (f"Sparat svaret om {name} och begärt förslag för komponenten utifrån det.",
+            True, {"project", "baseline", "alternatives"})
+
+
 def _apply_set_override(inp, project, overrides):
     """Pin a derived figure to one the user has a source for (§12.5)."""
     cid = inp.get("component_id")
@@ -578,6 +654,7 @@ HANDLERS = {
     "remove_component": _apply_remove_component,
     "rerun_baseline": _apply_rerun_baseline,
     "rerun_alternatives": _apply_rerun_alternatives,
+    "answer_question": _apply_answer_question,
 }
 
 # Kept apart because they take the overrides bag instead of the four computed

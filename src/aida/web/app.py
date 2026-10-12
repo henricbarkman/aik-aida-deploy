@@ -606,7 +606,12 @@ def api_alternatives():
                 }), 400
 
         user_feedback = data.get('user_feedback')
-        result = find_alternatives(project, baseline, user_feedback=user_feedback)
+        # Components that already have alternatives in the browser: a rerun of
+        # those answers with alternatives, never with a question.
+        raw_settled = data.get('no_question_ids')
+        no_questions = {str(c) for c in raw_settled} if isinstance(raw_settled, list) else set()
+        result = find_alternatives(project, baseline, user_feedback=user_feedback,
+                                   no_questions=no_questions)
         return jsonify(result.to_dict())
     except _TIMEOUT_ERRORS:
         return jsonify({'error': 'Alternativanalysen tog för lång tid. Försök igen, eller minska antal komponenter.'}), 504
@@ -1780,6 +1785,12 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .type-baseline { background: var(--kk-gray-100); color: var(--kk-charcoal); }
 .type-reuse { background: var(--kk-gold-light); color: #7A6000; }
 .type-optimized { background: #FDE8D0; color: var(--kk-red-orange); }
+/* A component Aida asked about instead of suggesting for. The row is tinted,
+   not the badge: it is the one row in the card that waits on the user. */
+.type-question { background: #fff; color: var(--kk-charcoal); border: 1px solid var(--kk-charcoal); padding: 1px 7px; }
+.alt-question td { background: var(--kk-cream); }
+.alt-question .alt-question-text { font-weight: 500; color: var(--kk-text); }
+.alt-question .alt-question-hint { font-size: 12px; color: var(--kk-gray-500); margin-top: 2px; }
 
 /* === Summary cards === */
 .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0; }
@@ -2849,7 +2860,10 @@ function addReply(reply) {
 // answer what you know, or go straight on. Capped so it reads as a nudge and
 // not as a form, and the button keeps 'baslinje' in its label because the
 // reload path matches on that word to decide which confirm is still live.
-const INTAKE_CLARIFY_MAX = 3;
+// Four, because intake writes at most three questions about what it guessed
+// and then the one about the user's own material, last. At three the last one
+// was the one that got cut (measured 2026-10-12, 18 of 20 descriptions).
+const INTAKE_CLARIFY_MAX = 4;
 // The questions the confirm message shows. One function, because the answer to
 // them is read against the same list (correctionIntake, pendingQuestions).
 function shownQuestions(project) {
@@ -3177,6 +3191,10 @@ function scrollToSection(key) {
 // oavsiktligt nästa steg. "kör vidare" fungerar fortfarande via "vidare".
 const ADVANCE_RE = /\b(vidare|nästa|fortsätt|gå vidare|next|confirm|bekräfta)\b/i;
 const ADVANCE_EXACT_RE = /^(ok|okej|ja)$/i;
+// While a component waits on an answer, only a message that is nothing but the
+// command goes on. ADVANCE_RE matches anywhere, and "vet inte, kör vidare med
+// det troligaste" or "det blir innebandy nästa år" are answers.
+const ADVANCE_ONLY_RE = /^\s*(ok(ej)?[,.!]?\s+)?(gå vidare|kör vidare|fortsätt|vidare|nästa( steg)?|next|confirm|bekräfta)[.!\s]*$/i;
 const CORRECTION_RE = /\b(ändra|nej|fel|byt|korrigera|gör om|uppdatera|ta bort|lägg till|ändring|rätta|fixa|nytt? antal|inte \d|ska vara|stämmer inte|borde vara)\b/i;
 // Adding a component once alternatives exist. Matilda's "lägg till krokar i
 // fikarummet" (2026-10-12) was caught as a correction and reran the whole
@@ -3262,7 +3280,47 @@ function renderFound(found) {
 function pendingQuestions() {
   if (state.pendingIntake && state.pendingIntake.question) return [state.pendingIntake.question];
   if (state.step === 'intake_done') return shownQuestions(state.project);
-  return [];
+  return openAlternativeQuestions().map(q => q.name + ': ' + q.question);
+}
+
+// What the alternatives step asked instead of suggesting something, one per
+// component (Henric 2026-10-12: "alternativsteget kan också få ställa frågor
+// vid behov"). The component has no alternatives until the answer comes; the
+// chat agent takes the answer, writes it on the component (its usage context)
+// and reruns just that component.
+function alternativeQuestions(alternatives) {
+  const comps = (alternatives && Array.isArray(alternatives.components)) ? alternatives.components : [];
+  return comps.map(c => ({cid: c && c.component_id, name: String((c && c.component_name) || ''),
+                          question: String((c && c.question) || '').replace(/\s+/g, ' ').trim()}))
+    .filter(q => q.cid && q.question);
+}
+// Only while the alternatives are what is on the table: after a baseline rerun
+// the step is baseline_done and the old question belongs to nothing.
+function openAlternativeQuestions() {
+  return (state.step === 'alternatives_done' || state.step === 'report_done')
+    ? alternativeQuestions(state.alternatives) : [];
+}
+// Components that already have alternatives on screen. A rerun of those must
+// come back with alternatives: a question there would take the list, and the
+// choice made from it, away ("tänk bredare" answered with a question).
+function settledComponentIds() {
+  const comps = (state.alternatives && Array.isArray(state.alternatives.components)) ? state.alternatives.components : [];
+  return comps.filter(c => c && Array.isArray(c.alternatives) && c.alternatives.length > 0).map(c => c.component_id);
+}
+function alternativeQuestionsMsg(qs) {
+  if (!qs.length) return '';
+  const lead = qs.length === 1
+    ? 'Innan jag föreslår något för en av komponenterna behöver jag veta en sak:'
+    : 'Innan jag föreslår något för de här komponenterna behöver jag veta lite mer:';
+  return lead + '\n' + qs.map(q => '- **' + q.name.replace(/\*/g, '') + ':** ' + q.question).join('\n')
+    + '\n\nSvara här i chatten, så tar jag fram förslagen. Vet du inte, säg det, så utgår jag från det troligaste.';
+}
+function alternativeQuestionRowHtml(comp) {
+  const q = String((comp && comp.question) || '').replace(/\s+/g, ' ').trim();
+  if (!q) return '';
+  return '<tr class="alt-question"><td></td><td><span class="type-badge type-question">Fråga</span></td>'
+    + '<td colspan="6"><div class="alt-question-text">' + esc(q) + '</div>'
+    + '<div class="alt-question-hint">Svara i chatten, så kommer förslagen. Till dess räknas komponenten som konventionell.</div></td></tr>';
 }
 
 // The intake log so far: a correction that asked something back holds its own
@@ -3688,8 +3746,17 @@ async function _sendMessage() {
   const userEntry = addMsg(text, 'user', undefined, sentFiles);
   setLoading(true);
 
+  // A component the alternatives step asked about: a message without a
+  // question mark is the answer, and goes to the chat agent, which knows which
+  // component it belongs to. Read before the advance check, because "ja" to
+  // "Ska golvet tåla bollsport?" is an answer and not "generera rapporten",
+  // and before the correction check, because "nej, det är ett klassrum" would
+  // otherwise rerun every component with that sentence as a global wish.
+  const answersAlternatives = openAlternativeQuestions().length > 0 && text.indexOf('?') === -1;
   // Detect "advance to next step" intent at confirmation gates
-  const wantsAdvance = ADVANCE_RE.test(text) || ADVANCE_EXACT_RE.test(text.trim());
+  const wantsAdvance = answersAlternatives
+    ? ADVANCE_ONLY_RE.test(text)
+    : (ADVANCE_RE.test(text) || ADVANCE_EXACT_RE.test(text.trim()));
   const wantsCorrection = CORRECTION_RE.test(text);
   // After the alternatives, "lägg till X" / "kan du lägga till X?" adds a
   // component through the chat agent, which also answers it if it was a
@@ -3714,7 +3781,7 @@ async function _sendMessage() {
   // 2026-09-30 because the router never saw the question it answered.
   const answersIntake = !!state.pendingIntake && (state.step === 'idle' || !!state.pendingIntake.question)
     && text.indexOf('?') === -1;
-  if (!wantsAdvance && !wantsCorrection && !wantsAdd && !answersIntake) {
+  if (!wantsAdvance && !wantsCorrection && !wantsAdd && !answersIntake && !answersAlternatives) {
     try {
       const routed = await routeMessage(text);
       // No setLoading: the indicator belongs to the analysis now on screen.
@@ -3795,6 +3862,8 @@ async function _sendMessage() {
         // conventional, and the report says so (testgruppen 2026-10-12).
         setLoading(false);
         generateReport();
+      } else if (answersAlternatives) {
+        await runChat(text, userEntry);
       } else if (wantsCorrection) {
         // Re-run alternatives with user feedback
         addMsg('G\u00f6r om alternativs\u00f6kningen med dina kommentarer...', 'system');
@@ -3804,7 +3873,7 @@ async function _sendMessage() {
       }
       break;
     case 'report_done':
-      if (wantsAdd) {
+      if (wantsAdd || answersAlternatives) {
         await runChat(text, userEntry);
       } else if (wantsCorrection) {
         // Re-run from intake with correction
@@ -4313,6 +4382,7 @@ async function runAlternatives(userFeedback) {
     // Full rerun: replay all standing directives (global + every component's).
     const fb = effectiveFeedback([], userFeedback);
     if (fb) body.user_feedback = fb;
+    body.no_question_ids = settledComponentIds();
     const r = await authFetch('/api/alternatives', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
     const d = await r.json();
     if (lateReply(epoch)) return;
@@ -4347,6 +4417,9 @@ async function runAlternatives(userFeedback) {
     } else {
       addMsg('Alternativ klara! ' + ALTERNATIVES_DONE_MSG, 'bot');
     }
+    // Last, so the question is what the user sees when the step is done.
+    const asks = alternativeQuestionsMsg(alternativeQuestions(d));
+    if (asks) addMsg(asks, 'bot');
     setLoading(false);
   } catch(e) {
     if (lateReply(epoch)) return;
@@ -4623,8 +4696,11 @@ async function processPendingActions(actions) {
         addMsg('Hoppar över ' + action.type + ': inga giltiga komponent-id.', 'system');
         continue;
       }
-      // Re-classify as full when explicit list covers every component.
-      const coversAll = totalComponents > 0 && cids.length === totalComponents;
+      // Re-classify as full when explicit list covers every component. Not the
+      // rerun an answer set off (answer_question, which the server marks): it
+      // is one component by construction, and in a project with one component
+      // the user would answer and then be asked to confirm "kör om alla".
+      const coversAll = !action.answers && totalComponents > 0 && cids.length === totalComponents;
       const isFull = originallyEmpty || coversAll;
 
       if (action.type === 'rerun_baseline') {
@@ -4738,6 +4814,7 @@ async function runAlternativesForComponents(componentIds, userFeedback, reason, 
     // feedback — still carries "tänk bredare", "bara svenska" etc.
     const fb = effectiveFeedback(isFull ? [] : componentIds, userFeedback);
     if (fb) body.user_feedback = fb;
+    body.no_question_ids = settledComponentIds();
     const r = await authFetch('/api/alternatives', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
@@ -4766,6 +4843,12 @@ async function runAlternativesForComponents(componentIds, userFeedback, reason, 
     scheduleAutoSave();
     refreshResults();
     addMsg('Alternativ uppdaterade' + (isFull ? '' : ' för ' + componentIds.join(', ')) + '.', 'system');
+    // A rerun can ask too: a new component, or an answer that opened another
+    // question. Only what this rerun covered, so a question already in the
+    // chat for another component is not repeated.
+    const rerunAsks = alternativeQuestionsMsg(alternativeQuestions(d)
+      .filter(q => isFull || componentIds.indexOf(q.cid) !== -1));
+    if (rerunAsks) addMsg(rerunAsks, 'bot');
     notifyStepDone('alternatives_rerun', true, isFull ? null : componentIds.join(', '));
   } catch (e) {
     if (lateReply(epoch)) return;
@@ -6277,6 +6360,7 @@ function alternativHtml(st, cfg) {
       // leaves it out of the cost comparison, and the row must not say otherwise.
       '<td style="text-align:right">' + formatCost({cost_sek: comp.baseline_cost_sek}) + overrideBadge(comp.baseline_cost_override) + '</td>' +
       '<td style="text-align:right;color:var(--kk-gray-500)">referens</td><td></td></tr>';
+    html += alternativeQuestionRowHtml(comp);
     // By material type first (Henric, 2026-10-12): one row per type with the
     // range of climate impact and cost across its products, the products
     // themselves folded away under it. Info rows (nothing on Palats, no

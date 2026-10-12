@@ -285,6 +285,15 @@ class Alternative:
         return asdict(self)
 
 
+# How an answered question from the alternatives step is written into the
+# component's usage_context: "Aida frågade: ... Användaren svarade: ...". The
+# usage context is in every alternatives prompt for the component, full run or
+# scoped, so the answer is not lost when everything is run again. The ranking
+# also reads the mark as "already asked", and does not ask a second time.
+ASKED_MARK = "Aida frågade:"
+ANSWERED_MARK = "Användaren svarade:"
+
+
 @dataclass
 class ComponentAlternatives:
     component_id: str
@@ -292,15 +301,23 @@ class ComponentAlternatives:
     baseline_co2e_kg: float
     baseline_cost_sek: float
     alternatives: list[Alternative] = field(default_factory=list)
+    # What Aida asked before suggesting anything for this component, when the
+    # alternatives depend on something the description does not settle
+    # (Henric 2026-10-12). Set means no alternatives were chosen. The answer is
+    # written onto the component (see ASKED_MARK) and the component is rerun.
+    question: str = ""
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "component_id": self.component_id,
             "component_name": self.component_name,
             "baseline_co2e_kg": self.baseline_co2e_kg,
             "baseline_cost_sek": self.baseline_cost_sek,
             "alternatives": [a.to_dict() for a in self.alternatives],
         }
+        if self.question:
+            d["question"] = self.question
+        return d
 
 
 @dataclass

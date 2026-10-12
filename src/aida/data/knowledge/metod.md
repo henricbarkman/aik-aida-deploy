@@ -14,6 +14,14 @@ Väljer du inget alternativ för en byggdel räknas den som baslinjen, alltså k
 
 Resultatet är ett underlag för beslut, inte ett klimatbokslut.
 
+### När Aida frågar
+
+Aida frågar hellre än räknar på en gissning som du inte ser. Efter beskrivningen frågar Aida om det som fått antas och som påverkar resultatet mest, till exempel en yta, och skriver antagandet i frågan: "Jag har räknat med 320 m² fasad. Stämmer det?" Du kan svara eller gå vidare. Går du vidare gäller antagandet. Saknas så mycket att projektet inte går att räkna vettigt stannar Aida och frågar först.
+
+Aida kan också fråga om du redan har ett material eller en produkt i tankarna. Har du det tas en sådan produkt med i jämförelsen, om katalogen har en med lägre klimatpåverkan än baslinjen, bredvid Aidas egna förslag.
+
+När alternativen tas fram kan Aida ställa en fråga om en enskild byggdel. Det händer när produkterna i katalogen passar olika användningar och beskrivningen inte avgör vilken som gäller, till exempel ett sportgolv eller en slitstark matta. Byggdelen får då inga förslag förrän du har svarat, och räknas som konventionell så länge. Aida frågar högst en gång per byggdel. Svarar du att du inte vet utgår Aida från det troligaste och skriver antagandet i motiveringen. Svaret står sedan under byggdelens användning.
+
 ## Klimatmåttet
 
 Aida räknar GWP-fossil för livscykelskedena A1-A3, alltså produktskedet: råvaror, transport till fabriken och tillverkning. Det är samma mått som Boverkets klimatdatabas använder. Upptag av biogent kol räknas inte av, varken i baslinjen eller i alternativen.

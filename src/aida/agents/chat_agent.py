@@ -43,6 +43,7 @@ VERKTYG:
 - remove_component: ta bort en komponent ("vi byter inte fönstren ändå").
 - rerun_baseline: begär att baslinjen räknas om för specifika komponenter (component_ids=['c1']) eller hela analysen (component_ids=[]). Frontend kör själva omberäkningen.
 - rerun_alternatives: begär att alternativen körs om, eventuellt med user_feedback som styrning ("fokusera på ljudmiljö", "bara svenska tillverkare").
+- answer_question: spara användarens svar på en fråga som alternativsteget ställt om en komponent, och ta fram förslagen för den.
 - set_as_built: registrera vad som faktiskt installerades, i uppföljningsläget ("vi la iQ Granit, 100 kvadrat, fakturan gick på 41 000").
 - bind_epd: bind en miljödeklaration till det installerade ("ja, det är iQ Granit SD"). Kräver ett epd_id ur kandidatlistan.
 
@@ -53,6 +54,9 @@ NÄR DU SKA ANVÄNDA VERKTYG:
 - Använd verktyg när användaren ger en konkret korrigering, ett val eller en begäran som går att genomföra direkt.
 - Använd INTE verktyg för rena frågor ("varför är betong sämre?"). Svara bara med text.
 - Om användaren är tvetydig: fråga först, använd verktyg sen.
+
+SVAR PÅ AIDAS FRÅGA OM EN KOMPONENT:
+Står det "Aida väntar på svar" vid en komponent under ALTERNATIV, har alternativsteget frågat något innan det föreslår något för den. Svarar användaren på frågan, även med "vet inte", anropa answer_question med den komponentens id och svaret med användarens egna ord ("ja, det är en idrottshall för bollsport"). Verktyget sparar svaret på komponenten och begär själv nya förslag för den, så anropa inte rerun_alternatives också. Svarar meddelandet på frågor om flera komponenter: ett anrop per komponent, med var sin del av svaret. Säg kort att du tar fram förslag för komponenten utifrån svaret. Är det oklart vilken komponents fråga användaren svarar på, fråga det i stället för att gissa. Vill användaren i stället något annat (ändra en komponent, ett önskemål om alla förslag, en egen fråga): gör det som vanligt, frågan står kvar.
 
 OBLIGATORISKT RERUN-MÖNSTER VID MATERIAL- ELLER KATEGORIBYTE:
 När du anropar update_component och ändringen rör name, category eller unit (alltså inte ENBART quantity), ska du i SAMMA tur också anropa rerun_baseline och rerun_alternatives med component_ids=[id på komponenten]. Användaren ska aldrig behöva klicka en knapp eller säga "räkna om" för att få ut nya värdet. Skala-tricket (linjär skalning vid quantity-only) gäller bara mängd, inte material.
@@ -321,6 +325,26 @@ TOOLS = [
             "required": ["component_ids", "reason"],
         },
     },
+    {
+        "name": "answer_question",
+        "description": (
+            "Spara användarens svar på en fråga som alternativsteget ställt om en komponent "
+            "(står som 'Aida väntar på svar' under ALTERNATIV) och ta fram förslag för "
+            "komponenten utifrån svaret. Använd även när svaret är att användaren inte vet. "
+            "Går bara för en komponent som har en öppen fråga."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "component_id": {"type": "string"},
+                "answer": {
+                    "type": "string",
+                    "description": "Svaret med användarens egna ord, utan frågan.",
+                },
+            },
+            "required": ["component_id", "answer"],
+        },
+    },
 ]
 
 
@@ -388,6 +412,11 @@ def _format_state(project, baseline, alternatives, selections) -> str:
         lines.append("\nALTERNATIV:")
         for c in alternatives["components"]:
             alts = c.get("alternatives", [])
+            question = " ".join(str(c.get("question") or "").split())
+            if question:
+                lines.append(f"  {c.get('component_id')}: {c.get('component_name')} — inga förslag än, "
+                             f"Aida väntar på svar: {question}")
+                continue
             lines.append(f"  {c.get('component_id')}: {c.get('component_name')} — {len(alts)} alternativ")
             for a in alts[:5]:
                 lines.append(f"    • {a.get('name')}: {_kg(a.get('co2e_kg'))}, {_sek(a)}")

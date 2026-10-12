@@ -38,6 +38,7 @@ from aida.data.nordic_supply import availability_label, nordic_supplier
 from aida.errors import UserFacingError
 from aida.llm_json import extract_json_object, extract_json_value
 from aida.models import (
+    ASKED_MARK,
     Alternative,
     AlternativesResult,
     Baseline,
@@ -87,6 +88,10 @@ MIN_REUSE_COVERAGE = 0.2
 # classifier uses.
 _ROUTER_MODEL = DEFAULT_MODEL
 
+# A question to the user instead of a list is one short sentence or two; past
+# this it is the model thinking aloud, and the chat would show all of it.
+QUESTION_MAX = 300
+
 SYSTEM_PROMPT = """Du är Aidas alternativanalys-agent — en byggnadsexpert som hittar klimatsmartare alternativ till konventionella byggmaterial.
 
 UPPDRAG:
@@ -110,6 +115,16 @@ PRINCIPER FÖR ALTERNATIV:
 - Presentera spridning i pris — det är användarens beslut att väga ekonomi mot klimat.
 - Var innovativ — föreslå kombinationer som löser flera behov samtidigt, till exempel återbruk för en del av behovet och nyinköp för resten när annonsen inte täcker allt.
 - Förklara installationsaspekter som påverkar totalkostnaden (enklare montering kan kompensera dyrare material).
+- Har användaren sagt vilket material, vilken produkt eller vilket alternativ hen själv tänkt sig (i användningskontexten eller i önskemålen): ta med det bästa alternativet av det slaget ur listorna, om det finns ett under baslinjen, och säg i reasoning hur det står sig mot de andra. Finns inget sådant, eller bara på eller över baslinjen, säg det i reasoning på ett av de andra alternativen, så att användaren ser att önskemålet prövats.
+
+FRÅGA FÖRST, NÄR DET BEHÖVS:
+Ibland går det inte att välja vettigt utan att veta något mer. Då ställer du en fråga i stället för att föreslå något för komponenten. Gör det bara när allt detta stämmer:
+- listorna delar sig i alternativ som passar olika krav eller användningar (till exempel sportgolv mot säkerhetsmatta, inne mot ute, våtrum mot torrt utrymme),
+- varken komponenten, projektets behov, användningskontexten eller användarens önskemål avgör vilket som gäller, och
+- ett felaktigt antagande skulle ge förslag som inte passar komponenten.
+Är bara en egenskap osäker och förslagen passar ändå: föreslå som vanligt och flagga osäkerheten i reasoning.
+Du frågar högst en gång per komponent. Har användaren redan svarat (svaret står i användningskontexten, efter "Aida frågade:") säger uppgiften att du inte får fråga: välj då utifrån svaret, eller det troligaste om hen inte visste, och skriv antagandet i reasoning. Fråga inte heller om något som användningskontexten säger att användaren inte vet.
+Frågan är en enda kort fråga till en förvaltare, utan EPD-termer, som säger vilka möjligheter du ser, till exempel: "Ska golvet i hallen tåla bollsport, eller räcker en slitstark matta för gång och möbler?" Svara då med {"question": "din fråga"} i stället för arrayen, utan alternativ.
 
 TEKNISKA REGLER:
 - VÄLJ BARA alternativ från listorna du får. Fabricera INGA egna alternativ, varken EPD:er eller återbruksannonser.
@@ -149,7 +164,9 @@ Svara med giltig JSON-array:
     "reasoning": "Vad annonsen är, hur den passar, vad täckning och pris betyder, vad som ska kontrolleras",
     "alternative_type": "reuse"
   }
-]"""
+]
+
+Eller, när du måste fråga först (se ovan): {"question": "din fråga"}"""
 
 
 def _load_epd_alternatives() -> dict[str, list[dict]]:
@@ -2884,8 +2901,12 @@ def find_alternatives(
     project: Project,
     baseline: Baseline,
     user_feedback: str | None = None,
+    no_questions: set[str] | None = None,
 ) -> AlternativesResult:
     """Find climate-optimized alternatives for each component.
+
+    ``no_questions``: ids of components the ranking may not answer with a
+    question, because the user already has alternatives for them on screen.
 
     Strategy:
     1. Load pre-categorized EPD data from Environdec
@@ -3021,6 +3042,8 @@ def find_alternatives(
             )
 
         refused: list[str] = []
+        asked: list[str] | None = (
+            None if bl_comp.component_id in (no_questions or ()) else [])
         alternatives = _find_alternatives_with_epds(
             proj_comp, bl_comp, epds_for_category, user_feedback,
             needs_analysis=project.needs_analysis,
@@ -3028,7 +3051,21 @@ def find_alternatives(
             palats_candidates=palats_candidates,
             category=comp_key,
             refused=refused,
+            asked=asked,
         )
+        if asked:
+            # Nothing chosen and nothing to rank: the component waits for the
+            # answer, which comes back on a rerun of just this component. No
+            # Palats rows either, since they were part of what the question
+            # is about; the rerun shows them with the rest.
+            return ComponentAlternatives(
+                component_id=bl_comp.component_id,
+                component_name=bl_comp.component_name,
+                baseline_co2e_kg=eff_baseline_co2e,
+                baseline_cost_sek=bl_comp.cost_sek,
+                alternatives=[],
+                question=asked[0],
+            )
 
         # Validate data quality: filter zero CO2, component-only parts, flag prices
         dropped: list[str] = []
@@ -3487,8 +3524,19 @@ def _find_alternatives_with_epds(
     palats_candidates: list[tuple] | None = None,
     category: str | None = None,
     refused: list[str] | None = None,
+    asked: list[str] | None = None,
 ) -> list[Alternative]:
     """Use LLM to rank EPD alternatives and Palats reuse listings together.
+
+    ``asked``: the model may answer with a question instead of a list, when
+    the alternatives depend on something nothing it was given settles (Henric
+    2026-10-12, "alternativsteget kan också få ställa frågor vid behov"). The
+    question is appended there and nothing is returned. A question that comes
+    with rows is dropped and the rows kept, which is never worse than before
+    questions existed. One question per component: once the answer is on the
+    component (ASKED_MARK in its usage context), or when the caller passes no
+    list, the prompt does not offer the question form, and a model that asks
+    anyway is told so and asked once more for the list.
 
     ``effective_baseline_co2e`` is the baseline reference after any
     routed-category reroute (see _effective_baseline_co2e). When a component was
@@ -3606,32 +3654,64 @@ Inga återbruksannonser på Palats matchar denna komponent just nu, så listan b
     if user_feedback:
         prompt += f"\nAnvändarens önskemål: {user_feedback}\n"
 
-    prompt += "\nSvara med JSON-array."
+    already_answered = ASKED_MARK in (usage_context or "")
+    may_ask = asked is not None and not already_answered
+    if may_ask:
+        prompt += "\nSvara med JSON-array, eller med {\"question\": \"...\"} om du måste fråga först."
+    else:
+        if already_answered:
+            prompt += ("\nAnvändaren har redan svarat på din fråga om komponenten (se användningskontexten). "
+                       "Du får inte fråga igen: välj utifrån svaret, eller det troligaste om hen inte visste.\n")
+        prompt += "\nSvara med JSON-array."
 
-    # Only the call and the parse are "the model failed". A fault in the row
-    # handling below is our own bug and must not be reported as a busy API.
-    try:
-        response = call_model(
-            client,
-            model=DEFAULT_MODEL,
-            max_tokens=REASONING_MAX_TOKENS,
-            effort=EFFORT_HIGH,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        text = extract_text(response)
-        data = extract_json_value(text, what="alternativsökningen")
-    except Exception as exc:
-        logger.warning("Ranking call failed for %s", proj_comp.name, exc_info=True)
-        raise RankingFailed(
-            proj_comp.name,
-            timed_out=isinstance(exc, (anthropic.APITimeoutError, TimeoutError)),
-        ) from exc
+    def _ask_model(prompt_text: str) -> tuple[str, list]:
+        """One call, read as (question, rows). Only the call and the parse are
+        "the model failed". A fault in the row handling below is our own bug
+        and must not be reported as a busy API."""
+        try:
+            response = call_model(
+                client,
+                model=DEFAULT_MODEL,
+                max_tokens=REASONING_MAX_TOKENS,
+                effort=EFFORT_HIGH,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": prompt_text}],
+            )
+            text = extract_text(response)
+            data = extract_json_value(text, what="alternativsökningen")
+        except Exception as exc:
+            logger.warning("Ranking call failed for %s", proj_comp.name, exc_info=True)
+            raise RankingFailed(
+                proj_comp.name,
+                timed_out=isinstance(exc, (anthropic.APITimeoutError, TimeoutError)),
+            ) from exc
+        question = ""
+        if isinstance(data, dict):
+            question = " ".join(str(data.get("question") or "").split())[:QUESTION_MAX]
+            data = data.get("alternatives", [] if question else [data])
+        if not isinstance(data, list):
+            data = [data]
+        return question, data
 
-    if isinstance(data, dict):
-        data = data.get("alternatives", [data])
-    if not isinstance(data, list):
-        data = [data]
+    question, data = _ask_model(prompt)
+    if question and data:
+        logger.info("Ranking for %s asked %r and also returned %d rows; "
+                    "keeping the rows", proj_comp.name, question, len(data))
+    elif question and may_ask:
+        logger.info("Ranking for %s asks first: %r", proj_comp.name, question)
+        asked.append(question)
+        return []
+    elif question:
+        # Asked although the task did not offer it. Not an empty answer: an
+        # empty list would be shown as "nothing in the lists fits".
+        logger.warning("Ranking for %s asked %r out of turn; asking once more for the list",
+                       proj_comp.name, question)
+        question, data = _ask_model(
+            prompt + "\n\nDu svarade med en fråga. Det går inte att fråga här. "
+                     "Svara med JSON-arrayen, och skriv det du antagit i reasoning.")
+        if question and not data:
+            logger.warning("Ranking for %s asked again (%r); giving up", proj_comp.name, question)
+            raise RankingFailed(proj_comp.name)
 
     results = []
     used_candidates: set[str] = set()
@@ -3782,6 +3862,8 @@ Du har just tagit fram alternativ för ett ombyggnadsprojekt. Skriv en kort komm
 - Resonera kort om hur alternativen uppfyller praktiska behov (ljudmiljö, underhåll, inomhusklimat etc)
 - Ge ett helhetsintryck av besparingspotentialen
 
+Står det att Aida har frågat användaren om en komponent: föreslå inget för den och upprepa inte frågan, den står redan i chatten. Räkna inte med den i besparingspotentialen.
+
 Format:
 - Dela upp texten så den är lätt att skumma: korta stycken, punktlistor eller en kombination.
 - Max 5-6 meningar/punkter totalt. Korta formuleringar.
@@ -3819,6 +3901,8 @@ def _generate_commentary(
         usage = usage_by_id.get(comp.component_id, "")
         if usage:
             summary_lines.append(f"  Användning: {usage}")
+        if comp.question:
+            summary_lines.append(f"  Inga förslag än. Aida har frågat användaren: {comp.question}")
         for alt in comp.alternatives:
             # Convention (matches the per-component prompt): minus = reduction.
             # pct = (alt - baseline)/baseline, so a 45% saving renders as "-45%".

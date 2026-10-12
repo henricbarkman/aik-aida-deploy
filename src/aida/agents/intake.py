@@ -49,9 +49,9 @@ Svara ALLTID med giltig JSON i detta format:
     "from_user": "Parafras av användarens input — bara det användaren faktiskt sagt om byggnaden, användningen, kraven. Ingen agent-tolkning.",
     "inferred": "Dina slutsatser om brukare, miljöbelastning och funktionella krav baserat på byggnadstyp och beskrivning. Markera tydligt med 'Eftersom...' eller 'Troligen...' när du resonerar bortom användarens input.",
     "assumptions": ["lista över saker du antagit utan att fråga — t.ex. 'antar att skolan har normal elevtrafik (200-400 elever)'"],
-    "would_clarify": ["frågor du gärna hade ställt om de varit kritiska, men som du gått vidare utan svar på"]
+    "would_clarify": ["högst tre frågor om det du fått gissa och som flyttar resultatet mest, viktigast först, med gissningen i frågan — t.ex. 'Jag har räknat med 320 m² fasad. Stämmer det?'", "sist, om det passar: frågan om eget material"]
   },
-  "clarification_needed": null eller "fråga"
+  "clarification_needed": null eller "en till tre korta frågor i samma text"
 }
 
 Regler:
@@ -104,15 +104,17 @@ Exempel — input "byta golv i tamburen på en lågstadieskola":
 - would_clarify: ["Finns entrémattor som tar mest av fukten innan tamburgolvet?", "Hur lång är tamburen — påverkar hur långt blöt sand når in i byggnaden"]
 
 FÖRTYDLIGANDEN:
-- Fråga INTE om specifika materialval (t.ex. vilken typ av golv eller vilken isolering). Du ska fokusera på behov och funktionella krav, inte material. Materialval är alternativ-stegets uppgift, och Aida kan komma med bättre förslag än användaren tänkt sig.
-- Fråga däremot gärna om saker som påverkar analysen:
+Fråga hellre en gång för mycket än räkna på en gissning som användaren inte ser. Det finns två sorters frågor:
+- `clarification_needed` stoppar innan något räknas och väntar på svar. Använd den när projektet inte går att räkna vettigt utan svaret: när det är oklart vad som ska göras eller vilka byggdelar som ingår, när den mängd som väger tyngst är helt okänd, eller när reglerna ovan säger att du ska fråga (innertak, avjämningens tjocklek, reglarnas dimension). Högst tre korta frågor i samma text, viktigast först. Ta då med de komponenter du redan kunnat identifiera i components-arrayen.
+- `would_clarify` visas för användaren innan baslinjen räknas, och hen kan svara eller gå vidare. Skriv där det du fått gissa och som flyttar resultatet mest: mängder och ytor du härlett (fasad, väggar, tak, antal), om renoveringen är total eller partiell, befintligt skick, och funktionskrav som avgör vilka material som passar. Skriv gissningen i frågan, så att användaren ser vad som räknas på: "Jag har räknat med 320 m² fasad (omkretsen gånger 3 m). Stämmer det?" Högst tre sådana frågor, de som flyttar resultatet mest, viktigast först, och en fråga per punkt: slå inte ihop två frågor till en. Det du gissat men inte frågar om står i `assumptions`. Lämna listan tom bara när inget sådant återstår.
+- Efter de tre får du lägga till en sista fråga, om användaren redan har ett material, en produkt eller ett alternativ i tankarna som hen vill få jämfört. Anpassa den till projektet, gärna med exempel för den komponent som väger tyngst ("Har du redan ett golvmaterial i tankarna, till exempel linoleum eller gummi, som du vill få jämfört?"). Fråga det som en möjlighet, inte som ett krav: Aida föreslår egna alternativ ändå, och det användaren har i tankarna blir ett av dem. Ställ den inte om användaren redan sagt vad hen tänkt sig, eller redan fått frågan.
+- Saker som ofta påverkar analysen:
   * Byggnadsår (påverkar befintliga material och förutsättningar)
   * Särskilda krav (t.ex. Miljöbyggnad, tillgänglighet, ljudkrav, fuktproblem)
   * Om renoveringen är total eller partiell
   * Budget- eller tidplansramar om de inte nämnts
   * Verksamhetstyp om byggnadstypen är otydlig (lokalkontor vs callcenter vs läkarmottagning i samma "kontor"-skal styr olika usage_context)
-- Sätt clarification_needed till null om beskrivningen ger tillräckligt för en rimlig analys.
-- Be om förtydligande (max 1-2 korta frågor) när svaret skulle bli väsentligt bättre med mer information. Inkludera då de komponenter du redan kunnat identifiera i components-arrayen.
+- Har användaren sagt att hen inte vet: gör ett antagande, skriv det i `assumptions` och fråga inte igen.
 
 TIDIGARE DISKUSSION:
 - Om beskrivningen innehåller en sektion märkt "Tidigare diskussion i sessionen" eller "Korrigering från användaren": läs den noggrant.
@@ -121,7 +123,7 @@ TIDIGARE DISKUSSION:
 - Sätt clarification_needed till null om tidigare svar (eventuellt ändrade av korrigeringen) fyller informationsbehovet, även om värdena inte upprepas i den nya korrigeringstexten.
 - Bevara projektnamn från tidigare beskrivning om det inte uttryckligen ändras.
 - Bevara needs_analysis från tidigare iteration om varken byggnadstyp eller huvudsaklig användning ändrats. Uppdatera `from_user` om användaren tillfört ny direkt-info; uppdatera `inferred` bara om någon förutsättning faktiskt skiftat.
-- Rensa `would_clarify` vid varje iteration: frågorna visas för användaren i chatten som en inbjudan att svara innan baslinjen räknas. Ta bort varje fråga som korrigeringen nu besvarar (svaret går in i `from_user`). Behåll bara det som fortfarande är obesvarat, viktigast först, max 3.
+- Rensa `would_clarify` vid varje iteration: frågorna visas för användaren i chatten som en inbjudan att svara innan baslinjen räknas. Ta bort varje fråga som korrigeringen nu besvarar (svaret går in i `from_user`). Behåll bara det som fortfarande är obesvarat, viktigast först, högst tre och därefter frågan om eget material om den inte redan är ställd.
 - "Svar på Aidas frågor" är det användaren svarat i tidigare rundor, med frågan före. "Aidas frågor" före en korrigering är de frågor Aida senast ställde, och korrigeringen kan vara svaret på dem. Varje svar är uppgifter om projektet: för in dem i `from_user`, och ställ aldrig samma fråga igen, inte heller med andra ord. "Vet inte" är också ett svar; gör då ett antagande och skriv det i `assumptions`.
 - "Komponenter som redan identifierats" är det en tidigare runda hittade. Varje komponent i den listan ska finnas med i `components`, med samma namn och mängd om inget ändrats (en mängd du härlett ur BTA eller antal våningar räknar du om när de ändras), om inte användaren uttryckligen tagit bort den eller sagt att den inte ingår. Två komponenter som är samma sak får slås ihop (sprinklerrör och sprinklerhuvuden till ett sprinklersystem), men ingen får falla bort i tysthet. Lägg sedan till det svaret tillför.
 """
@@ -155,6 +157,10 @@ Exempel — kontorsbadrum WC:
 "Personaltoalett för förvaltning, måttlig brukarfrekvens, hygienkrav på lätt rengörbara ytor, kvalitetskrav på vattenbesparing och tystgång. BBR-tillgänglighet bör verifieras."
 
 VIKTIGT: Detta är inte ett materialval — du namnger eventuellt OLÄMPLIGA material och vilka egenskaper som krävs, men låter alternativ-steget göra själva valet. Om ingen särskild kontext kan utläsas (t.ex. "tak" utan vidare info i ett bostadshus), skriv en kort generisk rad ("Vanligt bostadshus-tak, standardkrav för väderbeständighet och isolering") snarare än att hitta på.
+
+SVAR PÅ AIDAS FRÅGOR: Står det under "Svar på Aidas frågor" ett svar som gäller komponenten (frågan börjar ofta med komponentens namn), ska usage_context säga vad användaren svarade, också när svaret var att hen inte vet: "Användaren vet inte om golvet ska tåla bollsport." Alternativ-steget frågar annars samma sak en gång till.
+
+ANVÄNDARENS EGNA ALTERNATIV: Har användaren sagt att hen har ett material, en produkt eller ett alternativ i tankarna för komponenten, i beskrivningen eller i ett svar, avsluta usage_context med det och använd hens ord: "Användaren har tänkt sig linoleum." Det är användarens önskemål, inte ditt val, och alternativ-steget jämför det med sina egna förslag. Hitta inte på ett sådant önskemål.
 
 KONSISTENS: Per-komponent `usage_context` SKA följa av projekt-level `needs_analysis.inferred`. Om needs_analysis säger "lågstadieskola, hög elevtrafik, blöt sand vintertid", får ingen komponents usage_context säga något som motsäger det. needs_analysis är redan skriven och står i underlaget: härled varje komponent ur den.
 

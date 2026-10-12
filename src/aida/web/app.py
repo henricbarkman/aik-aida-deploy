@@ -6028,7 +6028,8 @@ function materialGroupHtml(g, ctx) {
   const sub = groupSubText(g.entries.length, chosen);
   const co2 = g.co2Min === null ? '<span style="color:var(--kk-gray-500)">-</span>'
     : rangeText(g.co2Min, g.co2Max) + (g.savingMin !== null
-      ? ' <span style="color:' + (g.savingMin >= 0 ? 'var(--green-saving)' : 'var(--kk-red-orange)') + ';font-size:11px">' + savingRangeText(g.savingMin, g.savingMax) + '</span>'
+      // Kept on one line: "%" alone under "↓76-81" in the narrow column.
+      ? ' <span style="color:' + (g.savingMin >= 0 ? 'var(--green-saving)' : 'var(--kk-red-orange)') + ';font-size:11px;white-space:nowrap">' + savingRangeText(g.savingMin, g.savingMax) + '</span>'
       : '');
   const cost = g.costMin === null
     ? '<span style="color:var(--kk-gray-500)">Pris saknas</span>'

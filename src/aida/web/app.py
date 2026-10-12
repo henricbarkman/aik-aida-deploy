@@ -1611,8 +1611,6 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
    on top, and the gold is back to being an accent - the top bar's line, the
    user's own bubbles, the system notes. */
 .chat-container { flex: 1; display: flex; flex-direction: column; background: var(--kk-gray-50); border-radius: 12px; border: 1px solid var(--kk-gray-200); overflow: hidden; min-height: 0; }
-.chat-header { padding: 10px 16px; border-bottom: 1px solid var(--kk-gray-200); background: white; display: flex; justify-content: space-between; align-items: center; }
-.chat-header h2 { font-size: 15px; font-weight: 600; color: var(--kk-charcoal); }
 .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 .msg { padding: 10px 14px; border-radius: 16px; max-width: 85%; font-size: 13px; line-height: 1.5; }
 .msg.user { background: var(--kk-cream); color: var(--kk-text); align-self: flex-end; border-bottom-right-radius: 4px; }
@@ -2261,9 +2259,6 @@ a.palats-link { color: inherit; text-decoration: underline; }
   <!-- Chat panel -->
   <div class="chat-panel">
     <div class="chat-container">
-      <div class="chat-header">
-        <h2>Aida</h2>
-      </div>
       <div class="messages" id="messages">
         <div class="msg bot">Hej! Beskriv ditt projekt. Berätta vad byggnaden används till, byggnadsår, ungefärlig yta och vilka behoven är.</div>
       </div>

@@ -14,17 +14,19 @@ from __future__ import annotations
 
 import copy
 import logging
+import time
 
 from aida import knowledge
 from aida import sheet as sheet_mod
+from aida.agents.aggregate import _number, article_price
 from aida.api_client import (
     DEFAULT_MODEL,
     EFFORT_HIGH,
     call_model,
     extract_text,
     get_client,
+    remaining_budget,
 )
-from aida.agents.aggregate import _number, article_price
 from aida.data.climate_data import VALID_CATEGORIES
 from aida.errors import UserFacingError
 
@@ -467,9 +469,15 @@ def _resolve_bind_input(inp, resolver):
 
 def _sanitize_history(history: list) -> list[dict]:
     """Filter history to a shape Anthropic accepts: only {role, content} entries
-    with role in {user, assistant} and content as a non-empty string. Collapses
-    consecutive same-role turns by dropping the earlier one — we never want
-    two user or two assistant turns in a row."""
+    with role in {user, assistant} and content as a non-empty string. Joins
+    consecutive same-role turns into one, since Anthropic refuses two user or two
+    assistant turns in a row.
+
+    Joined, not dropped. Two user turns in a row mean the first went unanswered
+    (an empty reply, a failed call), and dropping it lost the question: Patrik's
+    "Hur vet du då hur mycket innervägg du ska räkna med?" got an empty answer on
+    2026-10-11, and his "Du gav mig inget svar" was then answered about the
+    ceiling height he had asked about one turn earlier."""
     clean: list[dict] = []
     for entry in history:
         if not isinstance(entry, dict):
@@ -481,10 +489,79 @@ def _sanitize_history(history: list) -> list[dict]:
         if not isinstance(content, str) or not content.strip():
             continue
         if clean and clean[-1]["role"] == role:
-            clean[-1] = {"role": role, "content": content}
+            clean[-1] = {"role": role, "content": clean[-1]["content"] + "\n\n" + content}
         else:
             clean.append({"role": role, "content": content})
     return clean
+
+
+def turns_with_message(history: list[dict], message: str, keep: int) -> list[dict]:
+    """The last `keep` turns of a sanitized history, followed by `message`.
+
+    Anthropic wants the first turn to be the user's and no two user turns in a
+    row, so a leading assistant turn is dropped. A trailing user turn is either
+    the message itself (runChat tags it before sending) or an earlier question
+    that never got an answer. The second is joined into the message instead of
+    dropped, so "Du gav mig inget svar" still carries the question it is about.
+    """
+    recent = list(history[-keep:])
+    if recent and recent[0]["role"] == "assistant":
+        recent = recent[1:]
+    if recent and recent[-1]["role"] == "user":
+        earlier = recent.pop()["content"]
+        # The tagged message may already sit joined onto the unanswered question
+        # (_sanitize_history); then that joined turn is the message.
+        e, m = earlier.strip(), (message or "").strip()
+        if e == m or e.endswith("\n\n" + m):
+            message = earlier
+        else:
+            message = earlier + "\n\n" + message
+    return recent + [{"role": "user", "content": message}]
+
+
+# Room for adaptive thinking plus the answer. Thinking counts toward max_tokens,
+# and at 1 500 (chat) and 1 200 (advisory) Opus 5.5 at high effort could think
+# up to the ceiling and return no text at all: four empty replies in the
+# testers' saved analyses, 2026-09-30 and 2026-10-11. Still far under the SDK's
+# limit for a non-streaming call.
+REPLY_MAX_TOKENS = 8000
+
+# What the user sees when a reply still comes back without text. An empty
+# bubble reads as being ignored; this says what happened and what to do.
+EMPTY_REPLY = ("Jag fick inte ihop något svar den här gången. "
+               "Skriv frågan igen, så försöker jag på nytt.")
+CHANGED_NO_TEXT = "Ändringen är gjord. Kolla resultatet och skriv igen om något saknas."
+
+# A turn is not started with less left than this: intake's usage calls of about
+# 2 000 tokens took 30-41 s each (2026-10-12), and a turn that cannot finish
+# only swaps our reply for a gateway page. At 8 000 tokens a turn the loop's
+# turns together could otherwise outlast the platform's 300 s.
+REPLY_MIN_BUDGET = 40
+OUT_OF_TIME = ("Jag hann inte klart inom tidsgränsen. Kolla resultatet och skriv igen, "
+               "gärna med en sak i taget.")
+
+
+def turn_budget(started_at: float, where: str) -> float | None:
+    """Seconds the next model call may take, or None when there is no time
+    for another turn. Shared by the chat and advisory loops."""
+    budget = remaining_budget(started_at)
+    if budget < REPLY_MIN_BUDGET:
+        logger.warning("%s: %.0fs left, no time for another turn", where, budget)
+        return None
+    return budget
+
+
+def final_text(response, where: str, changed: bool = False) -> str:
+    """The reply text of a finished turn, never empty.
+
+    Logs the stop reason and usage when the model returned no text, so a
+    recurrence shows up in the log as a cause and not as a blank bubble."""
+    text = (extract_text(response) or "").strip()
+    if text:
+        return text
+    logger.warning("%s: no text in reply (stop_reason=%s, usage=%s)", where,
+                   getattr(response, "stop_reason", None), getattr(response, "usage", None))
+    return CHANGED_NO_TEXT if changed else EMPTY_REPLY
 
 
 def run_chat_agent(
@@ -533,7 +610,7 @@ def run_chat_agent(
     # Normalizing also copies, so the caller's sheet is never written to.
     sheet = sheet_mod.normalize_sheet(sheet) if sheet is not None else None
     tools = TOOLS + sheet_mod.SHEET_TOOLS + [knowledge.SEARCH_TOOL] if sheet is not None else TOOLS
-    max_tokens = 1500
+    max_tokens = REPLY_MAX_TOKENS
     if sheet is not None:
         # An answer on the sheet is several writes, and a table is long.
         max_turns, max_tokens = max_turns + sheet_mod.EXTRA_TURNS, 8000
@@ -549,23 +626,24 @@ def run_chat_agent(
 
     # Anthropic requires the first message to be 'user' and forbids two same-role
     # turns in a row. _sanitize_history guarantees internal alternation but not
-    # the boundaries: drop a leading assistant turn (e.g. a stored UI greeting)
-    # and a trailing user turn that would collide with the message we append.
-    recent = list(history[-10:])
-    if recent and recent[0]["role"] == "assistant":
-        recent = recent[1:]
-    if recent and recent[-1]["role"] == "user":
-        recent = recent[:-1]
+    # the boundaries; turns_with_message handles those.
     messages: list[dict] = attach_to_messages(
-        recent + [{"role": "user", "content": message}], blocks)
+        turns_with_message(history, message, keep=10), blocks)
 
+    started_at = time.monotonic()
+    out_of_time = False
     for _ in range(max_turns):
+        budget = turn_budget(started_at, "chat_agent")
+        if budget is None:
+            out_of_time = True
+            break
         # Explicit effort: on Opus 5 an omitted effort meant "high", on Opus 5.5
         # it means "medium". Kept at the level the chat was tuned on.
         try:
             response = call_model(
                 client,
                 model=DEFAULT_MODEL,
+                timeout=budget,
                 max_tokens=max_tokens,
                 effort=EFFORT_HIGH,
                 system=system_prompt,
@@ -601,11 +679,12 @@ def run_chat_agent(
             sheet_mod.nudge(messages)
             continue
         if response.stop_reason != "tool_use":
-            reply = extract_text(response) or ""
-            if not reply.strip() and "sheet" in touched_bags:
+            if "sheet" in touched_bags and not (extract_text(response) or "").strip():
                 reply = sheet_mod.DONE
+            else:
+                reply = final_text(response, "chat_agent", changed=bool(touched_bags))
             return {
-                "reply": reply.strip(),
+                "reply": reply,
                 "state_updates": _build_state_updates(
                     touched_bags, project, baseline, alternatives, selections,
                     pending_actions, overrides=overrides, as_built=as_built, sheet=sheet,
@@ -692,10 +771,12 @@ def run_chat_agent(
 
         messages.append({"role": "user", "content": tool_results})
 
-    # Exhausted turns without a stop — force a final reply.
-    logger.warning("chat_agent hit max_turns=%d", max_turns)
+    # Exhausted turns (or time) without a stop — force a final reply.
+    if not out_of_time:
+        logger.warning("chat_agent hit max_turns=%d", max_turns)
     return {
         "reply": (sheet_mod.UNFINISHED if "sheet" in touched_bags else
+                  OUT_OF_TIME if out_of_time else
                   "Jag fastnade i en loop. Försök formulera om, eller använd knapparna för att köra om stegen."),
         "state_updates": _build_state_updates(
             touched_bags, project, baseline, alternatives, selections,

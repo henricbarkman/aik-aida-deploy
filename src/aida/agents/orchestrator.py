@@ -22,11 +22,20 @@ server-side orchestrator that owns AnalysisState.
 from __future__ import annotations
 
 import logging
+import time
 
 from aida import knowledge
 from aida import sheet as sheet_mod
 from aida.agents.alternatives import _format_epd_list, _load_epd_alternatives
-from aida.agents.chat_agent import _format_state, _sanitize_history
+from aida.agents.chat_agent import (
+    OUT_OF_TIME,
+    REPLY_MAX_TOKENS,
+    _format_state,
+    _sanitize_history,
+    final_text,
+    turn_budget,
+    turns_with_message,
+)
 from aida.api_client import (
     DEFAULT_MODEL,
     EFFORT_HIGH,
@@ -146,6 +155,7 @@ def classify_intent(
     has_project: bool,
     history: list[dict] | None = None,
     attachment_note: str = "",
+    pending_questions: list[str] | None = None,
 ) -> dict:
     """Classify a user message into one intent. Returns {intent, reason}.
 
@@ -167,17 +177,22 @@ def classify_intent(
     )
     if attachment_note:
         state_note += " " + attachment_note + "."
-    # Same boundary handling as run_chat_agent. _sanitize_history guarantees
-    # internal alternation but not the edges, and Anthropic rejects a leading
-    # assistant turn or two user turns in a row. This was survivable while the
+    questions = [str(q).strip() for q in (pending_questions or []) if str(q or "").strip()][:3]
+    if questions:
+        # The intake turns are not in `history` (a fresh intake clears the
+        # model's context), so without this the classifier cannot see that
+        # "Det finns problem med ljudöverföring" answers the question Aida just
+        # asked. Matilda's answer went to the advisory branch on 2026-09-30 and
+        # never reached the project.
+        state_note += (
+            " Aida har just ställt de här frågorna om projektet: "
+            + " | ".join(questions)
+            + ". Ett meddelande som svarar på dem eller ger ny information om projektet är flow_action."
+        )
+    # Same boundary handling as run_chat_agent. This was survivable while the
     # history died on reload; from increment 4 it persists, so a single failed
     # chat turn would otherwise leave a permanently unroutable history.
-    recent = list(clean[-6:])
-    if recent and recent[0]["role"] == "assistant":
-        recent = recent[1:]
-    if recent and recent[-1]["role"] == "user":
-        recent = recent[:-1]
-    messages = recent + [{"role": "user", "content": message}]
+    messages = turns_with_message(clean, message, keep=6)
 
     try:
         response = client.messages.create(
@@ -254,7 +269,7 @@ def answer_advisory(
     clean = _sanitize_history(history or [])
 
     system_prompt = with_rule(_ADVISORY_SYSTEM, blocks)
-    tools, max_turns, max_tokens = _ADVISORY_TOOLS, _MAX_ADVISORY_TURNS, 1200
+    tools, max_turns, max_tokens = _ADVISORY_TOOLS, _MAX_ADVISORY_TURNS, REPLY_MAX_TOKENS
     touched = False
     if sheet is not None:
         # Normalizing also copies, so a rejected write never reaches the caller.
@@ -269,27 +284,28 @@ def answer_advisory(
         system_prompt += "\n\nNUVARANDE PROJEKT-STATE:\n" + state_block
 
     # Same edge handling as classify_intent and run_chat_agent. With files the
-    # first turn has to be the user's, because that is where they go, and the
-    # tail must not collide with the message appended here.
-    recent = list(clean[-8:])
-    if recent and recent[0]["role"] == "assistant":
-        recent = recent[1:]
-    if recent and recent[-1]["role"] == "user":
-        recent = recent[:-1]
+    # first turn has to be the user's, because that is where they go.
     messages: list[dict] = attach_to_messages(
-        recent + [{"role": "user", "content": message}], blocks)
+        turns_with_message(clean, message, keep=8), blocks)
     tool_calls: list[dict] = []
 
     # An exception here must NOT propagate: route() would re-raise, api_route would
     # 500, and the frontend's fail-safe fall-through would run runIntake on the
     # question — re-creating the exact idle crash this feature exists to kill. So
     # an API error returns a graceful advisory reply instead.
+    started_at = time.monotonic()
     try:
         for _ in range(max_turns):
+            budget = turn_budget(started_at, "answer_advisory")
+            if budget is None:
+                return {"reply": sheet_mod.UNFINISHED if touched else OUT_OF_TIME,
+                        "tool_calls": tool_calls,
+                        "state_updates": {"sheet": sheet} if touched else {}}
             # Explicit effort, as in chat_agent: Opus 5.5 defaults to "medium".
             response = call_model(
                 client,
                 model=ADVISORY_MODEL,
+                timeout=budget,
                 max_tokens=max_tokens,
                 effort=EFFORT_HIGH,
                 system=system_prompt,
@@ -302,9 +318,10 @@ def answer_advisory(
                 sheet_mod.nudge(messages)
                 continue
             if response.stop_reason != "tool_use":
-                reply = (extract_text(response) or "").strip()
-                if not reply and sheet is not None:
-                    reply = sheet_mod.DONE if touched else "Jag hann inte färdigt med svaret. Försök formulera om frågan."
+                if touched and not (extract_text(response) or "").strip():
+                    reply = sheet_mod.DONE
+                else:
+                    reply = final_text(response, "answer_advisory")
                 return {"reply": reply, "tool_calls": tool_calls,
                         "state_updates": {"sheet": sheet} if touched else {}}
 
@@ -364,6 +381,7 @@ def route(
     attachments: list[dict] | None = None,
     attachment_note: str = "",
     sheet: dict | None = None,
+    pending_questions: list[str] | None = None,
 ) -> dict:
     """Classify, and answer in the same call when the intent is advisory.
 
@@ -376,7 +394,8 @@ def route(
     """
     has_project = bool(project and project.get("components"))
     classification = classify_intent(message, has_project=has_project, history=history,
-                                     attachment_note=attachment_note)
+                                     attachment_note=attachment_note,
+                                     pending_questions=pending_questions)
     intent = classification["intent"]
 
     if intent == INTENT_ADVISORY:

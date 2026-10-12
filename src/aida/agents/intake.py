@@ -11,6 +11,7 @@ import time
 from aida.api_client import (
     DEFAULT_MODEL,
     EFFORT_HIGH,
+    EFFORT_MEDIUM,
     REASONING_MAX_TOKENS,
     call_model,
     extract_text,
@@ -30,8 +31,7 @@ Du ska identifiera:
 1. Byggnadstyp (t.ex. skola, kontor, förskola, bostadshus)
 2. Ungefärlig area i BTA (bruttoarea i kvadratmeter)
 3. En lista av renoveringskomponenter (vad som ska bytas/renoveras)
-4. För varje komponent: ett kort resonemang om brukar- och miljökrav som styr vilka material som är lämpliga ("usage_context")
-5. En projektövergripande behovsanalys (`needs_analysis`) — separerad i (a) vad användaren faktiskt sagt och (b) vad du som agent inferrat. Användaren kommer granska och godkänna detta innan downstream-stegen körs.
+4. En projektövergripande behovsanalys (`needs_analysis`) — separerad i (a) vad användaren faktiskt sagt och (b) vad du som agent inferrat. Användaren kommer granska och godkänna detta innan downstream-stegen körs.
 
 Svara ALLTID med giltig JSON i detta format:
 {
@@ -39,9 +39,8 @@ Svara ALLTID med giltig JSON i detta format:
   "area_bta": number,
   "storeys": number,
   "name": "projektnamn om nämnt",
-  "description": "original beskrivning",
   "components": [
-    {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm|kg", "category": "kategori", "quantity_source": "user_specified" eller "estimated", "usage_context": "1-3 meningar om brukare + miljö + funktionella krav"}
+    {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm|kg", "category": "kategori", "quantity_source": "user_specified" eller "estimated"}
   ],
   "needs_analysis": {
     "from_user": "Parafras av användarens input — bara det användaren faktiskt sagt om byggnaden, användningen, kraven. Ingen agent-tolkning.",
@@ -87,28 +86,7 @@ GEOMETRI — härled ytor, återanvänd aldrig BTA rakt av:
 - Ange `storeys` (antal våningar) på projektnivå. Står det "enplanshus" är det 1. Framgår det inte, gissa utifrån byggnadstyp och yta och skriv antagandet i `needs_analysis.assumptions`.
 - Fasad och yttervägg: byggnadens omkrets gånger våningshöjd. Med kvadratisk approximation blir omkretsen 4 × roten ur (BTA / antal våningar), och våningshöjden är cirka 3 meter om inget annat sägs. Ett enplanshus på 700 m² får alltså ungefär 4 × √700 × 3 ≈ 320 m² fasad, inte 700.
 - Tak: motsvarar byggnadens fotavtryck, alltså BTA delat med antal våningar (plus påslag för lutning om taket är brant).
-- Skriv i komponentens `usage_context` hur du kom fram till ytan när du uppskattat den.
-
-USAGE_CONTEXT — funktionella krav per komponent:
-Du är byggnadsexpert med materialkunskap och brukarsförståelse. Det betyder att du ska resonera om komponentens *användning* — inte välja material, men identifiera de krav som styr vilka material som ens är lämpliga.
-
-För varje komponent, fyll i usage_context med 1-3 meningar som täcker:
-- VEM använder utrymmet/komponenten (brukare: barn, vårdpersonal, allmänhet, ofta-besökare, sällan-besökare)
-- VILKEN MILJÖLAST den utsätts för (våtbelastning, slitage, kemikalier, sand, salt, värme, ljud, hygienkrav)
-- VILKA FUNKTIONELLA KRAV det implicerar (halksäker, lätt rengörbar, slittålig, brandklass, ljudklass, vattentät, antibakteriell)
-
-Exempel — förskole-tambur golv:
-"Entré på förskola, dagligt slitage från barn 1-6 år som kommer in med blöt snö, sand och saltslask vintertid. Kräver halksäker yta, mycket lätt att våtmoppa, tål kemikalier från städmedel, och slittålig mot abrasiv smuts. Material som absorberar fukt (obehandlat trä, oljat parkett) är olämpliga; gummi, linoleum, klinker med halkfri yta passar bättre."
-
-Exempel — klassrumsgolv:
-"Klassrum för 6-12 år, högt slitage från möbler och dagligt fottryck, krav på god akustik och dammbinding. Behöver tåla regelbunden mopprengöring."
-
-Exempel — kontorsbadrum WC:
-"Personaltoalett för förvaltning, måttlig brukarfrekvens, hygienkrav på lätt rengörbara ytor, kvalitetskrav på vattenbesparing och tystgång. BBR-tillgänglighet bör verifieras."
-
-VIKTIGT: Detta är inte ett materialval — du namnger eventuellt OLÄMPLIGA material och vilka egenskaper som krävs, men låter alternativ-steget göra själva valet. Om ingen särskild kontext kan utläsas (t.ex. "tak" utan vidare info i ett bostadshus), skriv en kort generisk rad ("Vanligt bostadshus-tak, standardkrav för väderbeständighet och isolering") snarare än att hitta på.
-
-KONSISTENS: Per-komponent `usage_context` SKA följa av projekt-level `needs_analysis.inferred`. Om needs_analysis säger "lågstadieskola, hög elevtrafik, blöt sand vintertid", får ingen komponents usage_context säga något som motsäger det. Tänk top-down: skriv needs_analysis först, härled sedan per-komponent.
+- Skriv i `needs_analysis.assumptions` hur du kom fram till ytan när du uppskattat den.
 
 NEEDS_ANALYSIS — separationen citat vs. inferens:
 `from_user` ska vara så nära användarens egen text som möjligt — parafrasera bara för att städa språket. Skriv ALDRIG där: "Eftersom det är en skola antar vi...", "Troligen är detta...", "Det implicerar att...". Sådant hör i `inferred`.
@@ -138,10 +116,45 @@ TIDIGARE DISKUSSION:
 - Om korrigeringen explicit ändrar ett tidigare besvarat fält, använd det NYA värdet från korrigeringen — inte det gamla från diskussionen.
 - Sätt clarification_needed till null om tidigare svar (eventuellt ändrade av korrigeringen) fyller informationsbehovet, även om värdena inte upprepas i den nya korrigeringstexten.
 - Bevara projektnamn från tidigare beskrivning om det inte uttryckligen ändras.
-- Bevara usage_context från tidigare iteration om komponenten inte ändrats — uppdatera bara när komponenten ändrats eller ny info påverkar funktionella krav.
 - Bevara needs_analysis från tidigare iteration om varken byggnadstyp eller huvudsaklig användning ändrats. Uppdatera `from_user` om användaren tillfört ny direkt-info; uppdatera `inferred` bara om någon förutsättning faktiskt skiftat.
-- Rensa `would_clarify` vid varje iteration: frågorna visas för användaren i chatten som en inbjudan att svara innan baslinjen räknas. Ta bort varje fråga som korrigeringen nu besvarar (svaret går in i `from_user` och berörda komponenters `usage_context`). Behåll bara det som fortfarande är obesvarat, viktigast först, max 3.
+- Rensa `would_clarify` vid varje iteration: frågorna visas för användaren i chatten som en inbjudan att svara innan baslinjen räknas. Ta bort varje fråga som korrigeringen nu besvarar (svaret går in i `from_user`). Behåll bara det som fortfarande är obesvarat, viktigast först, max 3.
+- "Svar på Aidas frågor" är det användaren svarat i tidigare rundor, med frågan före. "Aidas frågor" före en korrigering är de frågor Aida senast ställde, och korrigeringen kan vara svaret på dem. Varje svar är uppgifter om projektet: för in dem i `from_user`, och ställ aldrig samma fråga igen, inte heller med andra ord. "Vet inte" är också ett svar; gör då ett antagande och skriv det i `assumptions`.
+- "Komponenter som redan identifierats" är det en tidigare runda hittade. Varje komponent i den listan ska finnas med i `components`, med samma namn och mängd om inget ändrats (en mängd du härlett ur BTA eller antal våningar räknar du om när de ändras), om inte användaren uttryckligen tagit bort den eller sagt att den inte ingår. Två komponenter som är samma sak får slås ihop (sprinklerrör och sprinklerhuvuden till ett sprinklersystem), men ingen får falla bort i tysthet. Lägg sedan till det svaret tillför.
 """
+
+
+# Second step of intake: the per-component usage_context, written in parallel
+# chunks once the component list is known. Until 2026-10-12 one call wrote both,
+# and on large projects the answer outgrew max_tokens: Patrik's gruppboende
+# (about 40 components) was cut off after 16 000 tokens and 172 s, the repair
+# took another 81 s, and in production that ran into Vercel's 300 s as
+# "Analysen tog för lång tid". Without usage_context the list took 130 s.
+USAGE_SYSTEM_PROMPT = """Du är Aida — en byggnadsexpert som hjälper förvaltare och byggledare att hitta renoveringslösningar med kraftigt minskad klimatpåverkan, utan att ge avkall på praktiska behov.
+
+Projektets komponenter är redan identifierade. Din uppgift i detta steg är att skriva `usage_context` för var och en av komponenterna du får: de brukar- och miljökrav som styr vilka material som är lämpliga.
+
+USAGE_CONTEXT — funktionella krav per komponent:
+Du är byggnadsexpert med materialkunskap och brukarsförståelse. Det betyder att du ska resonera om komponentens *användning* — inte välja material, men identifiera de krav som styr vilka material som ens är lämpliga.
+
+För varje komponent, fyll i usage_context med 1-3 meningar som täcker:
+- VEM använder utrymmet/komponenten (brukare: barn, vårdpersonal, allmänhet, ofta-besökare, sällan-besökare)
+- VILKEN MILJÖLAST den utsätts för (våtbelastning, slitage, kemikalier, sand, salt, värme, ljud, hygienkrav)
+- VILKA FUNKTIONELLA KRAV det implicerar (halksäker, lätt rengörbar, slittålig, brandklass, ljudklass, vattentät, antibakteriell)
+
+Exempel — förskole-tambur golv:
+"Entré på förskola, dagligt slitage från barn 1-6 år som kommer in med blöt snö, sand och saltslask vintertid. Kräver halksäker yta, mycket lätt att våtmoppa, tål kemikalier från städmedel, och slittålig mot abrasiv smuts. Material som absorberar fukt (obehandlat trä, oljat parkett) är olämpliga; gummi, linoleum, klinker med halkfri yta passar bättre."
+
+Exempel — klassrumsgolv:
+"Klassrum för 6-12 år, högt slitage från möbler och dagligt fottryck, krav på god akustik och dammbinding. Behöver tåla regelbunden mopprengöring."
+
+Exempel — kontorsbadrum WC:
+"Personaltoalett för förvaltning, måttlig brukarfrekvens, hygienkrav på lätt rengörbara ytor, kvalitetskrav på vattenbesparing och tystgång. BBR-tillgänglighet bör verifieras."
+
+VIKTIGT: Detta är inte ett materialval — du namnger eventuellt OLÄMPLIGA material och vilka egenskaper som krävs, men låter alternativ-steget göra själva valet. Om ingen särskild kontext kan utläsas (t.ex. "tak" utan vidare info i ett bostadshus), skriv en kort generisk rad ("Vanligt bostadshus-tak, standardkrav för väderbeständighet och isolering") snarare än att hitta på.
+
+KONSISTENS: Per-komponent `usage_context` SKA följa av projekt-level `needs_analysis.inferred`. Om needs_analysis säger "lågstadieskola, hög elevtrafik, blöt sand vintertid", får ingen komponents usage_context säga något som motsäger det. needs_analysis är redan skriven och står i underlaget: härled varje komponent ur den.
+
+Svara ENBART med ett JSON-objekt där varje nyckel är ett komponent-id du fått och värdet är dess usage_context, till exempel {"c1": "...", "c2": "..."}. Ta med alla id:n du fått och inga andra. Svara på svenska."""
 
 
 # Facade geometry. Sara's June test got a facade area of 700 m² for a 700 m²
@@ -256,34 +269,40 @@ def _call_intake(client, messages: list[dict], timeout: float | None = None,
     )
 
 
-def run_intake(description: str, attachments: list[dict] | None = None) -> dict:
-    """Extract project parameters from a natural language description.
+def _finish(data: dict, description: str) -> dict:
+    """The list as the rest of Aida expects it, before usage_context is added.
+
+    usage_context is dropped if the model wrote one anyway: it is the second
+    step's, and the facade guard below writes its note into the same field."""
+    for component in data.get("components") or []:
+        if isinstance(component, dict):
+            component.pop("usage_context", None)
+    # Not asked of the model: copying the input back cost a thousand tokens of
+    # answer per round on the gruppboende. The browser replaces it with the
+    # user's own words (intake_log); this is the fallback for other callers.
+    data.setdefault("description", description)
+    return fix_envelope_quantities(canonicalize_categories(data))
+
+
+def _extract(client, description: str, blocks: list[dict], started_at: float) -> dict:
+    """The project and its component list, without usage_context.
 
     Both testers hit a hard crash here in June 2026, because the response was
     parsed with a bare json.loads: an off-format answer surfaced in the chat as
     "Fel: Expecting value: line 1 column 4 (char 3)". Parsing now goes through
     extract_json_object, and a first failure buys one repair round-trip before
-    we give up.
-
-    `attachments` are content blocks from aida.attachments.load_blocks, so a
-    förfrågningsunderlag can be the project description (§14.6). The repair
-    round-trip reuses `messages` and `system`, so it sees the same files.
+    we give up. The repair round-trip reuses `messages` and `system`, so it
+    sees the same files.
     """
     from aida.attachments import attach_to_messages, with_rule
 
-    client = get_client()
-    started_at = time.monotonic()
-
-    blocks = attachments or []
     system = with_rule(SYSTEM_PROMPT, blocks)
     messages: list[dict] = attach_to_messages([{"role": "user", "content": description}], blocks)
     response = _call_intake(client, messages, system=system)
     text = extract_text(response)
 
     try:
-        return fix_envelope_quantities(
-            canonicalize_categories(extract_json_object(text, what="projektbeskrivningen"))
-        )
+        return _finish(extract_json_object(text, what="projektbeskrivningen"), description)
     except ModelOutputError as first:
         logger.warning(
             "Intake parse failed (%s). stop_reason=%s raw=%r",
@@ -307,15 +326,137 @@ def run_intake(description: str, attachments: list[dict] | None = None) -> dict:
     retry = _call_intake(client, repair_messages, timeout=budget, system=system)
     retry_text = extract_text(retry)
     try:
-        return fix_envelope_quantities(
-            canonicalize_categories(extract_json_object(retry_text, what="projektbeskrivningen"))
-        )
+        return _finish(extract_json_object(retry_text, what="projektbeskrivningen"), description)
     except ModelOutputError as second:
         logger.error(
             "Intake parse failed after repair (%s). stop_reason=%s raw=%r",
             second, getattr(retry, "stop_reason", None), retry_text[:2000],
         )
         raise
+
+
+# Twelve components per call, up to four calls at once: the gruppboende's 40
+# become four chunks of ten that each answer in well under a minute.
+USAGE_CHUNK_SIZE = 12
+USAGE_MAX_PARALLEL = 4
+USAGE_MAX_TOKENS = 8000
+# The list is the correctness step and keeps high effort; describing use for a
+# known component is shorter work.
+USAGE_EFFORT = EFFORT_MEDIUM
+# Below this many seconds left there is no point starting the second step:
+# the list is worth more to the user than a timeout.
+USAGE_MIN_BUDGET = 15
+
+
+def _usage_message(data: dict, description: str, chunk: list[dict]) -> str:
+    needs = json.dumps(data.get("needs_analysis") or {}, ensure_ascii=False)
+    lines = [
+        f"Byggnadstyp: {data.get('building_type', '')}, {data.get('area_bta', '')} m² BTA, "
+        f"{data.get('storeys') or 1} våning(ar).",
+        "",
+        "Användarens beskrivning:",
+        description,
+        "",
+        f"Behovsanalys (needs_analysis): {needs}",
+        "",
+        "Komponenter att skriva usage_context för:",
+    ]
+    lines += [
+        f"- {c['id']}: {c.get('name', '')} ({c.get('quantity', '')} {c.get('unit', '')}, "
+        f"kategori {c.get('category', '')})"
+        for c in chunk
+    ]
+    return "\n".join(lines)
+
+
+def _usage_chunk(data: dict, description: str, chunk: list[dict], started_at: float) -> dict:
+    """usage_context per component id for one chunk; {} when the call fails.
+
+    A failed chunk leaves its components without usage_context rather than
+    failing the intake: the list is what the user is waiting for, and every
+    step downstream already handles an empty usage_context.
+
+    The budget is read when the chunk starts, not when the step does: past
+    USAGE_MAX_PARALLEL chunks run in a second wave, which must not get the
+    whole budget again."""
+    timeout = remaining_budget(started_at)
+    if timeout < USAGE_MIN_BUDGET:
+        logger.warning("No time left for a usage_context chunk (%.0fs)", timeout)
+        return {}
+    try:
+        response = call_model(
+            get_client(),
+            model=DEFAULT_MODEL,
+            timeout=timeout,
+            max_tokens=USAGE_MAX_TOKENS,
+            effort=USAGE_EFFORT,
+            system=USAGE_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": _usage_message(data, description, chunk)}],
+        )
+        found = extract_json_object(extract_text(response), what="användningsbeskrivningarna")
+    except Exception:
+        logger.exception("usage_context chunk failed (%d components)", len(chunk))
+        return {}
+    return {k: v.strip() for k, v in found.items() if isinstance(v, str) and v.strip()}
+
+
+def add_usage_context(data: dict, description: str, started_at: float) -> dict:
+    """Write usage_context for every component, in parallel chunks.
+
+    Not run when intake asks a clarifying question: only the component names
+    are shown then, and the next round writes the list again."""
+    components = [c for c in data.get("components") or [] if isinstance(c, dict) and c.get("id")]
+    if not components:
+        return data
+    budget = remaining_budget(started_at)
+    if budget < USAGE_MIN_BUDGET:
+        logger.warning("No time left for usage_context (%.0fs); %d components without it",
+                       budget, len(components))
+        return data
+
+    n_chunks = -(-len(components) // USAGE_CHUNK_SIZE)
+    size = -(-len(components) // n_chunks)  # balanced: 40 -> 10, 10, 10, 10
+    chunks = [components[i:i + size] for i in range(0, len(components), size)]
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=min(USAGE_MAX_PARALLEL, len(chunks))) as ex:
+        results = list(ex.map(lambda chunk: _usage_chunk(data, description, chunk, started_at), chunks))
+
+    written: dict[str, str] = {}
+    for found in results:
+        written.update(found)
+    for component in components:
+        text = written.get(component["id"])
+        if text:
+            # The facade guard's note stays, after the description of use.
+            note = (component.get("usage_context") or "").strip()
+            component["usage_context"] = f"{text} {note}".strip()
+    missing = [c["id"] for c in components if c["id"] not in written]
+    if missing:
+        logger.warning("usage_context missing for %d of %d components: %s",
+                       len(missing), len(components), ", ".join(missing))
+    return data
+
+
+def run_intake(description: str, attachments: list[dict] | None = None) -> dict:
+    """Extract project parameters from a natural language description.
+
+    Two steps since 2026-10-12: the project and its component list in one call,
+    then usage_context per component in parallel chunks (see
+    USAGE_SYSTEM_PROMPT for why).
+
+    `attachments` are content blocks from aida.attachments.load_blocks, so a
+    förfrågningsunderlag can be the project description (§14.6). Only the first
+    step reads them; the second works from the needs_analysis the first wrote
+    from them, so a long PDF is not paid for once per chunk.
+    """
+    client = get_client()
+    started_at = time.monotonic()
+    data = _extract(client, description, attachments or [], started_at)
+    if data.get("clarification_needed"):
+        return data
+    return add_usage_context(data, description, started_at)
 
 
 def main():

@@ -719,7 +719,7 @@ def api_route():
     own flow switch: an advisory reply is rendered and stops; new_project and
     flow_action fall through to the existing flow.
 
-    Request:  {message, history?, project?, baseline?, alternatives?, selections?, sheet?}
+    Request:  {message, history?, project?, baseline?, alternatives?, selections?, sheet?, pending_questions?}
     Response: {intent: 'advisory_question', reply, state_updates, ...} | {intent: 'new_project'|'flow_action'}
 
     `sheet` comes only from Chatt, and with it the answer is written to the
@@ -745,6 +745,7 @@ def api_route():
             attachments=blocks,
             attachment_note=note,
             sheet=data.get('sheet'),
+            pending_questions=data.get('pending_questions') if isinstance(data.get('pending_questions'), list) else None,
         )
         return jsonify(result)
     except _TIMEOUT_ERRORS:
@@ -2417,7 +2418,7 @@ if (typeof marked !== 'undefined') {
 let _step = 'idle';
 let state = {
   project: null, baseline: null, alternatives: null,
-  selections: {}, pendingDesc: null, reportMarkdown: null,
+  selections: {}, pendingIntake: null, reportMarkdown: null,
   // Orchestration increment 4: the full chat, displayed and remembered. Durable
   // per analysis (analyses.conversation_data). Entries tagged with a `role` are
   // the model's context; see llmHistory().
@@ -2799,6 +2800,16 @@ function addMsg(text, cls, role, attachments) {
   return entry;
 }
 
+// A model reply into the chat. One without text is shown as what it is, never
+// as an empty bubble: four of those in the testers' analyses read as being
+// ignored (2026-09-30, 2026-10-11). Shown as a notice, not as Aida's turn, so
+// the question it failed to answer is still the open one in her history.
+function addReply(reply) {
+  const text = String(reply == null ? '' : reply).trim();
+  if (!text) return addMsg('Jag fick inte ihop något svar den här gången. Skriv frågan igen, så försöker jag på nytt.', 'system');
+  return addMsg(text, 'bot', 'assistant');
+}
+
 // The confirm message after intake (Henric 2026-09-08). Intake already writes
 // the questions Aida would have liked answered into needs_analysis.would_clarify,
 // but they were only rendered in the results panel, where nobody answers them.
@@ -2807,12 +2818,17 @@ function addMsg(text, cls, role, attachments) {
 // not as a form, and the button keeps 'baslinje' in its label because the
 // reload path matches on that word to decide which confirm is still live.
 const INTAKE_CLARIFY_MAX = 3;
+// The questions the confirm message shows. One function, because the answer to
+// them is read against the same list (correctionIntake, pendingQuestions).
+function shownQuestions(project) {
+  const na = (project && project.needs_analysis) || {};
+  return (Array.isArray(na.would_clarify) ? na.would_clarify : [])
+    .map(q => String(q || '').trim()).filter(Boolean).slice(0, INTAKE_CLARIFY_MAX);
+}
 function intakeSummary(project) {
   const compList = (project.components || []).map(c => '- ' + c.name + ' (' + c.quantity + ' ' + c.unit + ')').join('\n');
   let text = '**' + project.building_type + '**, ' + project.area_bta + ' m²\n\n**Komponenter:**\n' + compList;
-  const na = project.needs_analysis || {};
-  const asks = (Array.isArray(na.would_clarify) ? na.would_clarify : [])
-    .map(q => String(q || '').trim()).filter(Boolean).slice(0, INTAKE_CLARIFY_MAX);
+  const asks = shownQuestions(project);
   let hint;
   if (asks.length) {
     text += '\n\n**Bra att veta innan jag räknar:**\n' + asks.map(q => '- ' + q).join('\n');
@@ -3135,20 +3151,95 @@ function _scrubCtxDelimiters(s) {
   return s
     .replace(/Korrigering från användaren:/gi, '[korrigering]')
     .replace(/Tidigare diskussion i sessionen:/gi, '[diskussion]')
-    .replace(/^(Användare|Aida):/gim, '$1​:');  // zero-width space prevents role-line spoofing
+    .replace(/Svar på Aidas frågor:/gi, '[svar]')
+    .replace(/Aidas frågor:/gi, '[frågor]')
+    .replace(/Komponenter som redan identifierats:/gi, '[komponenter]')
+    .replace(/Projektbeskrivning:/gi, '[beskrivning]')
+    .replace(/^(Användaren?|Aida):/gim, '$1​:');  // zero-width space prevents role-line spoofing
 }
 
-function buildCorrectionContext(text) {
+// === Intake memory ===
+// What the user has told the intake so far: the description first, then every
+// answer with the question it answered ({q?, a}). Each intake call is built from
+// the whole log, and the log is kept on the project (intake_log), so an answer
+// from two rounds back is still there in the third. Before this a round sent the
+// latest answer and the component names only: Matilda was asked again how many
+// use the fikarum after saying 12 (2026-10-07), and Patrik's gruppboende was
+// asked twice for its target group (2026-10-12).
+function intakeLogOf(project) {
+  if (project && Array.isArray(project.intake_log) && project.intake_log.length) {
+    return project.intake_log.slice();
+  }
+  // Analyses from before the log: what the model wrote down of the user's own
+  // words is the closest thing there is.
+  const na = (project && project.needs_analysis) || {};
+  const first = String(na.from_user || (project && project.description) || '').trim();
+  return first ? [{a: first}] : [];
+}
+
+// `raw` for the description saved on the project: the user's words as written.
+// Scrubbed for the model, so a pasted "Svar på Aidas frågor:" cannot pose as
+// one of the sections.
+function renderIntakeLog(log, raw) {
+  const clean = raw ? (t => String(t)) : (t => _scrubCtxDelimiters(String(t)));
+  const [first, ...rest] = log || [];
+  let out = clean((first && first.a) || '');
+  if (rest.length) {
+    out += '\n\nSvar på Aidas frågor:\n' + rest.map(e =>
+      (e.q ? 'Aida: ' + clean(e.q) + '\n' : '') +
+      'Användaren: ' + clean(e.a || '')).join('\n');
+  }
+  return out;
+}
+
+// The components an earlier round already found, carried into the next one.
+// Without them every round started over from the text and could drop what it
+// had found: Patrik's "Innerväggar – uppdelning i tre verkstäder" was listed
+// after the first round and gone after the second (2026-09-29), so the baseline
+// had the doors but not the walls they sit in.
+function foundOf(components) {
+  return (components || []).filter(c => c && c.name)
+    .map(c => ({name: c.name, quantity: c.quantity, unit: c.unit}));
+}
+function renderFound(found) {
+  const items = (found || []).filter(c => c && c.name).map(c =>
+    _scrubCtxDelimiters(String(c.name)) + (c.quantity != null && c.unit ? ' (' + c.quantity + ' ' + c.unit + ')' : ''));
+  return items.length ? '\n\nKomponenter som redan identifierats: ' + items.join('; ') + '.' : '';
+}
+
+// The questions Aida is waiting on an answer to, for the router: the intake
+// turns are not in the model's history, so without them it cannot tell that
+// "Det finns problem med ljudöverföring" answers one of them.
+function pendingQuestions() {
+  if (state.step === 'idle' && state.pendingIntake && state.pendingIntake.question) {
+    return [state.pendingIntake.question];
+  }
+  if (state.step === 'intake_done') return shownQuestions(state.project);
+  return [];
+}
+
+// A correction to a project that already exists, through intake. `questions`
+// are the ones the confirm message asked, which the text may be answering.
+function correctionIntake(text, questions) {
+  const qs = questions || [];
+  const log = intakeLogOf(state.project).concat([qs.length ? {q: qs.join(' '), a: text} : {a: text}]);
+  return runIntake(buildCorrectionContext(text, qs),
+                   {log, found: foundOf(state.project && state.project.components)});
+}
+
+function buildCorrectionContext(text, questions) {
   // Guard: without core project fields we cannot build a useful ctx; pass the
   // raw correction text so intake at least sees the user's intent without
   // "undefined, undefined m2" garbage.
   if (!state.project || !state.project.building_type || state.project.area_bta == null) {
     return text;
   }
-  const compSummary = (state.project.components || []).map(c => c.name + ' (' + c.quantity + ' ' + c.unit + ')').join(', ');
   let ctx = '';
-  if (state.project.name) ctx += 'Projektnamn: ' + state.project.name + '. ';
-  ctx += state.project.building_type + ', ' + state.project.area_bta + ' m2. Komponenter: ' + compSummary + '.';
+  if (state.project.name) ctx += 'Projektnamn: ' + state.project.name + '.\n\n';
+  const log = intakeLogOf(state.project);
+  if (log.length) ctx += 'Projektbeskrivning:\n' + renderIntakeLog(log) + '\n\n';
+  ctx += state.project.building_type + ', ' + state.project.area_bta + ' m2.' +
+         renderFound(foundOf(state.project.components));
   const hist = llmHistory();
   if (hist.length > 0) {
     const tail = hist.slice(-8).map(m => {
@@ -3156,6 +3247,9 @@ function buildCorrectionContext(text) {
       return role + ': ' + _scrubCtxDelimiters(m.content || '');
     }).join('\n');
     ctx += '\n\nTidigare diskussion i sessionen:\n' + tail;
+  }
+  if (questions && questions.length) {
+    ctx += '\n\nAidas frågor: ' + questions.map(q => _scrubCtxDelimiters(String(q))).join(' ');
   }
   ctx += '\n\nKorrigering från användaren: ' + _scrubCtxDelimiters(text);
   return ctx;
@@ -3504,7 +3598,14 @@ async function sendMessage() {
   // advisory would silently drop the edit (advisory mutates nothing). So the
   // router only fires on messages neither regex catches — exactly the pure
   // questions we want it for. Any routing error falls through (fail-safe).
-  if (!wantsAdvance && !wantsCorrection) {
+  // While intake waits on the answer to its clarifying question, a message
+  // without a question mark is that answer. In intake_done the router decides,
+  // told which questions the confirm message asked (pendingQuestions): there a
+  // "Tack" must not start a new intake round. Matilda's "Det finns problem med
+  // ljudöverföring till närliggande rum" went to the advisory branch on
+  // 2026-09-30 because the router never saw the question it answered.
+  const answersIntake = state.step === 'idle' && !!state.pendingIntake && text.indexOf('?') === -1;
+  if (!wantsAdvance && !wantsCorrection && !answersIntake) {
     try {
       const routed = await routeMessage(text);
       // No setLoading: the indicator belongs to the analysis now on screen.
@@ -3513,7 +3614,7 @@ async function sendMessage() {
         userEntry.role = 'user';
         // In Chatt the answer itself went on the sheet, and the reply says where.
         if (routed.state_updates) applyAgentStateUpdates(routed.state_updates);
-        addMsg(routed.reply, 'bot', 'assistant');  // saves both entries
+        addReply(routed.reply);  // saves both entries
         setLoading(false);
         return;
       }
@@ -3527,10 +3628,12 @@ async function sendMessage() {
 
   switch (state.step) {
     case 'idle':
-      if (state.pendingDesc) {
-        await runIntake(state.pendingDesc + '\n\nFörtydligande: ' + text);
+      if (state.pendingIntake) {
+        const p = state.pendingIntake;
+        const log = p.log.concat([p.question ? {q: p.question, a: text} : {a: text}]);
+        await runIntake(renderIntakeLog(log) + renderFound(p.found), {log, found: p.found});
       } else {
-        await runIntake(text);
+        await runIntake(text, {log: [{a: text}], found: []});
       }
       break;
     case 'intake_done':
@@ -3539,7 +3642,7 @@ async function sendMessage() {
         confirmStep();
       } else {
         addMsg('Uppdaterar projektbeskrivning...', 'system');
-        await runIntake(buildCorrectionContext(text));
+        await correctionIntake(text, shownQuestions(state.project));
       }
       break;
     case 'baseline_done':
@@ -3549,7 +3652,7 @@ async function sendMessage() {
       } else if (wantsCorrection) {
         // Re-run intake with correction, then auto-trigger baseline
         addMsg('Uppdaterar projektet och r\u00e4knar om baslinjen...', 'system');
-        await runIntake(buildCorrectionContext(text));
+        await correctionIntake(text);
         if (epoch === analysisEpoch && state.step === 'intake_done') {
           await runBaseline();
         }
@@ -3580,7 +3683,7 @@ async function sendMessage() {
       if (wantsCorrection) {
         // Re-run from intake with correction
         addMsg('G\u00f6r om analysen med dina kommentarer...', 'system');
-        await runIntake(buildCorrectionContext(text));
+        await correctionIntake(text);
         if (epoch === analysisEpoch && state.step === 'intake_done') {
           await runBaseline();
           if (epoch === analysisEpoch && state.step === 'baseline_done') {
@@ -3621,18 +3724,32 @@ function confirmStep() {
 }
 
 // === Pipeline: Intake ===
-async function runIntake(desc) {
+// `opts.log` is the intake log this call is built from, `opts.found` the
+// components the round before had found (see intakeLogOf).
+async function runIntake(desc, opts) {
   addMsg('Analyserar projektbeskrivning...', 'system');
   setProgressStep('planering');
   const epoch = analysisEpoch;
+  const log = (opts && opts.log) || [{a: desc}];
+  const found = (opts && opts.found) || [];
+  // The name the user sees in the list. Intake only names a project it finds a
+  // name for in the text, so a correction would otherwise drop a renamed one.
+  const name = (state.project && state.project.name) || (state.pendingIntake && state.pendingIntake.name) || '';
+  // A failed round keeps what the user just said, so "Kan du testa igen" retries
+  // with it. Patrik's LSS answer was lost to a timeout on 2026-10-12, and the
+  // round after asked for the target group again.
+  const keepAnswer = () => {
+    if (state.step === 'idle') state.pendingIntake = {log, found, name, question: ''};
+  };
   try {
     const r = await authFetch('/api/intake', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({description: desc, attachments: attachmentRefs()})});
     const d = await r.json();
     if (lateReply(epoch)) return;
-    if (d.error) { addMsg('Fel: ' + d.error, 'system'); setLoading(false); return; }
+    if (d.error) { keepAnswer(); addMsg('Fel: ' + d.error, 'system'); setLoading(false); return; }
 
     if (d.clarification_needed) {
-      state.pendingDesc = desc;
+      const nowFound = foundOf(d.components);
+      state.pendingIntake = {log, found: nowFound.length ? nowFound : found, name, question: d.clarification_needed};
       state.project = null;
       state.step = 'idle';
       if (d.components && d.components.length) {
@@ -3644,7 +3761,11 @@ async function runIntake(desc) {
       return;
     }
 
-    state.pendingDesc = null;
+    state.pendingIntake = null;
+    d.intake_log = log;
+    // The user's own words, not the context string the call was built from.
+    d.description = renderIntakeLog(log, true);
+    if (name) d.name = name;
     state.project = d;
     state.baseline = null;
     state.alternatives = null;
@@ -3682,6 +3803,7 @@ async function runIntake(desc) {
     setLoading(false);
   } catch(e) {
     if (lateReply(epoch)) return;
+    keepAnswer();
     addMsg('Fel: ' + e.message, 'system'); setLoading(false);
   }
 }
@@ -4190,6 +4312,7 @@ async function routeMessage(text) {
     // Only from Chatt. Without it the server offers no block tools, so a question
     // asked in Stegvis is answered in the chat as before.
     sheet: isDoc() ? (state.sheet || emptySheet()) : null,
+    pending_questions: pendingQuestions(),
   };
   const r = await authFetch('/api/route', {method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify(body)});
@@ -4232,7 +4355,7 @@ async function runChat(text, userEntry) {
 
     applyAgentStateUpdates(d.state_updates);
 
-    addMsg(d.reply, 'bot', 'assistant');
+    addReply(d.reply);
 
     // Chat agent may have requested baseline/alternatives reruns. Execute them
     // sequentially so each action sees state from the previous one's merge.
@@ -7582,7 +7705,7 @@ async function loadAnalysis(id, opts) {
     // array. restoreUI renders it (and falls back to localStorage for analyses
     // saved before this shipped).
     state.conversation = Array.isArray(data.conversation_data) ? data.conversation_data : [];
-    state.pendingDesc = null;
+    state.pendingIntake = null;
     state.project = data.project_data;
     state.baseline = data.baseline_data;
     state.alternatives = data.alternatives_data;
@@ -7745,7 +7868,7 @@ async function createNewProject(opts) {
   try { localStorage.removeItem(_chatStorageKey()); } catch(e) {}
   state.conversation = [];
   state.project = null; state.baseline = null; state.alternatives = null;
-  state.selections = {}; state.pendingDesc = null; state.reportMarkdown = null;
+  state.selections = {}; state.pendingIntake = null; state.reportMarkdown = null;
   state.step = 'idle';
   state.directives = {global: [], byComponent: {}};
   state.selectionIntent = {};

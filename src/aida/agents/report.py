@@ -41,7 +41,7 @@ Aidas uppdrag är att hjälpa förvaltare och byggledare att hitta renoveringsl�
 
 Varje rapport ska följa denna rubrikstruktur exakt:
 
-# Klimatanalys: [Projekttyp]
+# Klimatanalys: [Projektnamn]
 
 ## Sammanfattning
 Kort projektbeskrivning, total klimatbesparing (kg CO2e och %), kostnadsjämförelse. Max 4-5 meningar.
@@ -129,6 +129,7 @@ def generate_report_markdown(
             "role": "user",
             "content": f"""Generera en rapport för detta ombyggnadsprojekt:
 
+Projektnamn: {report_title(project)}
 Projekttyp: {project.building_type}
 Area: {project.area_bta} m² BTA
 Datum: {date.today().isoformat()}
@@ -147,7 +148,7 @@ Skriv en komplett rapport i markdown. Inkludera disclaimer om att detta är upps
         }],
     )
 
-    markdown = extract_text(response)
+    markdown = with_title(extract_text(response), project)
     if no_choice:
         markdown = markdown.rstrip() + "\n\n" + render_missing_selection_caveat(
             no_choice, len(aggregate.components))
@@ -162,6 +163,28 @@ Skriv en komplett rapport i markdown. Inkludera disclaimer om att detta är upps
     if override_rows:
         markdown = markdown.rstrip() + "\n\n" + render_override_caveats(override_rows)
     return markdown
+
+
+def report_title(project: Project) -> str:
+    """What the report is called: the project's name, the building type only
+    when there is none. Matilda's "Renovering fikarum" came out as "Klimatanalys:
+    Kontor" (2026-10-07), because the heading was asked for by building type."""
+    name = (project.name or "").strip()
+    if name:
+        return name
+    kind = (project.building_type or "").strip()
+    return kind[:1].upper() + kind[1:] if kind else "Ombyggnad"
+
+
+def with_title(markdown: str, project: Project) -> str:
+    """The report's first heading set in code, so it never depends on the model
+    picking the right field."""
+    title = f"# Klimatanalys: {report_title(project)}"
+    lines = (markdown or "").lstrip().split("\n")
+    if lines and lines[0].startswith("# "):
+        lines[0] = title
+        return "\n".join(lines)
+    return title + "\n\n" + (markdown or "").lstrip()
 
 
 def build_stock_caveats(components: list[dict]) -> list[dict]:

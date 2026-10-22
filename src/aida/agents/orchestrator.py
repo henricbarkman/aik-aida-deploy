@@ -198,7 +198,13 @@ def classify_intent(
     messages = turns_with_message(clean, message, keep=6)
 
     try:
-        response = client.messages.create(
+        # Through call_model like every other call, so the route choice (the
+        # Max credits before OpenRouter) applies here too. Haiku is outside the
+        # thinking gate, so call_model adds nothing to the request, and the
+        # forced tool_choice is fine on Haiku 5.5 on both routes (it is Opus
+        # 5.5 and Sonnet 5.5 that refuse it).
+        response = call_model(
+            client,
             model=CLASSIFIER_MODEL,
             max_tokens=300,
             system=_CLASSIFY_SYSTEM + "\n\n" + state_note,

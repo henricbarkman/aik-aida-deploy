@@ -152,6 +152,7 @@ Skriv en komplett rapport i markdown. Inkludera disclaimer om att detta är upps
     )
 
     markdown = with_title(extract_text(response), project)
+    markdown = insert_after_title(markdown, render_heavy_summary(project, aggregate))
     if defaults:
         markdown = markdown.rstrip() + "\n\n" + render_default_choices(
             defaults, len(project.components) or len(aggregate.components))
@@ -174,6 +175,122 @@ Skriv en komplett rapport i markdown. Inkludera disclaimer om att detta är upps
 # Components without a choice count as their baseline (testgruppen
 # 2026-10-12). `baseline` is the analysis' baseline as the browser holds it,
 # read only for the material each default stands for.
+# Which part of the building each category belongs to, for the summary. A reader
+# planning work thinks in surfaces, envelope and installations, not in categories.
+_BUILDING_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Stomme", ("stomme", "betongvägg")),
+    ("Klimatskal", ("yttervägg", "fasadskikt", "tak", "fönster", "dörr", "isolering")),
+    ("Invändiga ytskikt och väggar", ("golv", "kakel", "innervägg", "undertak", "farg",
+                                      "tätskikt")),
+    ("Installationer", ("ventilation", "vvs", "el", "radiator", "belysning", "hiss",
+                        "kylanläggning", "sanitet")),
+    ("Inredning och utrustning", ("fast_inredning", "los_inredning", "vitvaror",
+                                  "storköksutrustning")),
+)
+_HEAVY_SHARE = 0.8
+
+
+def _number_sv(value: float, digits: int = 0) -> str:
+    return f"{value:,.{digits}f}".replace(",", " ").replace(".", ",")
+
+
+def _building_group(component) -> str:
+    from aida.data.climate_data import canonical_category, normalize_component_name
+
+    category = (canonical_category(component.category)
+                or normalize_component_name(component.name))
+    for label, categories in _BUILDING_GROUPS:
+        if category in categories:
+            return label
+    return "Övrigt"
+
+
+def build_heavy_summary(project: Project, aggregate) -> dict | None:
+    """The chosen figures with the heaviest first, and per m² BTA (DECISIONS 22).
+
+    Deterministic, not the model's: this is where a reader decides what to look at
+    first, and a table the model wrote could leave out the row that matters.
+    """
+    rows = [c for c in aggregate.components if (c.get("co2e_kg") or 0) > 0]
+    total = sum(c["co2e_kg"] for c in rows)
+    if not rows or total <= 0:
+        return None
+    rows = sorted(rows, key=lambda c: c["co2e_kg"], reverse=True)
+    heavy, running = [], 0.0
+    for c in rows:
+        heavy.append(c)
+        running += c["co2e_kg"]
+        if running >= _HEAVY_SHARE * total:
+            break
+    by_id = {c.id: c for c in project.components}
+    groups: dict[str, float] = {}
+    for c in rows:
+        comp = by_id.get(c.get("id"))
+        label = _building_group(comp) if comp else "Övrigt"
+        groups[label] = groups.get(label, 0.0) + c["co2e_kg"]
+    area = project.area_bta if isinstance(project.area_bta, (int, float)) else 0
+    return {"total": total, "count": len(rows), "heavy": heavy, "heavy_share": running / total,
+            "groups": sorted(groups.items(), key=lambda kv: kv[1], reverse=True),
+            "area": area if area and area > 0 else None,
+            "baseline": aggregate.baseline_total_co2e_kg}
+
+
+def render_heavy_summary(project: Project, aggregate) -> str:
+    summary = build_heavy_summary(project, aggregate)
+    if summary is None:
+        return ""
+    total, area = summary["total"], summary["area"]
+    per_area = (f"{_number_sv(total / area, 1)} kg CO2e per m² BTA "
+                f"(räknat på hela projektets {_number_sv(area)} m² BTA, också om bara en "
+                f"del av huset berörs)") if area else "BTA saknas, så siffran per m² går inte att räkna"
+    baseline = ""
+    if area and summary["baseline"]:
+        baseline = (f" Baslinjen är {_number_sv(summary['baseline'])} kg CO2e, "
+                    f"{_number_sv(summary['baseline'] / area, 1)} kg CO2e per m² BTA.")
+    n, count = len(summary["heavy"]), summary["count"]
+    lines = [
+        "## Tyngst i klimatkalkylen",
+        "",
+        f"Valda alternativ ger {_number_sv(total)} kg CO2e i tillverkning, {per_area}.{baseline}",
+        "",
+        f"{n} av {count} byggdelar står för {_number_sv(summary['heavy_share'] * 100)} % "
+        f"av siffran. Börja där.",
+        "",
+        "| Byggdel | Valt | kg CO2e | Andel |",
+        "|---|---|---|---|",
+    ]
+    lines += [
+        f"| {cell(c.get('name'))} | {cell(c.get('valt_alternativ'))} | "
+        f"{_number_sv(c['co2e_kg'])} | {_number_sv(c['co2e_kg'] / total * 100)} % |"
+        for c in summary["heavy"]
+    ]
+    if len(summary["groups"]) > 1:
+        lines += ["", "Fördelning per del av byggnaden:", "",
+                  "| Del | kg CO2e | Andel |", "|---|---|---|"]
+        lines += [f"| {cell(label)} | {_number_sv(value)} | {_number_sv(value / total * 100)} % |"
+                  for label, value in summary["groups"]]
+    return "\n".join(lines)
+
+
+def insert_after_title(markdown: str, section: str) -> str:
+    """A section right under the report's first heading, ahead of the model's text."""
+    if not section:
+        return markdown
+    lines = (markdown or "").split("\n")
+    if lines and lines[0].startswith("# "):
+        rest = "\n".join(lines[1:]).lstrip("\n")
+        return f"{lines[0]}\n\n{section}\n\n{rest}"
+    return f"{section}\n\n{markdown or ''}"
+
+
+def life_cycle_markdown(project: Project, selections: Selections, baseline: dict | None) -> str:
+    """The optional section on transport, site and demolition (DECISIONS 19)."""
+    from aida.data import livscykel
+
+    aggregate = compute_aggregate(project, selections)
+    return livscykel.render_markdown(livscykel.compute(project, aggregate, selections, baseline))
+
+
 def _baseline_by_id(baseline: dict | None) -> dict:
     out = {}
     for b in (baseline or {}).get("components") or []:

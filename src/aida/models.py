@@ -21,6 +21,14 @@ class Component:
     # rule out unsuitable materials (e.g. förskole-tambur → halksäker,
     # rengörbar, slittålig mot blöt sand och salt).
     usage_context: str = ""
+    # What the user said about the part already there: "går att laga", "måste
+    # bytas", "finns inte", or empty when nothing was said (DECISIONS 20). Decides
+    # whether a keep-and-repair row is offered.
+    existing_condition: str = ""
+    # A layer that came with another part (DECISIONS 21): the part's id, and for a
+    # bundle of accessories its recipe, whose figure is the recipe's and no model's.
+    recipe_parent: str = ""
+    recipe_bundle: str = ""
 
     def __post_init__(self):
         # Normalize unknown values to "estimated" — keeps UI logic simple
@@ -41,6 +49,9 @@ class Component:
             category=data.get("category", ""),
             quantity_source=data.get("quantity_source", "estimated"),
             usage_context=data.get("usage_context", ""),
+            existing_condition=data.get("existing_condition", "") or "",
+            recipe_parent=data.get("recipe_parent", "") or "",
+            recipe_bundle=data.get("recipe_bundle", "") or "",
         )
 
 
@@ -236,7 +247,7 @@ class Alternative:
     cost_sek: float
     source: str
     reasoning: str = ""
-    alternative_type: str = ""  # "reuse", "climate_optimized", "baseline", "info"
+    alternative_type: str = ""  # "preserve", "reuse", "climate_optimized", "baseline", "info"
     # Units in stock on Palats at analysis time, for reuse listings. cost_sek
     # and co2e_kg are deliberately computed for the FULL component quantity
     # regardless: Aida is an early-planning tool and stock turns over long

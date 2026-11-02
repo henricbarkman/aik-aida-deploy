@@ -136,7 +136,7 @@ TEKNISKA REGLER:
 - Är klimatskillnaden liten mellan två alternativ, välj det med "nordisk leverantör". Är skillnaden stor, välj det bästa ändå och nämn i reasoning att leverantören är utländsk.
 - Minst ett av dina EPD-alternativ ska ha "nordisk leverantör" om listan innehåller något sådant.
 - Välj EPD:er i projektets enhet. Systemet räknar co2e_kg från EPD:ns eget värde efteråt och jämför bara samma enhet (undantag anges i uppgiften), så en EPD i en annan enhet visas inte och en egen omräkning används inte.
-- co2e_kg MÅSTE vara > 0 — alla byggmaterial har klimatpåverkan, även återbruk (transport och renovering). Returnera aldrig 0.
+- co2e_kg MÅSTE vara > 0 — alla byggmaterial har klimatpåverkan, även återbruk (transport). Returnera aldrig 0.
 - Föreslå KOMPLETTA system, inte enskilda komponenter.
 - alternative_type är "climate_optimized" för EPD-rader och "reuse" för Palats-rader. Aldrig "reuse" på en EPD, aldrig "climate_optimized" på en annons.
 - source för en Palats-rad ska vara exakt "[Palats] palats.app/listing/<id>" med id från raden, så annonsen går att slå upp.
@@ -1974,7 +1974,7 @@ def _validate_alternatives(
         # arrive here, and the checks below (complete-system name filter,
         # market-price plausibility) are about new products and would only
         # add wrong notes to a second-hand listing.
-        if alt.alternative_type == "reuse":
+        if alt.alternative_type in ("reuse", "preserve"):
             valid.append(alt)
             continue
 
@@ -2050,7 +2050,7 @@ def _b1_keep_alternative(alt) -> bool:
     Only unpriced AND non-EPD alternatives (pure LLM guesses, unactionable on both
     price and climate verifiability) are dropped.
     """
-    if alt.alternative_type in ("baseline", "info", "reuse"):
+    if alt.alternative_type in ("baseline", "info", "reuse", "preserve"):
         return True
     if alt.cost_sek is not None and alt.cost_sek > 0:
         return True
@@ -2433,40 +2433,37 @@ def _palats_candidates(
         )
     unique = unique[:_MAX_PALATS_PER_COMPONENT]
 
-    # A reused frame member's climate figure is its transport, derived from
-    # the weight the name gives (stomme_reuse, HENRIC-3364). Without that
-    # weight there is no figure, and a default would be a number with no
-    # basis: 2 kg CO2e per metre of stud is more than a new stud. The
-    # listings are named in an info row instead, with the reason.
-    # Each listing is weighed with its own size when its title states one
-    # ("Reglar 45x120"), else with the component's (HENRIC-3395). A listing
-    # with no weight either way is named in the info row instead.
-    if category == "stomme" and unique:
-        from aida.data.stomme_reuse import (
-            family_label,
-            listing_reuse_figure,
-            reuse_figure,
-        )
+    # A reused product's climate figure is its transport: weight times Boverket's
+    # record for a reused product (massor, DECISIONS 18). Without a weight there is
+    # no figure, and a default would be a number with no basis. Each listing is
+    # weighed with its own name first, else with the component's (HENRIC-3395). A
+    # listing with no weight either way is named in the info row instead.
+    if unique:
+        from aida.data.massor import listing_reuse_figure, reuse_figure
 
         weighed = [(listing, coverage) for listing, coverage in unique
-                   if listing_reuse_figure(component_name, listing.title,
+                   if listing_reuse_figure(category, component_name, listing.title,
                                            project_unit).per_unit is not None]
         if weighed and len(weighed) < len(unique):
-            logger.info("Palats: %d stomme listings for %r dropped, no weight "
-                        "from title or component", len(unique) - len(weighed),
-                        component_name)
-        figure = reuse_figure(component_name, project_unit)
+            logger.info("Palats: %d listings for %r dropped, no weight from title or "
+                        "component", len(unique) - len(weighed), component_name)
         if not weighed:
+            figure = reuse_figure(category, component_name, project_unit)
             if figure.per_unit is not None:
-                figure = listing_reuse_figure(component_name, unique[0][0].title,
-                                              project_unit)
-            label = family_label(target_subcat)
+                figure = listing_reuse_figure(category, component_name,
+                                              unique[0][0].title, project_unit)
+            if category == "stomme":
+                from aida.data.stomme_reuse import family_label
+
+                label = family_label(target_subcat)
+            else:
+                label = category.replace("_", " ")
             one = len(unique) == 1
             listed = "; ".join(
                 f"{listing.title}" + (f" ({listing.url})" if listing.url else "")
                 for listing, _ in unique)
-            logger.info("Palats: %d stomme listings for %r without a climate "
-                        "figure: %s", len(unique), component_name, figure.note)
+            logger.info("Palats: %d listings for %r without a climate figure: %s",
+                        len(unique), component_name, figure.note)
             return [], Alternative(
                 name=f"{component_name}: återbruk på Palats utan klimatsiffra",
                 co2e_kg=0,
@@ -2497,10 +2494,10 @@ def _reuse_figures(
     (so the model reasons about the same figures the row will carry) and in
     the Alternative built from the model's answer.
 
-    A frame member (stomme) has no set figure: it is derived from the
-    component's name (stomme_reuse), and total_co2e is None when the name does
-    not give the weight. _palats_candidates turns such a component's listings
-    into an info row before they get here.
+    The figure is the product's weight times Boverket's record for a reused
+    product (massor, DECISIONS 18), and total_co2e is None when the weight is
+    not known. _palats_candidates turns such a component's listings into an info
+    row before they get here.
 
     Pricing logic:
     - If project counts in "st" (fönster, dörr), Palats price * quantity
@@ -2511,23 +2508,12 @@ def _reuse_figures(
       2026-09-30 the per-article price was returned as the total, and a 45 m2
       floor was summed as costing 725 kr.
     """
-    from aida.data.palats_client import (
-        _DEFAULT_REUSE_CO2E,
-        LOGIN_REQUIRED_NOTE,
-        REUSE_CO2E_PER_UNIT,
-        listing_requires_login,
-    )
+    from aida.data.massor import listing_reuse_figure
+    from aida.data.palats_client import LOGIN_REQUIRED_NOTE, listing_requires_login
 
-    stomme_note = ""
-    if category == "stomme":
-        from aida.data.stomme_reuse import listing_reuse_figure
-
-        figure = listing_reuse_figure(component_name, getattr(listing, "title", ""),
-                                      project_unit)
-        co2e_per_unit = figure.per_unit
-        stomme_note = figure.note
-    else:
-        co2e_per_unit = REUSE_CO2E_PER_UNIT.get(category, _DEFAULT_REUSE_CO2E)
+    figure = listing_reuse_figure(category, component_name,
+                                  getattr(listing, "title", ""), project_unit)
+    co2e_per_unit = figure.per_unit
     units_match = project_unit.lower() in ("st", "styck", "stk")
     total_co2e = co2e_per_unit * quantity if co2e_per_unit is not None else None
 
@@ -2572,18 +2558,6 @@ def _reuse_figures(
                       + _coverage_note(listing, quantity, project_unit, coverage))
         cost_is_estimate = False
 
-    # A category without its own reuse figure gets the default, and the row
-    # says so: the number is a placeholder, not something derived for this
-    # kind of product, and a reader comparing it with a new product's EPD
-    # should know which of the two is the soft one.
-    default_note = stomme_note
-    if category not in REUSE_CO2E_PER_UNIT and category != "stomme":
-        default_note = (
-            f"Klimatvärdet för återbruket är en schablon ({_DEFAULT_REUSE_CO2E:g} "
-            f"kg CO2e per {project_unit or 'enhet'}): kategorin saknar eget "
-            f"underlag för transport och upprustning"
-        )
-
     location_note = f"Plats: {listing.location}" if listing.location else ""
     # A seller without a public shop (Sola's furniture, HENRIC-3365) can only
     # be linked to Palats' internal page, which shows a login form to anyone
@@ -2593,9 +2567,72 @@ def _reuse_figures(
         url_note = (f"Se annons ({LOGIN_REQUIRED_NOTE}): {listing.url}"
                     if listing_requires_login(listing.url)
                     else f"Se annons: {listing.url}")
-    detail = " | ".join(p for p in [price_note, default_note, location_note, url_note] if p)
-    total = round(total_co2e, 1) if total_co2e is not None else None
+    detail = " | ".join(p for p in [price_note, figure.note, location_note, url_note] if p)
+    # Two decimals below one kilo: one reused office chair is 0,03 kg, and a row
+    # reading 0 would look like a figure nobody calculated.
+    total = None
+    if total_co2e is not None:
+        total = round(total_co2e, 1) if total_co2e >= 1 else (
+            round(total_co2e, 2) or round(total_co2e, 4))
     return total, round(total_cost), detail, cost_is_estimate
+
+
+def _kept_layer_alternative(proj_comp) -> Alternative | None:
+    """A layer from a recipe can stay as it is (DECISIONS 21). Nothing is added for
+    it, and that is a figure: if the part it came with is kept, a layer still counted
+    as new would make keeping look worse than it is."""
+    from aida.data import bevara
+    from aida.data.pricing_provider import BASIS_NONE_NEEDED
+
+    if not bevara.offered(getattr(proj_comp, "existing_condition", "") or ""):
+        return None
+    return Alternative(
+        name="Behåll befintligt lager",
+        co2e_kg=0,
+        cost_sek=0,
+        source=f"{bevara.SOURCE_PREFIX} {bevara.KEPT_LAYER}",
+        reasoning=("Lagret står kvar, så inget nytt tillförs för det. Välj det här om "
+                   "byggdelen det följer med bevaras, eller om lagret är helt."),
+        alternative_type="preserve",
+        material_type="Bevara och laga",
+        price_basis=BASIS_NONE_NEEDED,
+    )
+
+
+def _preserve_alternative(proj_comp, bl_comp, category: str, baseline_co2e: float
+                          ) -> Alternative | None:
+    """The keep-and-repair row for a component, or None (DECISIONS 20).
+
+    None when no repair fits the part, when the user said it must be replaced or
+    is not there, and when the repair is not below the baseline: a row that says
+    keeping costs more than new is a row nobody should be shown as an alternative.
+    Its source names the repair, so the life cycle stages can find it again from a
+    saved selection.
+    """
+    from aida.data import bevara
+
+    if getattr(proj_comp, "recipe_parent", ""):
+        return _kept_layer_alternative(proj_comp)
+    condition = getattr(proj_comp, "existing_condition", "") or ""
+    if not bevara.offered(condition):
+        return None
+    material = " ".join(p for p in (getattr(bl_comp, "assumed_material", ""),
+                                    getattr(bl_comp, "boverket_product", "")) if p)
+    repair = bevara.repair_for(category, f"{proj_comp.name} {material}", proj_comp.unit)
+    if repair is None:
+        return None
+    total = repair.per_unit * proj_comp.quantity
+    if total <= 0 or (baseline_co2e and total >= baseline_co2e):
+        return None
+    return Alternative(
+        name=repair.name,
+        co2e_kg=round(total, 1) if total >= 1 else (round(total, 2) or round(total, 4)),
+        cost_sek=0,
+        source=f"{bevara.SOURCE_PREFIX} {repair.key}",
+        reasoning=bevara.reasoning(repair, condition, proj_comp.unit),
+        alternative_type="preserve",
+        material_type="Bevara och laga",
+    )
 
 
 def _sv_num(value: float) -> str:
@@ -2681,7 +2718,7 @@ def _format_palats_list(
         lines.append(
             f"- [Palats återbruk] {listing.title} | id: {listing.id} | "
             f"Uppskattad CO2e: {total_co2e} kg totalt för {quantity} {project_unit} "
-            f"(transport och renovering, ingen nytillverkning) | {detail}{sub}"
+            f"(transport, ingen nytillverkning, upprustning ej inräknad) | {detail}{sub}"
         )
     return "\n".join(lines)
 
@@ -2948,6 +2985,20 @@ def find_alternatives(
         )
         if not proj_comp:
             return None
+        if proj_comp.recipe_bundle:
+            # Accessories have nothing worth comparing: no ranking, no reuse search.
+            rows = [Alternative(
+                name=f"Inga alternativ jämförs för {proj_comp.name}",
+                co2e_kg=bl_comp.co2e_kg, cost_sek=bl_comp.cost_sek, source="N/A",
+                reasoning="Tillbehör som följer med byggdelen. Aida jämför inga alternativ för dem.",
+                alternative_type="baseline")]
+            kept = _kept_layer_alternative(proj_comp)
+            if kept is not None:
+                rows.insert(0, kept)
+            return ComponentAlternatives(
+                component_id=bl_comp.component_id, component_name=bl_comp.component_name,
+                baseline_co2e_kg=bl_comp.co2e_kg, baseline_cost_sek=bl_comp.cost_sek,
+                alternatives=rows)
 
         comp_key = routing.get(bl_comp.component_id) or resolve_category(
             proj_comp.name, proj_comp.category)
@@ -3144,6 +3195,13 @@ def find_alternatives(
                            or "Inga alternativ identifierade."),
                 alternative_type="baseline",
             ))
+
+        # Keep and repair goes first: the question before "what should it be
+        # replaced with" is whether it needs replacing (DECISIONS 20). Added last
+        # so it counts for neither "nothing found" above nor the ranking.
+        preserve = _preserve_alternative(proj_comp, bl_comp, comp_key, eff_baseline_co2e)
+        if preserve is not None:
+            alternatives.insert(0, preserve)
 
         return ComponentAlternatives(
             component_id=bl_comp.component_id,
@@ -3383,6 +3441,7 @@ def _enrich_alternative_prices(
     from aida.data.pricing_provider import (
         BASIS_ADJUSTED,
         BASIS_LLM_ESTIMATE,
+        BASIS_NONE_NEEDED,
         BASIS_WEB_SEARCH,
         estimate_prices_batch,
         lookup_prices_batch,
@@ -3407,7 +3466,8 @@ def _enrich_alternative_prices(
             # "reuse" excluded: a Palats reuse listing is a specific second-hand
             # item, so a generic market price for the material would not be its
             # price. Those keep whatever the listing said.
-            if alt.cost_sek <= 0 and alt.alternative_type not in ("baseline", "info", "reuse"):
+            if alt.cost_sek <= 0 and alt.alternative_type not in ("baseline", "info", "reuse") \
+                    and alt.price_basis != BASIS_NONE_NEEDED:
                 # The component's unit goes into the question ("enhet: m2"),
                 # so the answer comes back in the unit the quantity is counted
                 # in, and is checked against it in apply() below.
@@ -3549,7 +3609,7 @@ def _find_alternatives_with_epds(
     _palats_candidates. They go into the same prompt as the EPDs, tagged
     [Palats återbruk], and the model ranks both sources in one list and
     writes the reasoning for the reuse rows too. The figures on a reuse row
-    (CO2e from REUSE_CO2E_PER_UNIT, the listing's own price) are computed
+    (CO2e from massor.listing_reuse_figure, the listing's own price) are computed
     here, not taken from the model.
 
     The figures on an EPD row are ours too (_catalog_co2e): the model picks
@@ -3726,7 +3786,7 @@ Inga återbruksannonser på Palats matchar denna komponent just nu, så listan b
         )
         if is_reuse:
             # A reuse row is only ever a Palats candidate the prompt showed.
-            # Its figures are ours (REUSE_CO2E_PER_UNIT and the listing
+            # Its figures are ours (massor.listing_reuse_figure and the listing
             # price), its reasoning is the model's. Anything that does not
             # map back to a candidate is fabricated and dropped, logged.
             hit = _match_palats_candidate(item, palats_candidates)

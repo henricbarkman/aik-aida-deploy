@@ -670,6 +670,29 @@ def api_report():
         return step_failed(e, 'rapportgenereringen')
 
 
+@app.route('/api/report/life-cycle', methods=['POST'])
+@require_auth
+def api_report_life_cycle():
+    """The optional section (DECISIONS 19), computed when the box is ticked. No
+    model call: the rest of the report does not have to be written again."""
+    from aida.agents.aggregate import fill_default_selections
+    from aida.agents.report import life_cycle_markdown
+    from aida.overrides import apply_to_selections_payload
+
+    data = request.json or {}
+    try:
+        project = Project.from_dict(data.get('project', {}))
+        baseline = data.get('baseline') if isinstance(data.get('baseline'), dict) else None
+        payload = fill_default_selections(data.get('selections', {}), project, baseline)
+        payload = apply_to_selections_payload(payload, data.get('overrides') or {})
+        selections = Selections.from_dict(payload)
+        if not selections.components:
+            return jsonify({'error': 'Inga komponenter att räkna på'}), 400
+        return jsonify({'markdown': life_cycle_markdown(project, selections, baseline)})
+    except Exception as e:
+        return step_failed(e, 'avsnittet om transport, byggplats och rivning')
+
+
 @app.route('/api/report/docx', methods=['POST'])
 @require_auth
 def api_report_docx():
@@ -1784,6 +1807,7 @@ body { font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif; hei
 .type-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
 .type-baseline { background: var(--kk-gray-100); color: var(--kk-charcoal); }
 .type-reuse { background: var(--kk-gold-light); color: #7A6000; }
+.type-preserve { background: #DCEFE3; color: #1F5C3A; }
 .type-optimized { background: #FDE8D0; color: var(--kk-red-orange); }
 /* A component Aida asked about instead of suggesting for. The row is tinted,
    not the badge: it is the one row in the card that waits on the user. */
@@ -4253,7 +4277,8 @@ function altSelection(comp, alt) {
       source: alt.source,
       available_quantity: (alt.available_quantity === undefined ? null : alt.available_quantity),
       available_amount: (typeof alt.available_amount === 'number' ? alt.available_amount : null),
-      price_basis: alt.price_basis || '', gwp_basis: alt.gwp_basis || ''},
+      price_basis: alt.price_basis || '', gwp_basis: alt.gwp_basis || '',
+      alternative_type: alt.alternative_type || ''},
     baseline_co2e_kg: comp.baseline_co2e_kg, baseline_cost_sek: comp.baseline_cost_sek};
 }
 
@@ -5225,6 +5250,7 @@ function formatSource(source, url) {
   if (!source) return '';
   if (source.startsWith('[EPD]')) return '<span class="source-badge source-verified">EPD</span>' + esc(source.replace('[EPD] ', ''));
   if (source.startsWith('[Palats]')) return '<span class="source-badge source-verified">Palats</span>' + palatsSourceLabel(source, url);
+  if (source.startsWith('[Bevara]')) return '<span class="source-badge source-verified">BVK</span>Boverket, åtgång uppskattad';
   if (source.includes('Boverket')) return '<span class="source-badge source-verified">BVK</span>' + esc(source);
   // EPD-typvärde: median of upper-half EPDs by GWP per category — better
   // than Uppskattning, less precise than a single verified EPD. Approximates
@@ -5238,6 +5264,7 @@ function formatSource(source, url) {
 
 function getTypeBadge(alt) {
   if (alt.alternative_type === 'info') return '<span class="type-badge" style="background:var(--kk-gray-100);color:var(--kk-gray-500)">Info</span>';
+  if (alt.alternative_type === 'preserve') return '<span class="type-badge type-preserve">Bevara</span>';
   if (alt.alternative_type === 'reuse') return '<span class="type-badge type-reuse">\u00c5terbruk</span>';
   if (alt.alternative_type === 'climate_optimized') return '<span class="type-badge type-optimized">Klimatopt.</span>';
   return '<span class="type-badge type-baseline">Baslinje</span>';
@@ -6028,6 +6055,10 @@ function rankedAlternatives(comp) {
   const info = rows.filter(r => r.alt.alternative_type === 'info');
   const rest = rows.filter(r => r.alt.alternative_type !== 'info');
   rest.sort((a, b) => {
+    // Keep and repair first: whether to replace at all comes before with what.
+    const pa = a.alt.alternative_type === 'preserve' ? 0 : 1;
+    const pb = b.alt.alternative_type === 'preserve' ? 0 : 1;
+    if (pa !== pb) return pa - pb;
     const va = altValue(comp, a.alt), vb = altValue(comp, b.alt);
     if (va.tier !== vb.tier) return va.tier - vb.tier;
     if (va.value !== vb.value) return va.value - vb.value;
@@ -6046,8 +6077,9 @@ function rankedAlternatives(comp) {
 //
 // The type is the catalog's own (alt.material_type, set on the server from the
 // row's subtype). Reuse is a group of its own whatever the material: its figure
-// is a fixed per-unit schablon, and a range spanning it and declared products
-// would describe neither. A product with no known type goes under "Övrigt".
+// is transport only, and a range spanning it and declared products would describe
+// neither. Keep and repair is first, and its own material_type is its group. A
+// product with no known type goes under "Övrigt".
 const REUSE_GROUP = 'Återbruk från Palats';
 const OTHER_GROUP = 'Övrigt';
 
@@ -6295,6 +6327,7 @@ function formatCost(alt) {
   // An EPD-verified alternative that could not be web-priced survives the B1
   // filter with cost_sek 0. Rendering that as "0 kr" read as free; Johanna
   // reported it as "pris visas inte för nyproducerade material".
+  if (alt.price_basis === 'none_needed') return '0 kr';
   if (!(alt.cost_sek > 0)) return '<span style="color:var(--kk-gray-500)">Pris saknas</span>';
   return Math.round(alt.cost_sek).toLocaleString('sv') + ' kr';
 }
@@ -6470,8 +6503,61 @@ function renderAlternativContent() {
   bindAltRows();
 }
 
+// The report as it stands: the model's text, plus the optional section on
+// transport, site and demolition when the box is ticked (DECISIONS 19). The
+// section is tied to the report it was computed for, so a new report cannot carry
+// an old one's figures. Everything that shows or exports the report goes through
+// here, so the screen and the Word file cannot differ.
+function fullReportMarkdown(st) {
+  const lc = st.lifeCycle;
+  const on = lc && lc.on && lc.forReport === st.reportMarkdown && lc.markdown;
+  return on ? st.reportMarkdown.trimEnd() + '\n\n' + lc.markdown : st.reportMarkdown;
+}
+
+async function toggleLifeCycle(on) {
+  const box = document.getElementById('lifeCycleBox');
+  if (!on) {
+    if (state.lifeCycle) state.lifeCycle.on = false;
+    renderRapportContent();
+    return;
+  }
+  if (state.lifeCycle && state.lifeCycle.forReport === state.reportMarkdown && state.lifeCycle.markdown) {
+    state.lifeCycle.on = true;
+    renderRapportContent();
+    return;
+  }
+  if (box) box.disabled = true;
+  const forReport = state.reportMarkdown;
+  try {
+    const sels = {components: Object.values(selectionsWithDefaults(state))};
+    const r = await authFetch('/api/report/life-cycle', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({project: state.project, selections: sels, overrides: state.overrides, baseline: state.baseline})});
+    const d = await r.json();
+    if (d.error) {
+      addMsg('Avsnittet gick inte att räkna: ' + d.error, 'system');
+      if (box) { box.checked = false; box.disabled = false; }
+      return;
+    }
+    // The report may have been redone while this was on its way: the section was
+    // counted for the one that was open when the box was ticked.
+    if (state.reportMarkdown !== forReport) {
+      if (box) { box.checked = false; box.disabled = false; }
+      return;
+    }
+    state.lifeCycle = {on: true, forReport: forReport, markdown: d.markdown};
+    renderRapportContent();
+  } catch (e) {
+    addMsg('Avsnittet gick inte att räkna: ' + e.message, 'system');
+    if (box) { box.checked = false; box.disabled = false; }
+  }
+}
+
 function rapportHtml(st) {
-  let html = '<div class="report-area">' + renderMd(st.reportMarkdown) + '</div>';
+  const lcOn = !!(st.lifeCycle && st.lifeCycle.on && st.lifeCycle.forReport === st.reportMarkdown);
+  let html = '<div class="report-area">' + renderMd(fullReportMarkdown(st)) + '</div>';
+  html += '<label class="life-cycle-toggle" style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;cursor:pointer">'
+    + '<input type="checkbox" id="lifeCycleBox"' + (lcOn ? ' checked' : '') + '>'
+    + '<span>Ta med transport, byggplats och rivning i rapporten. Huvudsiffran ändras inte, det blir ett eget avsnitt.</span></label>';
   html += '<div style="margin-top:12px;display:flex;gap:8px">';
   html += '<button class="btn" id="dlDocxBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Ladda ner Word (.docx)</button>';
   html += '<button class="btn btn-secondary" id="dlBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Ladda ner (.md)</button>';
@@ -6485,16 +6571,18 @@ function renderRapportContent() {
 }
 
 function bindReportDownloads() {
+  const lifeCycleBox = document.getElementById('lifeCycleBox');
+  if (lifeCycleBox) lifeCycleBox.onchange = () => toggleLifeCycle(lifeCycleBox.checked);
   if (!document.getElementById('dlBtn')) return;
   document.getElementById('dlBtn').onclick = () => {
-    const blob = new Blob([state.reportMarkdown], {type:'text/markdown'});
+    const blob = new Blob([fullReportMarkdown(state)], {type:'text/markdown'});
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'aida-rapport.md'; a.click();
   };
   document.getElementById('dlDocxBtn').onclick = async () => {
     const btn = document.getElementById('dlDocxBtn');
     btn.disabled = true; btn.textContent = 'Skapar dokument...';
     try {
-      const r = await authFetch('/api/report/docx', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({markdown: state.reportMarkdown})});
+      const r = await authFetch('/api/report/docx', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({markdown: fullReportMarkdown(state)})});
       if (!r.ok) { const d = await r.json(); alert('Fel: ' + d.error); return; }
       const blob = await r.blob();
       const today = new Date().toISOString().slice(0,10);
@@ -7179,7 +7267,7 @@ async function downloadSheetDocx(btn) {
   try {
     const r = await authFetch('/api/sheet/docx', {method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({sheet: state.sheet, state: {project: st.project, baseline: st.baseline,
-        alternatives: st.alternatives, selections: st.selections, reportMarkdown: st.reportMarkdown}})});
+        alternatives: st.alternatives, selections: st.selections, reportMarkdown: st.reportMarkdown ? fullReportMarkdown(st) : st.reportMarkdown}})});
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       addMsg('Word-dokumentet gick inte att skapa: ' + esc(d.error || ('fel ' + r.status)), 'system');
@@ -7590,7 +7678,8 @@ function summaryTotals(allSels) {
   // Costs follow the same rule: "90000" is not a price, and summed it
   // concatenated.
   const priceOf = v => isFigure(v) && v > 0;
-  const hasCost = c => priceOf(c.selected_alternative.cost_sek) && !(articlePrice(c.selected_alternative) > 0);
+  const hasCost = c => c.selected_alternative.price_basis === 'none_needed'
+    || (priceOf(c.selected_alternative.cost_sek) && !(articlePrice(c.selected_alternative) > 0));
   const altPriced = sels.filter(hasCost);
   const unpriced = sels.filter(c => !hasCost(c)).map(c => c.name);
   const knownCost = altPriced.reduce((s,c) => s + c.selected_alternative.cost_sek, 0);

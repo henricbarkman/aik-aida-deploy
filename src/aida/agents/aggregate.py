@@ -132,7 +132,9 @@ def compute_aggregate(project: Project, selections: Selections) -> AggregateResu
         per_article = article_price(alt)
         alt_cost = 0.0 if per_article else max(_number(alt.get("cost_sek")) or 0.0, 0.0)
         bl_cost = max(_number(sel.baseline_cost_sek) or 0.0, 0.0)
-        has_price = alt_cost > 0
+        # Keeping a layer costs nothing, and that is known: "Pris saknas" would say
+        # the opposite and keep it out of the cost comparison.
+        has_price = alt_cost > 0 or alt.get("price_basis") == "none_needed"
         baseline_has_price = bl_cost > 0
 
         total_co2e += alt_co2e

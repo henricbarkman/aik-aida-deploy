@@ -14,7 +14,7 @@ from aida.data.steel_profiles import names_steel_profile
 
 # Reasoning templates per alternative type
 REASONING = {
-    "reuse": "Återbruk eliminerar nästan all tillverkningsrelaterad klimatpåverkan. Kvarvarande CO2e kommer främst från transport och eventuell renovering av materialet.",
+    "reuse": "Återbruk räknas utan tillverkning. Siffran är transporten: produktens vikt gånger Boverkets värde för en återanvänd byggprodukt. Upprustning ingår inte och läggs till om den behövs.",
     "climate_optimized": "Klimatoptimerat alternativ med lägre CO2e-avtryck jämfört med konventionell produkt, genom val av material med lägre inbyggd klimatpåverkan.",
     "conventional": "Konventionell nyproduktion utan särskild klimathänsyn. Representerar baslinjen: vad standardmaterial kostar klimatmässigt (Boverket Typical A1-A3).",
 }

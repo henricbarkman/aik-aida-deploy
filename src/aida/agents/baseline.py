@@ -95,6 +95,8 @@ def _validate_baseline(results: list[BaselineResult], components: list) -> list[
         exempt = basis.get("kind") == "epd_typvärde" and (
             not basis.get("bridge")
             or (category, basis.get("subcategory")) in UNLIKE_THEIR_CATEGORY)
+        # A recipe's bundle is a sum of Boverket's values, not the category's material.
+        exempt = exempt or bool(comp and comp.recipe_bundle)
         if not exempt and quantity > 0 and r.co2e_kg > 0:
             co2 = check_co2e(r.co2e_kg / quantity, quantity, category, unit)
             if co2.clamped:
@@ -322,8 +324,12 @@ def calculate_baseline(project: Project, *, started_at: float | None = None) -> 
     # Phase 1: LLM-based matching against full Boverket product list, with
     # exactly one row per component (re-asked once for any the model skipped).
     boverket_products = provider._cache.get_all_boverket()
-    results = _complete_baseline(project, boverket_products)
-    _apply_member_geometry(results, project, boverket_products)
+    # A recipe's bundle of accessories has its own figure and no model call.
+    matched = dataclasses.replace(
+        project, components=[c for c in project.components if not c.recipe_bundle])
+    results = _complete_baseline(matched, boverket_products) if matched.components else []
+    _apply_member_geometry(results, matched, boverket_products)
+    results = _with_recipe_bundles(results, project)
 
     # Phase 1b: For components where the LLM fell back to "Uppskattning"
     # (no Boverket material proxy fit), substitute an EPD-median where the
@@ -335,6 +341,27 @@ def calculate_baseline(project: Project, *, started_at: float | None = None) -> 
 
     results = _validate_baseline(results, project.components)
     return Baseline(components=results)
+
+
+def _with_recipe_bundles(results: list[BaselineResult], project: Project) -> list[BaselineResult]:
+    """The rows for a recipe's bundles (DECISIONS 21), back in project order."""
+    from aida.data.byggdelsrecept import BUNDLES, bundle_text
+
+    by_id = {r.component_id: r for r in results}
+    out: list[BaselineResult] = []
+    for comp in project.components:
+        bundle = BUNDLES.get(comp.recipe_bundle)
+        if bundle is None:
+            if comp.id in by_id:
+                out.append(by_id[comp.id])
+            continue
+        out.append(BaselineResult(
+            component_id=comp.id, component_name=comp.name,
+            co2e_kg=round(bundle.per_unit * comp.quantity, 1), cost_sek=0,
+            description=bundle_text(bundle, comp.unit), source="Boverkets klimatdatabas",
+            assumed_material=bundle.name, co2e_per_unit=bundle.per_unit, unit=comp.unit,
+            quantity=comp.quantity, basis={"kind": "boverket", "label": "Recept"}))
+    return out
 
 
 def _price_baseline(results: list[BaselineResult], project: Project,
@@ -705,13 +732,19 @@ def _apply_facade_panel(r: BaselineResult, comp, product, extra: dict,
 
     if comp.unit != "m2" or extra.get("category") != "Trävaror":
         return
-    if component_facade_kind(comp.name) not in ("trä", ""):
-        return
+    # Another kind in the name ("Fasadskivor fibercement 8 mm"), and the model still
+    # took wood as the conventional facade. Its own conversion stands, but a value
+    # per kg left standing as one per m² does not (DECISIONS 24). The thickness in
+    # that name is the other product's, not the panel's.
     density = extra.get("density_kg_m3")
     if not density:
         return
-    mm = thickness_mm(comp.name)
-    if mm is None:
+    own_name = component_facade_kind(comp.name) in ("trä", "")
+    if not own_name and abs((r.co2e_per_unit or 0) - product.co2e_per_unit) > (
+            0.01 * product.co2e_per_unit):
+        return
+    mm = thickness_mm(comp.name) if own_name else None
+    if mm is None and own_name:
         section = cross_section_mm(comp.name)
         mm = min(section) if section else None
     assumed = mm is None
@@ -740,6 +773,8 @@ def _apply_facade_panel(r: BaselineResult, comp, product, extra: dict,
     r.co2e_kg = round(per_unit * comp.quantity, 1)
     why = (f" Namnet anger ingen paneltjocklek, så en vanlig fasadpanel på "
            f"{mm:g} mm antas." if assumed else "")
+    if not own_name:
+        why = f" Baslinjen är en vanlig träfasad, och en panel på {mm:g} mm antas."
     total = f" Tillsammans {per_unit:g} kg CO2e/m²." if paint_m2 else ""
     r.description = (r.description or "").rstrip() + (
         f" Omräknat ur panelen, {mm:g} mm: {product.co2e_per_unit} kg CO2e/kg × "

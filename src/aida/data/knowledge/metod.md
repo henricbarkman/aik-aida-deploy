@@ -24,7 +24,7 @@ När alternativen tas fram kan Aida ställa en fråga om en enskild byggdel. Det
 
 ## Klimatmåttet
 
-Aida räknar GWP-fossil för livscykelskedena A1-A3, alltså produktskedet: råvaror, transport till fabriken och tillverkning. Det är samma mått som Boverkets klimatdatabas använder. Upptag av biogent kol räknas inte av, varken i baslinjen eller i alternativen.
+Aida räknar livscykelskedena A1-A3, alltså produktskedet: råvaror, transport till fabriken och tillverkning. Miljödeklarationerna räknas som GWP-fossil. Boverkets klimatdatabas redovisar ett annat mått, GWP-GHG, så en baslinje ur Boverket och ett alternativ ur en deklaration är inte exakt samma mått. Skillnaden är oftast liten, och Aida räknar inte om något. Upptag av biogent kol räknas inte av, varken i baslinjen eller i alternativen.
 
 Några miljödeklarationer är motsägelsefulla: det redovisade fossilvärdet stämmer inte med deklarationens egen totalsumma, eller värdet för markanvändning är större än fossilvärdet, vilket betyder att siffrorna hamnat på fel rad i den digitala deklarationen. För dem används GWP-GHG i stället, alltså totala växthusgasutsläpp exklusive biogent kol, och rapporten redovisar vilka poster det gäller. GWP-GHG ligger nära GWP-fossil i storlek men är inte samma indikator. Regeln om markanvändning gäller sedan 2 oktober 2026 även golv och sanitet, som byggdes före den: tre rader ändrades (en kalkstensplatta från 0 till 0,08 kg CO2e per kg, en porslinsplatta från −0,24 till 12,9 per m² och en takdusch från 0,41 till 6,4 per kg).
 
@@ -57,6 +57,12 @@ Ventilationsaggregat räknas inte med ett typvärde per styck. Katalogens aggreg
 ### Uppskattning som sista utväg
 
 Finns varken en passande produkt i Boverket eller ett typvärde gör Aida en egen uppskattning av GWP-fossil A1-A3. Den märks som uppskattning i tabellen.
+
+### Lager som följer med en byggdel
+
+Kakel läggs i fästmassa på ett tätskikt på en skiva, och räknar man bara plattan saknas en stor del av badrummet. Därför lägger Aida till lagren som egna rader i projektet när en byggdel brukar ha dem: tätskikt, våtrumsgips, avjämning, fästmassa och fog till kakel, montage och foder till fönster, underlagspapp, läkt och infästning till tak, läkt till fasadbeklädnad, murbruk till tegelfasad. En ny innervägg delas upp i gips på båda sidor, stålreglar och isolering. Ett lager som redan står i projektet läggs inte till igen.
+
+Raderna går att ta bort, och ändrar du mängden på byggdelen följer lagren inte med av sig själva. Mängderna är uppskattningar av typisk åtgång och märkta så. Lager som har jämförbara produkter går samma väg som andra byggdelar. Övriga tillbehör är en samlad rad vars klimatvärde är varje mängd gånger Boverkets värde, och raden visar uträkningen. För dem jämförs inga alternativ. Ett lager kan också behållas: då tillförs inget för det, och siffran är noll. Det är rätt val när byggdelen det följer med bevaras.
 
 ## Alternativen
 
@@ -92,13 +98,19 @@ En ny produkt visas bara som alternativ när den har lägre klimatpåverkan än 
 
 När katalogen har jämförbara deklarationer men ingen av dem blir kvar som alternativ, säger raden varför: hur många det var, och om de låg över baslinjen (med siffrorna), var en del av en byggdel snarare än en hel byggdel, eller inte kom med i analysen. "Inga alternativ" står bara när katalogen inte hade något att jämföra med.
 
+### Bevara och laga
+
+Det klimatmässigt bästa med en byggdel som fungerar är att låta den sitta kvar. Därför kommer raden Bevara först, före återbruk och nytt, när byggdelen går att laga. Siffran är det lagningen tillför: mängden material gånger Boverkets värde per kg, till exempel färg och en ny isolerruta i en befintlig båge. Mängderna är typiska och märkta som uppskattning. Arbetet och rivningen av det gamla ingår inte. Boverket saknar inomhusfärg och golvbehandling, så där räknas utomhusfärg, och raden säger vilken post som använts.
+
+Raden säger vad den förutsätter, och Aida frågar om skicket för den tyngsta byggdelen. Säger du att delen måste bytas, eller att den inte finns än, visas ingen sådan rad. Är skicket inte angivet visas raden med sitt antagande, så att alternativet finns på bordet medan det går att välja. En byggdel där det inte finns något material att lägga på, till exempel en toalettstol eller en hiss, har ingen rad: noll skulle läsas som en räknad siffra. Priset tas fram som för andra alternativ och står som saknat om inget hittas, aldrig som noll kronor.
+
 ### Återbruk
 
-Återbrukade produkter hämtas från Palats, Karlstads kommuns återbruksplattform, med upp till fem annonser per byggdel. Deras klimatpåverkan är en schablon per enhet för transport och enklare renovering, till exempel 0,5 kg CO2e per m² golv och 10 kg CO2e per fönster. Priset är annonsens pris.
+Återbrukade produkter hämtas från Palats, Karlstads kommuns återbruksplattform, med upp till fem annonser per byggdel. Deras klimatpåverkan är transporten till bygget: produktens vikt gånger Boverkets värde för en återanvänd byggprodukt, 0,00539 kg CO2e per kg (transport 40 km, ingen tillverkning). Ett fönster på 1,44 m² väger omkring 56 kg och får omkring 0,3 kg CO2e. Vikten kommer ur annonsens namn och mått om de finns, annars från Boverkets typiska vikt för produkten, och raden säger när vikten är en uppskattning. Upprustning ingår inte. Går vikten inte att få fram visas annonsen utan klimatsiffra och med en förklaring. Priset är annonsens pris.
 
 En annons som täcker under 20 procent av behovet visas inte, utan raden säger att det finns för lite. Det gäller när annonsens mängd och behovet går att jämföra i samma enhet: i styck alltid, i m² och löpmeter när annonsen anger sin yta eller längd. Palats anger antal artiklar, och anger annonsen inte hur mycket en artikel täcker är täckningen okänd. Då visas annonsen, och raden säger att täckningen är okänd i stället för att jämföra antal artiklar med kvadratmeter.
 
-Återbrukad stomme (reglar, balkar, skivor och betongelement) har ingen schablon. Där räknas klimatpåverkan som transporten till bygget: komponentens vikt gånger Boverkets värde för transport (modul A4) för samma material. Vikten räknas på samma sätt som baslinjen, ur tvärsnittet eller tjockleken i namnet och Boverkets densitet för trä och skivor, ur standardprofilens vikt per meter för stål och ur 2 500 kg/m³ för massiv betong. En regel 45x95 väger 1,9 kg per löpmeter och får 0,04 kg CO2e per löpmeter som återbrukad, mot 0,12 som ny. Boverkets transportvärde gäller en ny produkt från fabriken via lager till byggplatsen. Anger annonsen en egen storlek, till exempel "Reglar 45x120" när komponenten är "Reglar 45x95", vägs den med annonsens storlek, eftersom det är den som transporteras. Materialet är komponentens om annonsen inte säger något annat. Ett håldäck med en annan höjd än komponentens och utan egen vikt får ingen siffra. Sträckan för en viss annons är okänd, och nedmontering och upprustning räknas inte med. Går vikten inte att få fram, till exempel för en regel utan tvärsnitt eller ett håldäck utan leverantörens vikt per m², visas annonsen utan klimatsiffra och med en förklaring.
+Återbrukad stomme (reglar, balkar, skivor och betongelement) räknas på samma sätt. Vikten räknas som i baslinjen, ur tvärsnittet eller tjockleken i namnet och Boverkets densitet för trä och skivor, ur standardprofilens vikt per meter för stål och ur 2 500 kg/m³ för massiv betong. En regel 45x95 väger 1,9 kg per löpmeter och får 0,01 kg CO2e per löpmeter som återbrukad, mot 0,12 som ny. Anger annonsen en egen storlek, till exempel "Reglar 45x120" när komponenten är "Reglar 45x95", vägs den med annonsens storlek, eftersom det är den som transporteras. Materialet är komponentens om annonsen inte säger något annat. Ett håldäck med en annan höjd än komponentens och utan egen vikt får ingen siffra. Sträckan för en viss annons är okänd, och nedmontering och upprustning räknas inte med. Går vikten inte att få fram, till exempel för en regel utan tvärsnitt eller ett håldäck utan leverantörens vikt per m², visas annonsen utan klimatsiffra och med en förklaring.
 
 Varje annons har en länk. Sola byggåterbruks byggmaterial ligger i en öppen butik på Palats som vem som helst kan se. Solas möbler gör det inte: deras annonser går bara att öppna med ett konto på Palats, och då står det "kräver inloggning på Palats" vid länken. Samma sak gäller varje säljare som saknar en öppen butik.
 
@@ -133,13 +145,30 @@ Schablonen gäller byggdelen och säger inget om en viss produkt. Golvmaterial l
 
 I läget Uppföljning registrerar du vad som faktiskt byggdes in: vilken produkt, hur mycket och vad det kostade. Utfallet räknas som deklarationens GWP-fossil A1-A3 gånger inbyggd mängd, men bara när enheterna är desamma. Återbruk räknas som noll. Utfall, baslinje och plan jämförs över samma poster, och poster som inte går att räkna namnges.
 
+## Sammanställningen överst i rapporten
+
+Rapporten börjar med de tunga posterna: de byggdelar som tillsammans står för 80 procent av de valda alternativens siffra, tyngst först, fördelningen per del av byggnaden och kg CO2e per m² BTA. Saknas BTA står det. Avsnittet räknas fram direkt ur siffrorna, inte av språkmodellen.
+
+## Transport, byggplats och rivning
+
+Huvudsiffran är tillverkningen, A1-A3. I rapportfliken finns en ruta som lägger till ett eget avsnitt med det som går att räkna per byggdel, enligt IVL:s Anvisningar för LCA-beräkning av byggprojekt (version 2025-02) för renovering. Huvudsiffran och besparingen ändras aldrig: ett tal som betyder olika saker olika dagar går inte att jämföra.
+
+- Transport till byggplatsen (A4): vikten gånger Boverkets värde per kg.
+- Spill på byggplatsen (A5): Boverkets spillvärde som andel av tillverkningen, gånger den valda siffran.
+- Transport av rivningsavfall (C2): 50 km, 1,5 MJ per ton och km (IVL), Boverkets diesel.
+- Omhändertagande av rivningsavfall (C3-C4): vikten gånger IVL:s värde per produktgrupp.
+
+Ett återbrukat val har transporten i huvudsiffran och inget spill, men det gamla ska fortfarande bort. Det som bevaras rivs inte, och där räknas bara det som tillförs. Det som rivs antas väga lika mycket som baslinjens material, eftersom Aida inte vet vad som finns i dag. Saknas en vikt namnges byggdelen i avsnittet och summan är för låg med det som den står för.
+
 ## Vad som inte räknas
 
-- Transport till byggplatsen och byggproduktionen (A4 och A5).
+- I huvudsiffran: transport till byggplatsen, byggproduktionen och rivning (A4, A5 och C2-C4). De finns som valbart avsnitt.
+- Energin på byggplatsen (A5). IVL:s schablon gäller en hel nybyggd byggnad och det finns inget värde per byggdel.
+- Demontering (C1). IVL anger att den är mycket låg och inte behöver räknas vid renovering.
 - Användning, underhåll och utbyte (B1-B7), och därmed livslängd.
-- Rivning och avfallshantering (C1-C4) och nyttor bortom livscykeln (D).
+- Nyttor bortom livscykeln (D).
 - Upptag av biogent kol.
-- Transport av återbrukade produkter. Sträckan registreras i uppföljningen men räknas inte om till utsläpp.
+- I uppföljningen: transport av återbrukade produkter. Sträckan registreras där men räknas inte om till utsläpp.
 
 ## Hur källor och uppskattningar märks
 

@@ -47,6 +47,7 @@ BASIS_WEB_SEARCH = "market_estimate"   # web-searched typical installed price
 BASIS_LLM_ESTIMATE = "llm_estimate"    # model's own estimate, no source found
 BASIS_LISTING = "listing"              # a real Palats asking price
 BASIS_ADJUSTED = "adjusted"           # an outlier replaced by the category's typical price
+BASIS_NONE_NEEDED = "none_needed"      # nothing is bought or done: a known zero, not a missing price
 
 
 def _get_client() -> anthropic.Anthropic | None:

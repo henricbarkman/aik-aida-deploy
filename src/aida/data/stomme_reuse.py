@@ -1,15 +1,9 @@
-"""The climate figure for a reused frame member: its transport (HENRIC-3364).
+"""The weight of a reused frame member, and from it its climate figure.
 
-Every other reuse category has a set figure per unit in
-palats_client.REUSE_CO2E_PER_UNIT. Stomme had none and took the 2 kg CO2e
-default, which for a stud counted in löpmeter is far more than a new one
-(45x95 sawn timber is 0,12 kg CO2e per metre in A1-A3), so a used stud would
-have looked worse than a new one.
+A reused member is not manufactured again. What it costs is its transport, and
+that is derived here rather than set (DECISIONS 18):
 
-A reused member is not manufactured again. What it costs is the transport to
-the site, and that is derived here rather than set:
-
-    kg per unit of the member  x  kg CO2e per kg for transport (A4)
+    kg per unit of the member  x  Boverket's figure for a reused product per kg
 
 - The weight per unit is the one the baseline and the alternatives use for
   the same name: the section or thickness in the name times Boverket's
@@ -18,19 +12,18 @@ the site, and that is derived here rather than set:
   precast concrete 2 500 kg/m3 times the thickness or section (betongstomme),
   or a weight per m2 the name states for a hollow-core slab, never one derived
   from its thickness.
-- The transport is Boverket's generic A4 value for the same material: the
-  climate database's typical transport for a new product from the factory via
-  a warehouse to the building site, per kg. The distance for a given listing
-  is unknown, and AIda does not invent one; Boverket's scenario is the sourced
-  figure there is. A listing from the region likely travels less, so the
-  figure leans high, never towards a saving that is not there.
+- The transport is Boverket's record "Återanvänd byggprodukt": 0 for
+  manufacturing and 0,00539 kg CO2e per kg, a reused product in its existing
+  condition including 40 km to a cold store. Until 2026-11-02 a frame member took
+  the new material's A4 value instead, up to eighteen times higher, and other
+  reuse took set figures with no source. Now every category counts the same way.
 
-Dismantling and refurbishing are not included: there is no source for them.
-When the name does not give the weight (no section, no profile, a count in
-st, a hollow-core slab without its weight per m2), there is no figure, and
-the caller says so instead of showing the default.
+Dismantling and refurbishing are not included: there is no source for them, and
+Boverket says upgrading comes on top. When the name does not give the weight (no
+section, no profile, a count in st, a hollow-core slab without its weight per
+m2), there is no figure, and the caller says so instead of showing a default.
 
-Source, read 2026-10-01: Boverkets klimatdatabas, version 02.07.000
+Source, read 2026-10-01 and 2026-11-02: Boverkets klimatdatabas, version 02.07.000
 (api.boverket.se/klimatdatabas, GetAllResources/senaste), field DataItems,
 module "A4" and "A1-A3 Typical", and Conversions (kg/m3).
 """
@@ -41,6 +34,7 @@ import re
 from dataclasses import dataclass
 
 BOVERKET_VERSION = "02.07.000"
+REUSE_A4_PER_KG = 0.00539  # "Återanvänd byggprodukt"; same value as massor's
 
 
 @dataclass(frozen=True)
@@ -229,14 +223,13 @@ def reuse_figure(component_name: str, unit: str) -> ReuseFigure:
     kg, res, how = _mass_per_unit(family, component_name, unit)
     if kg is None or res is None:
         return ReuseFigure(None, how[:1].upper() + how[1:])
-    per_unit = round(kg * res.a4_per_kg, 4)
+    per_unit = round(kg * REUSE_A4_PER_KG, 4)
     return ReuseFigure(per_unit, (
-        f"Klimatvärdet för återbruket är transporten till bygget: "
-        f"{how} × {_sv(res.a4_per_kg)} kg CO2e/kg (Boverkets klimatdatabas "
-        f"{BOVERKET_VERSION}, {res.name}, modul A4: typisk transport från fabrik "
-        f"via lager till byggplatsen) = {_sv(per_unit)} kg CO2e/{unit}. Sträckan "
-        f"för just den här annonsen är okänd, och nedmontering och upprustning "
-        f"ingår inte"))
+        f"Klimatvärdet för återbruket är transporten: {how} × "
+        f"{_sv(REUSE_A4_PER_KG)} kg CO2e/kg (Boverkets klimatdatabas "
+        f"{BOVERKET_VERSION}, Återanvänd byggprodukt: tillverkning 0 och 40 km "
+        f"transport) = {_sv(per_unit)} kg CO2e/{unit}. Sträckan för just den här "
+        f"annonsen är okänd, och nedmontering och upprustning ingår inte"))
 
 
 def _states_own_size(family: str, title: str, unit: str) -> bool:
@@ -308,11 +301,10 @@ def listing_reuse_figure(component_name: str, listing_title: str, unit: str) -> 
     if kg is None or res is None:
         return ReuseFigure(None, (f"Annonsen \"{title}\" anger en egen storlek, och "
                                   f"vikten går inte att räkna ur den: {how}"))
-    per_unit = round(kg * res.a4_per_kg, 4)
+    per_unit = round(kg * REUSE_A4_PER_KG, 4)
     return ReuseFigure(per_unit, (
-        f"Klimatvärdet för återbruket är transporten till bygget, räknad på "
-        f"annonsens egen storlek: {how} × {_sv(res.a4_per_kg)} kg CO2e/kg "
-        f"(Boverkets klimatdatabas {BOVERKET_VERSION}, {res.name}, modul A4: "
-        f"typisk transport från fabrik via lager till byggplatsen) = "
-        f"{_sv(per_unit)} kg CO2e/{unit_n}. Sträckan för just den här annonsen är "
-        f"okänd, och nedmontering och upprustning ingår inte"))
+        f"Klimatvärdet för återbruket är transporten, räknad på annonsens egen "
+        f"storlek: {how} × {_sv(REUSE_A4_PER_KG)} kg CO2e/kg (Boverkets klimatdatabas "
+        f"{BOVERKET_VERSION}, Återanvänd byggprodukt: tillverkning 0 och 40 km "
+        f"transport) = {_sv(per_unit)} kg CO2e/{unit_n}. Sträckan för just den här "
+        f"annonsen är okänd, och nedmontering och upprustning ingår inte"))

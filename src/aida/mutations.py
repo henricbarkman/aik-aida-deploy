@@ -211,6 +211,7 @@ def _apply_update_component(inp, project, baseline, alternatives, selections, pe
 
     changed = {}
     old_quantity = target.get("quantity")
+    old_identity = {key: target.get(key) for key in ("name", "unit", "category")}
     for key in ("name", "quantity", "unit", "category"):
         if key in inp and inp[key] is not None:
             value = canonical_category(inp[key]) if key == "category" else inp[key]
@@ -231,6 +232,11 @@ def _apply_update_component(inp, project, baseline, alternatives, selections, pe
     # generate a fresh one when needed.
     if "name" in changed or "category" in changed:
         target["usage_context"] = ""
+
+    # A renamed bundle is no longer the recipe it was, and in another unit its amounts
+    # per unit do not apply: the model reads it. Sent unchanged, it is still the recipe.
+    if any(key in changed and changed[key] != old_identity[key] for key in old_identity):
+        target["recipe_bundle"] = ""
 
     touched: set[str] = {"project"}
 
@@ -332,8 +338,35 @@ def _apply_remove_component(inp, project, baseline, alternatives, selections, pe
     if not target:
         return f"Komponent {cid} finns inte i projektet.", False, set()
 
-    project["components"] = [c for c in project.get("components", []) if c.get("id") != cid]
     touched: set[str] = {"project"}
+    _drop_row(cid, project, baseline, alternatives, selections, touched)
+    message = f"Komponenten {cid} ({target.get('name')}) borttagen."
+
+    # The layers that came with it (DECISIONS 21) go with it, or they go on counting
+    # for a part that is no longer there. A layer other parts share stays, and says so:
+    # its amount is theirs too, and how much of it was this part's is not recorded.
+    gone, shared = [], []
+    for comp in list(project.get("components", [])):
+        parents = [p for p in str(comp.get("recipe_parent") or "").split(",") if p]
+        if cid not in parents:
+            continue
+        remaining = [p for p in parents if p != cid]
+        if remaining:
+            comp["recipe_parent"] = ",".join(remaining)
+            shared.append(str(comp.get("name")))
+        else:
+            _drop_row(comp.get("id"), project, baseline, alternatives, selections, touched)
+            gone.append(str(comp.get("name")))
+    if gone:
+        message += f" Lagren som följde med togs också bort: {', '.join(gone)}."
+    if shared:
+        message += (f" Kvar för att de också hör till andra byggdelar: {', '.join(shared)}. "
+                    f"Kontrollera mängden på dem.")
+    return message, True, touched
+
+
+def _drop_row(cid, project, baseline, alternatives, selections, touched: set[str]) -> None:
+    project["components"] = [c for c in project.get("components", []) if c.get("id") != cid]
 
     if baseline and baseline.get("components"):
         before = len(baseline["components"])
@@ -352,8 +385,6 @@ def _apply_remove_component(inp, project, baseline, alternatives, selections, pe
     if selections and cid in selections:
         del selections[cid]
         touched.add("selections")
-
-    return f"Komponenten {cid} ({target.get('name')}) borttagen.", True, touched
 
 
 def _apply_select_alternative(inp, project, baseline, alternatives, selections, pending_actions):
@@ -845,19 +876,27 @@ def run_handler(tool, inp, project, baseline, alternatives, selections,
     if handler is None:
         return f"Okänt verktyg: {tool}", False, set()
 
+    ids_before = {c.get("id") for c in project.get("components", [])}
     message, ok, touched = handler(
         inp, project, baseline, alternatives, selections, pending_actions,
     )
-    if ok and overrides is not None:
-        note = _drop_stale_overrides(tool, inp, overrides)
-        if note:
-            message = f"{message} {note}"
-            touched = set(touched) | {"overrides"}
-    if ok and as_built is not None:
-        note = _drop_stale_as_built(tool, inp, as_built)
-        if note:
-            message = f"{message} {note}"
-            touched = set(touched) | {"as_built"}
+    # A removed part can take its layers with it, and what was recorded on them goes too.
+    subjects = [inp]
+    if ok and tool == "remove_component":
+        ids_after = {c.get("id") for c in project.get("components", [])}
+        subjects += [{"component_id": cid} for cid in ids_before - ids_after
+                     if cid != inp.get("component_id")]
+    for subject in subjects:
+        if ok and overrides is not None:
+            note = _drop_stale_overrides(tool, subject, overrides)
+            if note:
+                message = f"{message} {note}"
+                touched = set(touched) | {"overrides"}
+        if ok and as_built is not None:
+            note = _drop_stale_as_built(tool, subject, as_built)
+            if note:
+                message = f"{message} {note}"
+                touched = set(touched) | {"as_built"}
     return message, ok, touched
 
 

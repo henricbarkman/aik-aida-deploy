@@ -19,6 +19,7 @@ from aida.api_client import (
     get_client,
     remaining_budget,
 )
+from aida.data.byggdelsrecept import expand as expand_recipes
 from aida.data.climate_data import canonical_category
 from aida.llm_json import ModelOutputError, extract_json_object
 from aida.models import construction_year
@@ -43,7 +44,7 @@ Svara ALLTID med giltig JSON i detta format:
   "construction_year": number eller null,
   "name": "projektnamn om nämnt",
   "components": [
-    {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm|kg", "category": "kategori", "quantity_source": "user_specified" eller "estimated"}
+    {"id": "c1", "name": "komponentnamn", "quantity": number, "unit": "m2|st|lm|kg", "category": "kategori", "quantity_source": "user_specified" eller "estimated", "existing_condition": "går att laga", "måste bytas", "finns inte" eller ""}
   ],
   "needs_analysis": {
     "from_user": "Parafras av användarens input — bara det användaren faktiskt sagt om byggnaden, användningen, kraven. Ingen agent-tolkning.",
@@ -84,6 +85,13 @@ QUANTITY_SOURCE — sätt per komponent:
 - Yta-baserade komponenter (golv, väggar, tak) där area_bta används direkt: "user_specified" om användaren gav arean explicit, annars "estimated".
 - Vid tvekan: "estimated".
 
+EXISTING_CONDITION — det användaren sagt om det som redan sitter där, per komponent:
+- "går att laga": användaren säger att delen är hel, i gott skick, eller går att renovera eller laga.
+- "måste bytas": användaren säger att delen är trasig, utdömd, fuktskadad, uttjänt eller av annat skäl måste bort.
+- "finns inte": komponenten är ny och ersätter inget, till exempel en ny vägg, en tillbyggnad eller allt i en nybyggnad.
+- "": inget av det är sagt. Gissa inte; då är tomt rätt svar.
+Står det bara att något ska bytas är det tomt, inte "måste bytas": att någon tänkt byta säger inget om skicket.
+
 GEOMETRI — härled ytor, återanvänd aldrig BTA rakt av:
 `area_bta` är golvytan. En fasad, ett tak eller en yttervägg har en helt annan yta, och att sätta samma siffra på dem är ett av de fel som gör hela analysen fel.
 
@@ -107,6 +115,7 @@ FÖRTYDLIGANDEN:
 Fråga hellre en gång för mycket än räkna på en gissning som användaren inte ser. Det finns två sorters frågor:
 - `clarification_needed` stoppar innan något räknas och väntar på svar. Använd den när projektet inte går att räkna vettigt utan svaret: när det är oklart vad som ska göras eller vilka byggdelar som ingår, när den mängd som väger tyngst är helt okänd, eller när reglerna ovan säger att du ska fråga (innertak, avjämningens tjocklek, reglarnas dimension). Högst tre korta frågor i samma text, viktigast först. Ta då med de komponenter du redan kunnat identifiera i components-arrayen.
 - `would_clarify` visas för användaren innan baslinjen räknas, och hen kan svara eller gå vidare. Skriv där det du fått gissa och som flyttar resultatet mest: mängder och ytor du härlett (fasad, väggar, tak, antal), om renoveringen är total eller partiell, befintligt skick, och funktionskrav som avgör vilka material som passar. Skriv gissningen i frågan, så att användaren ser vad som räknas på: "Jag har räknat med 320 m² fasad (omkretsen gånger 3 m). Stämmer det?" Högst tre sådana frågor, de som flyttar resultatet mest, viktigast först, och en fråga per punkt: slå inte ihop två frågor till en. Det du gissat men inte frågar om står i `assumptions`. Lämna listan tom bara när inget sådant återstår.
+- Ska något som redan sitter i byggnaden bytas och skicket framgår inte, ska en av de tre frågorna gälla skicket för den byggdel som väger tyngst, så att användaren får chansen att behålla det: "Är det befintliga golvet i så gott skick att det går att laga i stället för att byta?" Aida räknar då på att bevara delen som ett eget alternativ. Fråga inte det om projektet är nybyggnad eller om skicket redan är sagt.
 - Efter de tre får du lägga till en sista fråga, om användaren redan har ett material, en produkt eller ett alternativ i tankarna som hen vill få jämfört. Anpassa den till projektet, gärna med exempel för den komponent som väger tyngst ("Har du redan ett golvmaterial i tankarna, till exempel linoleum eller gummi, som du vill få jämfört?"). Fråga det som en möjlighet, inte som ett krav: Aida föreslår egna alternativ ändå, och det användaren har i tankarna blir ett av dem. Ställ den inte om användaren redan sagt vad hen tänkt sig, eller redan fått frågan.
 - Saker som ofta påverkar analysen:
   * Byggnadsår (påverkar befintliga material och förutsättningar)
@@ -324,9 +333,15 @@ def _finish(data: dict, description: str) -> dict:
 
     usage_context is dropped if the model wrote one anyway: it is the second
     step's, and the facade guard below writes its note into the same field."""
+    from aida.data.bevara import CONDITIONS
+
     for component in data.get("components") or []:
         if isinstance(component, dict):
             component.pop("usage_context", None)
+            # Anything but the three words is nothing said: it decides whether a
+            # keep-and-repair row is offered, and a free phrasing must not hide one.
+            condition = str(component.get("existing_condition") or "").strip().lower()
+            component["existing_condition"] = condition if condition in CONDITIONS else ""
     # Not asked of the model: copying the input back cost a thousand tokens of
     # answer per round on the gruppboende. The browser replaces it with the
     # user's own words (intake_log); this is the fallback for other callers.
@@ -510,7 +525,7 @@ def run_intake(description: str, attachments: list[dict] | None = None) -> dict:
     data = _extract(client, description, attachments or [], started_at)
     if data.get("clarification_needed"):
         return data
-    return add_usage_context(data, description, started_at)
+    return expand_recipes(add_usage_context(data, description, started_at))
 
 
 def main():

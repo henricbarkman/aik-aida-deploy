@@ -234,7 +234,10 @@ def _new_wall_layers(comp: dict, name: str, others: str) -> list[dict]:
     if _has(others, "regel", "reglar", "gipsskiva", "gips", "isolering", "mineralull"):
         return []
     quantity = comp.get("quantity") or 0
-    comp["name"] = f"Gipsskiva 13 mm, {comp.get('name')}"
+    # "ena sidan" in the name: without it the model at times read the row as both
+    # sides of the wall, and the other side is a row of its own (164 kg against 78 on
+    # two runs of the same project).
+    comp["name"] = f"Gipsskiva 13 mm, ena sidan, {comp.get('name')}"
     return [_plain(comp, "Gipsskiva 13 mm, andra sidan av väggen", "innervägg"),
             _plain(comp, "Stålreglar 70 mm", "stomme", quantity=round(quantity * 3, 1), unit="lm"),
             _plain(comp, "Isolering mineralull 70 mm", "isolering")]

@@ -2987,11 +2987,13 @@ def find_alternatives(
             return None
         if proj_comp.recipe_bundle:
             # Accessories have nothing worth comparing: no ranking, no reuse search.
+            from aida.data.pricing_provider import BASIS_IN_PART
             rows = [Alternative(
                 name=f"Inga alternativ jämförs för {proj_comp.name}",
-                co2e_kg=bl_comp.co2e_kg, cost_sek=bl_comp.cost_sek, source="N/A",
-                reasoning="Tillbehör som följer med byggdelen. Aida jämför inga alternativ för dem.",
-                alternative_type="baseline")]
+                co2e_kg=bl_comp.co2e_kg, cost_sek=0, source="N/A",
+                reasoning=("Tillbehör som följer med byggdelen. Aida jämför inga alternativ "
+                           "för dem, och kostnaden ingår i byggdelens installerade pris."),
+                alternative_type="baseline", price_basis=BASIS_IN_PART)]
             kept = _kept_layer_alternative(proj_comp)
             if kept is not None:
                 rows.insert(0, kept)
@@ -3932,9 +3934,16 @@ Format:
 - Skriv på svenska."""
 
 
-def _prompt_cost(value) -> str:
+def _prompt_cost(value, basis: str = "") -> str:
     """A cost for a model prompt. The model reads "0 SEK" as free and reasons
-    about cost from it, so a missing price must say it is missing."""
+    about cost from it, so a missing price must say it is missing, and a known
+    zero that it is one."""
+    from aida.data.pricing_provider import BASIS_IN_PART, BASIS_NONE_NEEDED
+
+    if basis == BASIS_NONE_NEEDED:
+        return "0 SEK, inget köps och inget görs"
+    if basis == BASIS_IN_PART:
+        return "kostnaden ingår i byggdelens installerade pris"
     n = _number(value)
     return f"{n:.0f} SEK" if n is not None and n > 0 else "pris saknas"
 
@@ -3969,7 +3978,7 @@ def _generate_commentary(
             pct = ((alt.co2e_kg - bl_co2) / bl_co2 * 100) if bl_co2 > 0 else 0
             per_article = article_price(alt.to_dict())
             cost_str = (f"annonspris {per_article:.0f} kr/st, täckning okänd" if per_article
-                        else _prompt_cost(alt.cost_sek))
+                        else _prompt_cost(alt.cost_sek, alt.price_basis))
             summary_lines.append(
                 f"  - {alt.name} ({alt.alternative_type}): {alt.co2e_kg:.0f} kg CO2e, "
                 f"{cost_str} ({pct:+.0f}% CO2e) | {alt.source}"

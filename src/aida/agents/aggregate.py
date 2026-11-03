@@ -103,6 +103,7 @@ def compute_aggregate(project: Project, selections: Selections) -> AggregateResu
     comparable_cost = 0.0
     comparable_baseline_cost = 0.0
 
+    by_id = {c.id: c for c in project.components}
     project_ids = [c.id for c in project.components]
     known_ids = set(project_ids)
     # Components the totals will not cover. Filled in below with every project
@@ -134,8 +135,11 @@ def compute_aggregate(project: Project, selections: Selections) -> AggregateResu
         bl_cost = max(_number(sel.baseline_cost_sek) or 0.0, 0.0)
         # Keeping a layer costs nothing, and that is known: "Pris saknas" would say
         # the opposite and keep it out of the cost comparison.
-        has_price = alt_cost > 0 or alt.get("price_basis") == "none_needed"
-        baseline_has_price = bl_cost > 0
+        # A recipe's accessories are in the part's installed price, so they have no
+        # price of their own to miss, on either side.
+        in_part = bool(getattr(by_id.get(sel.id), "recipe_bundle", ""))
+        has_price = alt_cost > 0 or alt.get("price_basis") == "none_needed" or in_part
+        baseline_has_price = bl_cost > 0 or in_part
 
         total_co2e += alt_co2e
         total_cost += alt_cost
@@ -162,6 +166,7 @@ def compute_aggregate(project: Project, selections: Selections) -> AggregateResu
             # formatting a zero that reads as free.
             "pris_saknas": not has_price,
             "baslinje_pris_saknas": not baseline_has_price,
+            "pris_i_byggdelen": in_part,
             # The one listed article's price for a per-article reuse pick, so
             # the report can name it next to "Pris saknas" without it ever
             # entering a sum. 0 for every other pick.

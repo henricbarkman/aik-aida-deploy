@@ -93,13 +93,7 @@ def generate_report_markdown(
     component_table = ""
     for comp in aggregate.components:
         saving_pct = (comp["co2e_besparing_kg"] / comp["baslinje_co2e_kg"] * 100) if comp["baslinje_co2e_kg"] > 0 else 0
-        # A missing price is not zero kronor. Printing "0" in this column let
-        # the model write about a cost saving that came out of a data gap.
-        cost_cell = "Pris saknas" if comp.get("pris_saknas") else f"{comp['kostnad_sek']:,.0f}"
-        if comp.get("pris_saknas") and comp.get("artikelpris_sek"):
-            # Named, so the model can do what the system prompt asks about
-            # Palats per-article prices, but never as the component's cost.
-            cost_cell += f" (annonspris {comp['artikelpris_sek']:,.0f} per artikel, täckning okänd)"
+        cost_cell = _cost_cell(comp)
         component_table += (
             f"| {comp['name']} | {comp['valt_alternativ']} | "
             f"{comp['co2e_kg']:.0f} | {comp['baslinje_co2e_kg']:.0f} | "
@@ -205,6 +199,20 @@ def _building_group(component) -> str:
     return "Övrigt"
 
 
+def _cost_cell(comp: dict) -> str:
+    """The cost column in the table the model writes from."""
+    # A missing price is not zero kronor. Printing "0" in this column let
+    # the model write about a cost saving that came out of a data gap.
+    cell = "Pris saknas" if comp.get("pris_saknas") else f"{comp['kostnad_sek']:,.0f}"
+    if comp.get("pris_i_byggdelen") and not comp.get("kostnad_sek"):
+        cell = "Ingår i byggdelens pris"
+    if comp.get("pris_saknas") and comp.get("artikelpris_sek"):
+        # Named, so the model can do what the system prompt asks about
+        # Palats per-article prices, but never as the component's cost.
+        cell += f" (annonspris {comp['artikelpris_sek']:,.0f} per artikel, täckning okänd)"
+    return cell
+
+
 def build_heavy_summary(project: Project, aggregate) -> dict | None:
     """The chosen figures with the heaviest first, and per m² BTA (DECISIONS 22).
 
@@ -229,7 +237,9 @@ def build_heavy_summary(project: Project, aggregate) -> dict | None:
         label = _building_group(comp) if comp else "Övrigt"
         groups[label] = groups.get(label, 0.0) + c["co2e_kg"]
     area = project.area_bta if isinstance(project.area_bta, (int, float)) else 0
-    return {"total": total, "count": len(rows), "heavy": heavy, "heavy_share": running / total,
+    # All of them: a part kept at no figure is still one of the project's parts.
+    return {"total": total, "count": len(aggregate.components), "heavy": heavy,
+            "heavy_share": running / total,
             "groups": sorted(groups.items(), key=lambda kv: kv[1], reverse=True),
             "area": area if area and area > 0 else None,
             "baseline": aggregate.baseline_total_co2e_kg}

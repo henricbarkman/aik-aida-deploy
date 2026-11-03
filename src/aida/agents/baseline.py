@@ -60,7 +60,9 @@ def _validate_baseline(results: list[BaselineResult], components: list) -> list[
         # Validate price
         if r.cost_sek <= 0:
             r.cost_sek = 0
-            if "pris ej tillgängligt" not in r.description.lower():
+            # Not a missing price: a bundle's cost is in the part's installed one.
+            if not (comp and comp.recipe_bundle) and (
+                    "pris ej tillgängligt" not in r.description.lower()):
                 r.description = r.description.rstrip(". ") + ". Pris ej tillgängligt."
         else:
             price = check_total_price(
@@ -358,6 +360,7 @@ def _with_recipe_bundles(results: list[BaselineResult], project: Project) -> lis
         out.append(BaselineResult(
             component_id=comp.id, component_name=comp.name,
             co2e_kg=round(bundle.per_unit * comp.quantity, 1), cost_sek=0,
+            cost_source="Ingår i byggdelens installerade pris",
             description=bundle_text(bundle, comp.unit), source="Boverkets klimatdatabas",
             assumed_material=bundle.name, co2e_per_unit=bundle.per_unit, unit=comp.unit,
             quantity=comp.quantity, basis={"kind": "boverket", "label": "Recept"}))
@@ -391,6 +394,10 @@ def _price_baseline(results: list[BaselineResult], project: Project,
     )
 
     comp_map = {c.id: c for c in project.components}
+    # Every price is an installed one, material and work, so a window's price already
+    # holds its fitting and a tile's its adhesive. Priced again they count twice.
+    results = [r for r in results
+               if not (r.component_id in comp_map and comp_map[r.component_id].recipe_bundle)]
     # Asked in the unit the component is counted in, and a price that comes
     # back in another unit is neither used nor cached: SEK/st times 45 m2 is
     # not a cost (Fable audit 2026-07-19, P2 #9). The row then keeps the

@@ -122,6 +122,8 @@ Hittas inget pris gör Aida en uppskattning utan källa, och den märks som AI-u
 
 Återbruk prissätts med annonsens pris, inte med webbsökning.
 
+Tillbehör som följer med en byggdel, till exempel montage och foder till fönster eller fästmassa och fog till kakel, får inget eget pris. Det installerade priset för byggdelen omfattar dem redan, så tabellen säger att de ingår. Ett lager som står kvar kostar noll kronor, för inget köps och inget görs.
+
 ## Livslängd
 
 Aida räknar inte med livslängd. Alla klimattal avser produktskedet, en gång, oavsett hur länge produkten håller. Två golv med samma klimatpåverkan per m² ser därför lika bra ut även om det ena håller dubbelt så länge.

@@ -5250,6 +5250,7 @@ function formatSource(source, url) {
   if (!source) return '';
   if (source.startsWith('[EPD]')) return '<span class="source-badge source-verified">EPD</span>' + esc(source.replace('[EPD] ', ''));
   if (source.startsWith('[Palats]')) return '<span class="source-badge source-verified">Palats</span>' + palatsSourceLabel(source, url);
+  if (source === '[Bevara] lager') return 'Inget tillförs';
   if (source.startsWith('[Bevara]')) return '<span class="source-badge source-verified">BVK</span>Boverket, åtgång uppskattad';
   if (source.includes('Boverket')) return '<span class="source-badge source-verified">BVK</span>' + esc(source);
   // EPD-typvärde: median of upper-half EPDs by GWP per category — better
@@ -5893,10 +5894,10 @@ function co2Rollup(rows) {
 }
 
 function knownCostRollup(rows) {
-  const priced = rows.filter(c => c.cost_sek > 0);
+  const priced = rows.filter(c => c.cost_sek > 0 || costInPart(c.component_id));
   return {
     known: priced.reduce((s,c) => s + c.cost_sek, 0),
-    unpriced: rows.filter(c => !(c.cost_sek > 0)).map(c => c.component_name || c.name || ''),
+    unpriced: rows.filter(c => !(c.cost_sek > 0) && !costInPart(c.component_id)).map(c => c.component_name || c.name || ''),
     pricedCount: priced.length,
     total: rows.length,
   };
@@ -6000,7 +6001,8 @@ function baslinjeHtml(st, cfg) {
     const costCell = overrideEdit(
         (c.cost_sek > 0
           ? Math.round(c.cost_sek).toLocaleString('sv')
-          : '<span style="color:var(--kk-gray-500)">Pris saknas</span>'),
+          : (costInPart(c.component_id) ? inPartCell()
+            : '<span style="color:var(--kk-gray-500)">Pris saknas</span>')),
         c.component_id, 'baseline_cost', c.cost_override, cfg)
       + overrideBadge(c.cost_override);
     html += '<tr><td style="font-weight:500">' + esc(c.component_name) + materialLine + '</td><td style="text-align:right">' + co2eCell + '</td><td style="font-size:11px">' + formatSource(c.source) + productLine + basisLine(c) + '</td><td style="text-align:right">' + costCell + '</td><td style="font-size:11px">' + esc(c.cost_source || '') + '</td></tr>';
@@ -6323,11 +6325,21 @@ function priceBasisNote(alt) {
   return '';
 }
 
+// A recipe's accessories (DECISIONS 21): every price is an installed one, so their
+// cost is in the part they follow, not missing and not free.
+function inPartCell() { return '<span style="color:var(--kk-gray-500)">Ingår i byggdelens pris</span>'; }
+function costInPart(id) {
+  const comps = (typeof state !== 'undefined' && state.project && state.project.components) || [];
+  return comps.some(c => c.id === id && c.recipe_bundle);
+}
+
 function formatCost(alt) {
   // An EPD-verified alternative that could not be web-priced survives the B1
   // filter with cost_sek 0. Rendering that as "0 kr" read as free; Johanna
   // reported it as "pris visas inte för nyproducerade material".
-  if (alt.price_basis === 'none_needed') return '0 kr';
+  // A price someone entered goes before both of these.
+  if (!(alt.cost_sek > 0) && alt.price_basis === 'none_needed') return '0 kr';
+  if (!(alt.cost_sek > 0) && alt.price_basis === 'in_part') return inPartCell();
   if (!(alt.cost_sek > 0)) return '<span style="color:var(--kk-gray-500)">Pris saknas</span>';
   return Math.round(alt.cost_sek).toLocaleString('sv') + ' kr';
 }
@@ -6391,7 +6403,7 @@ function alternativHtml(st, cfg) {
       '<td style="text-align:right">' + Math.round(comp.baseline_co2e_kg) + overrideBadge(comp.baseline_co2e_override) + '</td>' +
       // An unpriced baseline is "Pris saknas" here too, not "0 kr": the summary
       // leaves it out of the cost comparison, and the row must not say otherwise.
-      '<td style="text-align:right">' + formatCost({cost_sek: comp.baseline_cost_sek}) + overrideBadge(comp.baseline_cost_override) + '</td>' +
+      '<td style="text-align:right">' + formatCost({cost_sek: comp.baseline_cost_sek, price_basis: costInPart(comp.component_id) ? 'in_part' : ''}) + overrideBadge(comp.baseline_cost_override) + '</td>' +
       '<td style="text-align:right;color:var(--kk-gray-500)">referens</td><td></td></tr>';
     html += alternativeQuestionRowHtml(comp);
     // By material type first (Henric, 2026-10-12): one row per type with the
@@ -6514,6 +6526,14 @@ function fullReportMarkdown(st) {
   return on ? st.reportMarkdown.trimEnd() + '\n\n' + lc.markdown : st.reportMarkdown;
 }
 
+// The section lands last in a report that scrolls in its own box: without this,
+// ticking the box looks like nothing happened.
+function showLifeCycleSection() {
+  if (!document.querySelectorAll) return;
+  const h = [...document.querySelectorAll('.report-area h2')].find(el => el.textContent.includes('Transport, byggplats'));
+  if (h && h.scrollIntoView) h.scrollIntoView({block: 'start'});
+}
+
 async function toggleLifeCycle(on) {
   const box = document.getElementById('lifeCycleBox');
   if (!on) {
@@ -6524,6 +6544,7 @@ async function toggleLifeCycle(on) {
   if (state.lifeCycle && state.lifeCycle.forReport === state.reportMarkdown && state.lifeCycle.markdown) {
     state.lifeCycle.on = true;
     renderRapportContent();
+    showLifeCycleSection();
     return;
   }
   if (box) box.disabled = true;
@@ -6546,6 +6567,7 @@ async function toggleLifeCycle(on) {
     }
     state.lifeCycle = {on: true, forReport: forReport, markdown: d.markdown};
     renderRapportContent();
+    showLifeCycleSection();
   } catch (e) {
     addMsg('Avsnittet gick inte att räkna: ' + e.message, 'system');
     if (box) { box.checked = false; box.disabled = false; }
@@ -7678,18 +7700,18 @@ function summaryTotals(allSels) {
   // Costs follow the same rule: "90000" is not a price, and summed it
   // concatenated.
   const priceOf = v => isFigure(v) && v > 0;
-  const hasCost = c => c.selected_alternative.price_basis === 'none_needed'
+  const hasCost = c => c.selected_alternative.price_basis === 'none_needed' || costInPart(c.id)
     || (priceOf(c.selected_alternative.cost_sek) && !(articlePrice(c.selected_alternative) > 0));
   const altPriced = sels.filter(hasCost);
   const unpriced = sels.filter(c => !hasCost(c)).map(c => c.name);
   const knownCost = altPriced.reduce((s,c) => s + c.selected_alternative.cost_sek, 0);
   // Same rule on the baseline side: a baseline component the model gave no
   // cost for is not a free component.
-  const blPriced = sels.filter(c => priceOf(c.baseline_cost_sek));
+  const blPriced = sels.filter(c => priceOf(c.baseline_cost_sek) || costInPart(c.id));
   const blCost = blPriced.reduce((s,c) => s + c.baseline_cost_sek, 0);
-  const blUnpriced = sels.filter(c => !priceOf(c.baseline_cost_sek)).map(c => c.name);
+  const blUnpriced = sels.filter(c => !priceOf(c.baseline_cost_sek) && !costInPart(c.id)).map(c => c.name);
   // The pairs a cost difference can be formed for.
-  const priced = altPriced.filter(c => priceOf(c.baseline_cost_sek));
+  const priced = altPriced.filter(c => priceOf(c.baseline_cost_sek) || costInPart(c.id));
   const comparableCost = priced.reduce((s,c) => s + c.selected_alternative.cost_sek, 0);
   const comparableBl = priced.reduce((s,c) => s + c.baseline_cost_sek, 0);
   return {
